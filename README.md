@@ -4,6 +4,32 @@ An independently developed online Bitcoin Core Node environment for ordinary amd
 
 **Current test release candidate: v0.1.0-rc.1.** [Release assets, ISO, checksums and source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.1). This is not an official Bitcoin Core or Debian release, nor an independently audited or independently reproducible ISO. Evaluate it on noncritical hardware with disposable wallets.
 
+## Screenshots
+
+Actual Bitcoin Core Node v0.1.0-rc.1 interface, captured at 1280 × 800 in a demonstration session. No personal wallets, credentials or funds are shown. Open an image to see it at full size.
+
+The Node capture is intentionally disconnected from the network. The optional Home backup shortcut is enabled.
+
+### Node Home
+
+![image: Node Home](docs/screenshots/home.png)
+
+The installed Node home. The optional Backup and Restore shortcut is enabled after customization.
+
+### Node Settings
+
+![image: Node Settings](docs/screenshots/settings.png)
+
+Network, devices, backups, optional login password and software updates.
+
+### Node Guide
+
+![image: Node Guide](docs/screenshots/guide.png)
+
+Built-in guidance for validation, watch-only wallets and PSBT workflows.
+
+[Capture details](docs/screenshots/CAPTURE.json) · [Website gallery](https://btcpavao.com/en/bitcoin-core/debian-images/#online-node)
+
 ## How to verify downloads
 
 Download the ISO, `SHA256SUMS`, `SHA256SUMS.asc`, and `btcpavao-pgp.asc` from the same release. Independently validate that the signing key's fingerprint belongs to this publisher:

@@ -1,0 +1,28 @@
+{
+  "product": "Bitcoin Core Node",
+  "release": "v0.1.0-rc.1",
+  "capture_date": "2026-11-09",
+  "iso_sha256": "5e64c8c5b3b9889104a0d160ac77c842d8d67446757704d52bf8c16e167cb059",
+  "session": "Isolated copy of the installed validation image from the published ISO; no network adapter",
+  "method": "Unaltered QEMU display capture; PNG originals. Website previews use lossless WebP.",
+  "images": [
+    {
+      "file": "home.png",
+      "sha256": "69804c156aa4baf6b13db71462b1e5dc12b1e1a7566de264774bd4daf685c3cf",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "file": "settings.png",
+      "sha256": "af76de88e12be83a11afa552bcbde1f6b017648f040ded09ffff262ed6fcd45c",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "file": "guide.png",
+      "sha256": "3a4150e92c3573d303bd2819697c112386d91e1be5d0ec1a254ccbdf07633901",
+      "width": 1280,
+      "height": 800
+    }
+  ]
+}
