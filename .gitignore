@@ -1,0 +1,4 @@
+node_modules/
+*.iso
+*.tar.gz
+SHA256SUMS.asc
