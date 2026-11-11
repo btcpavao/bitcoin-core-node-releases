@@ -2,7 +2,7 @@
 
 An independently developed online Bitcoin Core Node environment for ordinary amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
-**Current test release candidate: v0.1.0-rc.1.** [Release assets, ISO, checksums and source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.1). This is not an official Bitcoin Core or Debian release, nor an independently audited or independently reproducible ISO. Evaluate it on noncritical hardware with disposable wallets.
+**Current test release candidate: v0.1.0-rc.2.** [Release assets, ISO, checksums and source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2). This is not an official Bitcoin Core or Debian release, nor an independently audited or independently reproducible ISO. Evaluate it on noncritical hardware with disposable wallets.
 
 ## Screenshots
 
@@ -49,7 +49,11 @@ The key and signature arriving together do *not* independently prove identity; c
 
 This installed Linux node maintains a persistent blockchain, watch-only wallet data and configuration. Home includes Bitcoin Core, private RAM workspace, optional Home shortcut for Backup and Restore after Node customization, encryption/decryption tools, KeePassXC, Files, Editor and Node Guide. A RAM-only PSBT Transfer Folder supports USB transfer to an offline signer.
 
+The practical 19-chapter Guide explains receiving with a Vault-exported watch-only wallet, offline PSBT signing, pruning, device privacy, and recovery.
+
 Backup categories include blockchain/chainstate, public watch-only wallets, portable Core configuration and supported Node settings (Wi-Fi profiles, date/time and managed WireGuard). USB media are exposed in the file pickers with scoped write access when writable. Decryption output is recovered in RAM and Private Workspace opens after success. An optional desktop login password is not repeatedly requested for the built-in Node operations; it does not encrypt the disk.
+
+**Four Backup and Restore exports finish after copying and flushing, without a second read-back verification pass.** A saved backup is not a confirmed recoverable backup; restore checks remain enabled and periodic recovery tests are recommended.
 
 **Installation erases the selected target internal disk.** The installed Node is different from the stateless Vault; its private working folders, not its blockchain, are RAM-only. Keep wallet signing keys offline and practice backup restoration before using it with real funds.
 
@@ -60,6 +64,6 @@ Backup categories include blockchain/chainstate, public watch-only wallets, port
 - A Node/watch-only backup does not contain signing keys. An unencrypted network-settings backup may reveal saved credentials.
 - Full mainnet sync, hardware compatibility and every external disk adapter have not been tested in this exact public release.
 
-The release includes scoped test evidence, package inventory, build/source commit and a curated matching source archive. See [release notes](docs/RELEASE-v0.1.0-rc.1.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Project-local code does not yet have a specified blanket license; upstream packages retain their licenses.
+The release includes scoped test evidence, package inventory, build/source commit and a curated matching source archive. See [release notes](docs/RELEASE-v0.1.0-rc.2.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Project-local code does not yet have a specified blanket license; upstream packages retain their licenses.
 
 Website download guide: https://btcpavao.com/en/bitcoin-core/debian-images/
