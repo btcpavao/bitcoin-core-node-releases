@@ -1,7 +1,5 @@
 # Build and compare a Bitcoin Core Node ISO
 
-[Upute na hrvatskom](REBUILD.hr.md)
-
 This recipe builds a **new candidate** from the public source of v0.1.0-rc.2. The old RC2 image was made from an earlier image and records its hash in BUILD-INFO.json. Its original build did not lock every input. The signed RC2 checksum authenticates that historical download. The comparison below uses two candidates built from the same revision of this recipe.
 
 ## 1. Set up a build computer
