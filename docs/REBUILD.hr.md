@@ -23,6 +23,8 @@ Zapiši svih 40 znakova iz posljednjeg retka. To je **commit**, točna verzija r
 
 ## 2. Pogledaj sadržaj i izmjene
 
+[Pregledaj datoteke iz točnog izvora RC2](https://github.com/btcpavao/bitcoin-core-node-releases/tree/669e90f9768975924ae443225f23f78cb4a28ecf/source) · [Pregledaj 42 izmjene između izdanja RC1 i RC2](https://github.com/btcpavao/bitcoin-core-node-releases/compare/5f5770f7000d9d7fa05687279b21bf26e1293a86...669e90f9768975924ae443225f23f78cb4a28ecf)
+
 Neovisnim kanalom potvrdi cijeli otisak Pavaova javnog ključa. GitHub i dokument prenesen s istog GitHuba mogu prikazivati isti zamijenjeni ključ. Očekivani je otisak `787A 2AAF B0D1 19CA 0522 B2A5 B9C9 9AF8 5788 96D0`.
 
 ```bash

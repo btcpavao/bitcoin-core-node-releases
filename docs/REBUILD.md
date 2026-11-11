@@ -25,6 +25,8 @@ Write down the full 40-character value printed by the last command. It identifie
 
 ## 2. Verify and inspect the source before building
 
+[Browse the exact RC2 source files](https://github.com/btcpavao/bitcoin-core-node-releases/tree/669e90f9768975924ae443225f23f78cb4a28ecf/source) · [Review the 42 source changes from RC1 to RC2](https://github.com/btcpavao/bitcoin-core-node-releases/compare/5f5770f7000d9d7fa05687279b21bf26e1293a86...669e90f9768975924ae443225f23f78cb4a28ecf)
+
 Confirm the publisher's full OpenPGP fingerprint with Pavao through an independently known channel. The expected primary fingerprint is `787A 2AAF B0D1 19CA 0522 B2A5 B9C9 9AF8 5788 96D0`. View the fingerprint in the local key, then download the source.
 
 ```bash

@@ -21,7 +21,7 @@ index 4c82867..e9e3e5e 100644
          # Never execute an unverified download. AppImage extraction needs no FUSE.
          subprocess.run([str(image), '--appimage-extract'], cwd=staging, check=True,
 diff --git a/build-iso.sh b/build-iso.sh
-index 2963bf3..552d7e9 100755
+index 2963bf3..0e3ca15 100755
 --- a/build-iso.sh
 +++ b/build-iso.sh
 @@ -20,8 +20,12 @@ bash "$NODE_SOURCE/installer/build-greeter.sh"
@@ -51,7 +51,7 @@ index 2963bf3..552d7e9 100755
  # Checkout umask must not make shipped runtime files unreadable.
  find config/includes.chroot -type d -exec chmod 755 {} +
  find config/includes.chroot -type f -perm /u=x -exec chmod 755 {} +
-@@ -46,7 +55,14 @@ mkdir -p config/includes.chroot/opt/bitcoin-core
+@@ -46,7 +55,19 @@ mkdir -p config/includes.chroot/opt/bitcoin-core
  tar -xzf core.tar.gz -C config/includes.chroot/opt/bitcoin-core
  mv config/includes.chroot/opt/bitcoin-core/bitcoin-32.1 config/includes.chroot/opt/bitcoin-core/32.1
  python3 "$NODE_SOURCE/tools/install-keepassxc.py" --root "$PWD/config/includes.chroot" --version 2.8.0
@@ -61,6 +61,11 @@ index 2963bf3..552d7e9 100755
 +lb bootstrap
 +lb chroot
 +lb installer
++# live-build 20250505 always saves cache/bootstrap (even with --cache false).
++# If it finds that saved tree, its binary_rootfs step switches back into the
++# shipped root to install boot tools. Keep the build and runtime APT states
++# separate by using its full-copy path instead.
++rm -rf -- cache/bootstrap
 +lb binary_chroot
 +bash "$NODE_RECIPE/finalize-root.sh" "$PWD/chroot/chroot"
 +lb binary
@@ -146,6 +151,55 @@ index fed5afc..2b8035c 100644
  print('PASS Core 32.1 pins, native Guide, public file bridge and removal of custom import/export')
  
  
+diff --git a/tests/check_ownership.py b/tests/check_ownership.py
+index f4d9384..1aefa05 100644
+--- a/tests/check_ownership.py
++++ b/tests/check_ownership.py
+@@ -12,7 +12,11 @@ BASELINE=ROOT/'tests/node-critical-ownership-debian13.json'
+ def verify(squashfs):
+     p=Path(squashfs).resolve(strict=True)
+     expected=json.loads(BASELINE.read_text())['required']
+-    cmd=['unsquashfs','-lln',str(p),*sorted(expected)]
++    # The transfer workspace moved to protected tmpfs. A source-built image
++    # should contain the root-owned preparation unit and helper, without a
++    # persistent PSBT transfer directory left over from a remaster.
++    legacy='var/lib/bitcoin-core-node/transfer'
++    cmd=['unsquashfs','-lln',str(p),*sorted(expected),legacy]
+     result=subprocess.run(cmd,capture_output=True,text=True,timeout=90)
+     if result.returncode:
+         raise RuntimeError('SquashFS numeric ownership inspection failed: '+result.stderr[-500:])
+@@ -24,6 +28,8 @@ def verify(squashfs):
+             name=line.split('squashfs-root/',1)[1].split(' -> ')[0]
+             found[name]={'uid':int(m[2]),'gid':int(m[3]),'mode':m[1]}
+     bad=[(k,v,found.get(k)) for k,v in expected.items() if found.get(k)!=v]
++    if legacy in found:
++        raise RuntimeError('Unexpected persistent PSBT transfer directory in the freshly built ISO.')
+     if bad:raise RuntimeError('Node ownership/mode regression: '+repr(bad[:10]))
+     helper=found['usr/lib/dbus-1.0/dbus-daemon-launch-helper']
+     assert helper['mode']=='-rwsr-xr--',helper
+diff --git a/tests/node-critical-ownership-debian13.json b/tests/node-critical-ownership-debian13.json
+index 082801a..c792321 100644
+--- a/tests/node-critical-ownership-debian13.json
++++ b/tests/node-critical-ownership-debian13.json
+@@ -102,10 +102,15 @@
+       "gid": 987,
+       "mode": "drwx------"
+     },
+-    "var/lib/bitcoin-core-node/transfer": {
++    "usr/libexec/core-node-private-prepare": {
+       "uid": 0,
+-      "gid": 987,
+-      "mode": "drwxrws---"
++      "gid": 0,
++      "mode": "-rwxr-xr-x"
++    },
++    "etc/systemd/system/core-node-private.service": {
++      "uid": 0,
++      "gid": 0,
++      "mode": "-rw-r--r--"
+     },
+     "var/lib/lightdm": {
+       "uid": 102,
 diff --git a/tools/install-keepassxc.py b/tools/install-keepassxc.py
 index 92d9499..652bafe 100755
 --- a/tools/install-keepassxc.py
