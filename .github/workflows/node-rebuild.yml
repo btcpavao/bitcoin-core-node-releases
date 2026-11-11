@@ -6,6 +6,9 @@ on:
       - 'rebuild/**'
       - '.github/workflows/node-rebuild.yml'
       - 'btcpavao-pgp.asc'
+concurrency:
+  group: node-rebuild-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -20,6 +23,12 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - name: Make room for the Debian filesystems on the disposable runner
+        run: |
+          if [ "$(df --output=avail -BG / | tail -1 | tr -dc 0-9)" -lt 45 ]; then
+            sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          fi
+          df -h /
       - run: bash rebuild/node build "$RUNNER_TEMP/result"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

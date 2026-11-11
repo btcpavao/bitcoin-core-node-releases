@@ -21,10 +21,10 @@ index 4c82867..e9e3e5e 100644
          # Never execute an unverified download. AppImage extraction needs no FUSE.
          subprocess.run([str(image), '--appimage-extract'], cwd=staging, check=True,
 diff --git a/build-iso.sh b/build-iso.sh
-index 2963bf3..d81a56d 100755
+index 2963bf3..552d7e9 100755
 --- a/build-iso.sh
 +++ b/build-iso.sh
-@@ -20,8 +20,10 @@ bash "$NODE_SOURCE/installer/build-greeter.sh"
+@@ -20,8 +20,12 @@ bash "$NODE_SOURCE/installer/build-greeter.sh"
  mkdir "$NODE_SOURCE/build"
  cd "$NODE_SOURCE/build"
  lb config --mode debian --distribution trixie --architectures amd64 \
@@ -32,12 +32,14 @@ index 2963bf3..d81a56d 100755
 -    --mirror-chroot-security https://security.debian.org/debian-security \
 +    --mirror-bootstrap "$DEBIAN_SNAPSHOT" --mirror-chroot "$DEBIAN_SNAPSHOT" \
 +    --mirror-chroot-security "$SECURITY_SNAPSHOT" \
++    --mirror-binary "$DEBIAN_SNAPSHOT" --mirror-binary-security "$SECURITY_SNAPSHOT" \
++    --cache false \
 +    --apt-options '--yes -o Acquire::Retries=5 -o Acquire::Check-Valid-Until=false' \
 +    --debootstrap-options '--include=ca-certificates' \
      --binary-images iso-hybrid --bootloaders 'syslinux,grub-efi' \
      --debian-installer none --archive-areas 'main non-free-firmware' --firmware-chroot false --apt-recommends false \
      --bootappend-live 'boot=live components username=node-live hostname=bitcoin-core-node locales=en_US.UTF-8 keyboard-layouts=us quiet splash loglevel=3 systemd.show_status=false rd.systemd.show_status=false vt.global_cursor_default=0' \
-@@ -30,6 +32,13 @@ mkdir -p config/includes.chroot/usr/lib/bitcoin-core-node config/package-lists c
+@@ -30,6 +34,11 @@ mkdir -p config/includes.chroot/usr/lib/bitcoin-core-node config/package-lists c
  cp "$NODE_SOURCE/artifacts/calamares_3.3.14-1+corenode2_amd64.deb" config/packages.chroot/
  cp "$NODE_SOURCE/artifacts/lightdm-gtk-greeter_2.0.9-1+corenode1_amd64.deb" config/packages.chroot/
  cp -a "$NODE_SOURCE/runtime/." config/includes.chroot/
@@ -45,9 +47,7 @@ index 2963bf3..d81a56d 100755
 +# must obtain every package, including late build dependencies, from the snapshot.
 +mv config/includes.chroot/etc/apt/sources.list.d/core-node.sources \
 +   config/includes.chroot/etc/apt/sources.list.d/core-node.sources.runtime
-+# APT ignores this suffix. The chroot's final binary archives step installs
-+# the normal runtime mirror without the temporary historical expiry option.
-+
++# APT ignores this suffix. Only the completed runtime copy activates it.
  # Checkout umask must not make shipped runtime files unreadable.
  find config/includes.chroot -type d -exec chmod 755 {} +
  find config/includes.chroot -type f -perm /u=x -exec chmod 755 {} +

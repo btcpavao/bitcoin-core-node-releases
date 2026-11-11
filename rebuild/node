@@ -25,26 +25,8 @@ scratch=$(mktemp -d)
 staging=$(mktemp -d -- "$(dirname -- "$destination")/.node-rebuild.XXXXXXXX")
 cleanup() { rm -rf -- "$scratch" "$staging"; }
 trap cleanup EXIT
-archive="bitcoin-core-node-$NODE_VERSION-source.tar.gz"
-base="https://github.com/btcpavao/bitcoin-core-node-releases/releases/download/$NODE_VERSION"
-cd "$scratch"
-for file in "$archive" SHA256SUMS SHA256SUMS.asc SOURCE-COMMIT.txt; do
-    curl --fail --location --retry 3 --proto '=https' --proto-redir '=https' --output "$file" "$base/$file"
-done
-install -d -m 700 gnupg
-gpg --no-options --batch --homedir "$scratch/gnupg" --dearmor < "$recipe/../btcpavao-pgp.asc" > release.gpg
-gpg --no-options --batch --homedir "$scratch/gnupg" --no-default-keyring \
-    --keyring "$scratch/release.gpg" --no-auto-key-retrieve --status-fd 1 \
-    --verify SHA256SUMS.asc SHA256SUMS > status
-awk -v key="$RELEASE_KEY" '$1 == "[GNUPG:]" && $2 == "VALIDSIG" && $NF == key {valid=1} END {exit !valid}' status
-grep -Fx "$SOURCE_DIGEST  $archive" SHA256SUMS >/dev/null
-# Check every required input explicitly. Missing files are errors.
-awk -v src="$archive" '$2 == src || $2 == "SOURCE-COMMIT.txt"' SHA256SUMS > required
-test "$(wc -l < required)" = 2
-sha256sum --check --strict required
-test "$(cat SOURCE-COMMIT.txt)" = "$SOURCE_COMMIT"
-mkdir "$scratch/source"
-tar -xzf "$archive" --no-same-owner --strip-components=1 -C "$scratch/source"
+source "$recipe/fetch-release.sh"
+fetch_release "$NODE_VERSION" "$scratch" "$SOURCE_DIGEST" "$SOURCE_COMMIT"
 (cd "$scratch/source" && patch --forward --batch --fuzz=0 -p1 < "$recipe/node.patch")
 if [[ $operation == source ]]; then
     cp -a "$scratch/source/." "$staging/"

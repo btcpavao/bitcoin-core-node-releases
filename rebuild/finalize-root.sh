@@ -36,3 +36,7 @@ for name in ('shadow', 'shadow-'):
             rows.append(':'.join(row))
         path.write_text('\n'.join(rows) + '\n')
 PY
+# Keep sidecar data outside the ISO so a discrepancy can be localized even
+# if an offline builder chooses to share only these hashes.
+(cd "$target" && find . -xdev -type f -print0 | LC_ALL=C sort -z | xargs -0r sha256sum) \
+    | gzip -n > /out/root-files.sha256.gz

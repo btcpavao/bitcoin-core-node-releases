@@ -40,6 +40,15 @@ The command uses an isolated keyring, checks the signature and the expected sign
 | Software installed and its source checks | `../node-source/packages.list`, `../node-source/build-iso.sh`, `../node-source/provenance/` |
 | Desktop, services, permissions, network and installer | `../node-source/app/`, `../node-source/runtime/`, `../node-source/installer/` |
 
+To see each source change from the older RC1 release to RC2, create a patch file. This helper checks each release's own signature and archive checksum before comparing the two extracted trees. The file is ordinary text. Search for a filename, or let an LLM explain a small section and confirm its explanation against the code.
+
+```bash
+bash rebuild/release-diff > ../node-rc1-to-rc2.diff
+less ../node-rc1-to-rc2.diff
+```
+
+Press `q` to leave the viewer. The historical comparison above covers changes between releases. The next candidate additionally applies the changes in `rebuild/node.patch`.
+
 For a quick check that the guide and transfer-folder settings refer to the intended source files, run the included test.
 
 ```bash
@@ -59,7 +68,7 @@ sudo cat ../node-result/SHA256SUMS
 
 The output directory must be new. The command fetches the authenticated source again so a local edit made during inspection cannot silently affect a build. It starts with a pinned amd64 Debian image, checks signed package metadata at a dated Debian snapshot, compiles the local installer and login greeter, verifies the pinned Bitcoin Core download, checks the KeePassXC bytes and upstream signature, then builds and checks the bootable ISO. Runtime package updates use the ordinary Debian repositories.
 
-The result includes the complete `bitcoin-core-node-candidate-amd64.iso`, its SHA-256, the package lists and individual hashes of files in the ISO staging directory. The latter hashes help locate differences. The final ISO hash includes the boot records and filesystem packaging as well.
+The result includes the complete `bitcoin-core-node-candidate-amd64.iso`, its SHA-256, the package lists and individual hashes of files in the ISO staging directory. The compressed `root-files.sha256.gz` lists file hashes inside the Debian payload. The latter hashes help locate differences. The final ISO hash includes the boot records and filesystem packaging as well.
 
 ## 4. Compare on a second machine
 
