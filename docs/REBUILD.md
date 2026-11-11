@@ -2,6 +2,10 @@
 
 This recipe builds a **new candidate** from the public source of v0.1.0-rc.2. The old RC2 image was made from an earlier image and records its hash in BUILD-INFO.json. Its original build did not lock every input. The signed RC2 checksum authenticates that historical download. The comparison below uses two candidates built from the same revision of this recipe.
 
+[Download the comparison ISO and complete project source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [View both build jobs and their byte comparison](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147)
+
+The publicly compared candidate is `rebuild-e6519d7e5e95`. Both GitHub-hosted machines produced an ISO of 1,284,276,224 bytes with SHA-256 `8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6`. The commands below select the exact revision. A rebuild on your own machine supplies a check outside GitHub.
+
 ## 1. Set up a build computer
 
 Use a fresh 64-bit Intel/AMD Debian 13 virtual machine with internet access and a user with sudo access. As an initial allocation, allow 4 CPU cores, 8 GB RAM and 50 GB of free VM disk. Downloading Debian and compiling the installer can take hours. Keep wallets and other personal files outside this VM. The Debian image builder uses a privileged Docker container for mounting filesystems.
@@ -14,8 +18,8 @@ sudo apt-get install -y ca-certificates curl docker.io git gnupg patch
 sudo systemctl start docker
 git clone https://github.com/btcpavao/bitcoin-core-node-releases.git
 cd bitcoin-core-node-releases
-git fetch origin reproducible-builds
-git switch --detach FETCH_HEAD
+git fetch --tags origin
+git switch --detach e6519d7e5e956aa62512294389a9db2cd0a60a96
 git rev-parse HEAD
 ```
 
@@ -87,3 +91,16 @@ sudo bash rebuild/node compare \
 The GitHub Actions workflow **Rebuild and compare Node** builds the same recipe on two fresh GitHub-hosted runners. The **compare** job downloads both artifacts and compares the full files. A successful run makes both candidate ISOs and their evidence available as short-lived Actions artifacts. To corroborate a result independently of GitHub, publish your own commit ID, build date, output filename, file size, SHA-256 and signature or other attributable statement. A public release should bind that exact tested ISO hash and recipe commit in its signed release manifest.
 
 [Build workflow and run history](https://github.com/btcpavao/bitcoin-core-node-releases/actions/workflows/node-rebuild.yml) · [Historical RC2 checksum, source archive and build record](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2)
+
+## Compare your result to the public ISO
+
+Stay in the cloned repository directory. This downloads the exact candidate from its own public release, checks its recorded hash, and compares all bytes to your local result. Set aside about 1.3 GB for this additional download.
+
+```bash
+curl -fL --retry 3 -o ../bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso \
+  https://github.com/btcpavao/bitcoin-core-node-releases/releases/download/rebuild-e6519d7e5e95/bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso
+echo '8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6  ../bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso' | sha256sum -c -
+sudo bash rebuild/node compare \
+  ../node-result/bitcoin-core-node-candidate-amd64.iso \
+  ../bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso
+```
