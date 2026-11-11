@@ -1,0 +1,45 @@
+name: Rebuild and compare Node
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'rebuild/**'
+      - '.github/workflows/node-rebuild.yml'
+      - 'btcpavao-pgp.asc'
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        builder: [one, two]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: bash rebuild/node build "$RUNNER_TEMP/result"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: node-${{ matrix.builder }}
+          path: ${{ runner.temp }}/result/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+  compare:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: node-*
+          path: results
+      - name: Compare both complete ISOs
+        run: |
+          bash rebuild/node compare results/node-one/bitcoin-core-node-candidate-amd64.iso results/node-two/bitcoin-core-node-candidate-amd64.iso
+          cat results/node-one/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
