@@ -1,0 +1,46 @@
+name: Inspect Node rebuild differences
+on:
+  push:
+    branches: [inspect-rebuild-43011051850]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 43011051850
+          path: results
+          pattern: node-*
+      - name: Compare package, image and file evidence
+        run: python3 diagnosis/collect.py
+      - name: Inspect the finished boot images without starting them
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xorriso squashfs-tools cpio initramfs-tools-core
+          for worker in one two; do
+            mkdir -p "tmp/$worker"
+            file="results/node-$worker/bitcoin-core-node-candidate-amd64.iso"
+            xorriso -osirrox on -indev "$file" -extract /live/filesystem.squashfs "tmp/$worker/fs.sq" -extract /live/initrd.img "tmp/$worker/initrd" -extract /boot/grub/efi.img "tmp/$worker/efi" -end > /dev/null
+            unsquashfs -lln -UTC "tmp/$worker/fs.sq" > "evidence/$worker.squash-meta"
+            unmkinitramfs "tmp/$worker/initrd" "tmp/$worker/initramfs"
+            (cd "tmp/$worker/initramfs" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "evidence/$worker.initrd-files"
+            xorriso -indev "$file" -pvd_info -report_system_area plain -report_el_torito plain > "evidence/$worker.header" 2>&1
+          done
+          diff -u evidence/{one,two}.squash-meta > evidence/squash-meta.diff || test $? -eq 1
+          diff -u evidence/{one,two}.initrd-files > evidence/initrd.diff || test $? -eq 1
+          diff -u evidence/{one,two}.header > evidence/headers.diff || test $? -eq 1
+          head -100 evidence/{squash-meta.diff,initrd.diff,headers.diff}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: evidence
+          path: evidence
+          retention-days: 3
