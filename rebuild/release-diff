@@ -1,0 +1,19 @@
+#!/bin/bash
+# Show the exact source changes between the two published historical candidates.
+# This command does not build or execute either archive.
+set -euo pipefail
+recipe=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+source "$recipe/inputs.env"
+review=$(mktemp -d)
+trap 'rm -rf -- "$review"' EXIT
+source "$recipe/fetch-release.sh"
+mkdir "$review/v0.1.0-rc.1" "$review/$NODE_VERSION"
+fetch_release v0.1.0-rc.1 "$review/v0.1.0-rc.1" \
+    319cc7ab7164c56d17bedba0b355405a657f0f3ff5b2be782ce200a8f23396a7 \
+    9f99f2b7084f4adb6d799f97e633d995e91dc767
+fetch_release "$NODE_VERSION" "$review/$NODE_VERSION" "$SOURCE_DIGEST" "$SOURCE_COMMIT"
+cd "$review"
+# git uses 1 for "differences were found". A command failure remains an error.
+status=0
+git diff --no-index --no-ext-diff --no-textconv -- v0.1.0-rc.1/source v0.1.0-rc.2/source || status=$?
+[[ $status == 0 || $status == 1 ]]

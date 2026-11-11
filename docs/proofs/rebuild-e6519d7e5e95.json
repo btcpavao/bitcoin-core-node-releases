@@ -1,0 +1,60 @@
+{
+  "recipe_commit": "e6519d7e5e956aa62512294389a9db2cd0a60a96",
+  "assembly_tested_commit": "e6519d7e5e956aa62512294389a9db2cd0a60a96",
+  "rebuild_git_tree": "0e97897f86f446670e117c16ac516a7fff25f491",
+  "additional_pair": {
+    "commit": "294cccd7f1d69ab216bb34d116dd0fac15517906",
+    "run_id": "43014184996",
+    "sha256": "8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6",
+    "comparison": "A second successful pair of fresh runners and a cross-run full-ISO cmp; only documentation changed between pairs.",
+    "jobs": [
+      {
+        "name": "build (one)",
+        "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43014184996/job/130501022830",
+        "result": "success"
+      },
+      {
+        "name": "build (two)",
+        "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43014184996/job/130501023218",
+        "result": "success"
+      },
+      {
+        "name": "compare",
+        "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43014184996/job/130512018028",
+        "result": "success"
+      }
+    ]
+  },
+  "base_source_commit": "0d43a61e82ab1a0ee86a0b916d1215f31f4502e3",
+  "base_source_archive_sha256": "268df99956cc450b514dc2af3bd2e6c855271ec08b1cf91eb13147325d702bf9",
+  "builder_image": "debian@sha256:bfc36aecdece0387418759dba474aa856c026ca8087da3606b41b90ab0509c99",
+  "debian_snapshot": "https://snapshot.debian.org/archive/debian/20261104T000000Z",
+  "security_snapshot": "https://snapshot.debian.org/archive/debian-security/20261104T000000Z",
+  "source_date_epoch": 1793750400,
+  "iso": "bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso",
+  "bytes": 1284276224,
+  "sha256": "8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6",
+  "per_builder_sha256": {
+    "one": "8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6",
+    "two": "8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6"
+  },
+  "workflow_run_id": "43015398147",
+  "comparison": "cmp on both complete ISO files on two fresh GitHub-hosted runners",
+  "jobs": [
+    {
+      "name": "build (one)",
+      "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147/job/130505067921",
+      "result": "success"
+    },
+    {
+      "name": "build (two)",
+      "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147/job/130505068239",
+      "result": "success"
+    },
+    {
+      "name": "compare",
+      "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147/job/130513786522",
+      "result": "success"
+    }
+  ]
+}

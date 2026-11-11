@@ -1,0 +1,48 @@
+#!/bin/bash
+set -euo pipefail
+umask 022
+recipe=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+source "$recipe/inputs.env"
+usage() {
+    echo 'Usage: bash rebuild/node source NEW_DIRECTORY | build NEW_DIRECTORY | compare ISO_A ISO_B' >&2
+    exit 2
+}
+[[ $# -ge 2 ]] || usage
+operation=$1
+if [[ $operation == compare ]]; then
+    [[ $# == 3 && -s $2 && -s $3 && -f $2 && -f $3 ]] || usage
+    sha256sum -- "$2" "$3"
+    cmp -- "$2" "$3"
+    echo 'MATCH: every byte of the two ISO files is identical.'
+    exit
+fi
+[[ $# == 2 && ( $operation == source || $operation == build ) ]] || usage
+destination=$(realpath -m -- "$2")
+[[ ! -e $destination && ! -L $destination && -d $(dirname -- "$destination") ]] || {
+    echo 'Choose a new directory inside an existing parent folder.' >&2; exit 1;
+}
+scratch=$(mktemp -d)
+staging=$(mktemp -d -- "$(dirname -- "$destination")/.node-rebuild.XXXXXXXX")
+cleanup() { rm -rf -- "$scratch" "$staging"; }
+trap cleanup EXIT
+source "$recipe/fetch-release.sh"
+fetch_release "$NODE_VERSION" "$scratch" "$SOURCE_DIGEST" "$SOURCE_COMMIT"
+(cd "$scratch/source" && patch --forward --batch --fuzz=0 -p1 < "$recipe/node.patch")
+if [[ $operation == source ]]; then
+    cp -a "$scratch/source/." "$staging/"
+else
+    command -v docker >/dev/null || { echo 'Docker Engine is required in the disposable build VM.' >&2; exit 1; }
+    # Stable paths, hostname and architecture inside each new container. No
+    # signing keys, disks, personal home directories or Docker socket are mounted.
+    docker run --rm --privileged --platform linux/amd64 --hostname node-builder \
+        --mount "type=bind,source=$scratch/source,target=/inputs,readonly" \
+        --mount "type=bind,source=$recipe,target=/recipe,readonly" \
+        --mount "type=bind,source=/etc/ssl/certs/ca-certificates.crt,target=/host-ca.pem,readonly" \
+        --mount "type=bind,source=$staging,target=/out" \
+        "$BUILDER_IMAGE" bash /recipe/builder.sh
+    (cd "$staging" && sha256sum --strict --check SHA256SUMS)
+fi
+# Publish a complete result only; concurrent runs cannot replace one another.
+mv --no-target-directory --no-clobber -- "$staging" "$destination"
+[[ ! -d $staging ]] || { echo 'Another run created the destination first.' >&2; exit 1; }
+printf 'Complete: %s\n' "$destination"

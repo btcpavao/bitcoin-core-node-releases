@@ -1,5 +1,7 @@
 # Bitcoin Core Node — Debian image releases
 
+**Rebuild candidate `rebuild-e6519d7e5e95`.** [Download the candidate ISO and complete source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [Build it yourself (English)](docs/REBUILD.md) · [Recorded ISO hash and both build jobs](docs/proofs/rebuild-e6519d7e5e95.json).
+
 An independently developed online Bitcoin Core Node environment for ordinary amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
 **Current test release candidate: v0.1.0-rc.2.** [Release assets, ISO, checksums and source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2). This is not an official Bitcoin Core or Debian release, nor an independently audited or independently reproducible ISO. Evaluate it on noncritical hardware with disposable wallets.
@@ -59,7 +61,7 @@ Backup categories include blockchain/chainstate, public watch-only wallets, port
 
 ## Limitations
 
-- Independent security audit and bit-for-bit reproducible independent build are not established.
+- The historical RC2 has no demonstrated bit-for-bit rebuild. Two fresh GitHub-hosted workers produced byte-identical rebuild candidates. [Run details](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147). A security audit and a third-party rebuild on separately administered infrastructure are distinct checks.
 - Apple Silicon/M-series Macs are not supported. Secure Boot, Intel Macs with T2 and certain Broadcom Wi-Fi cards are not certified.
 - A Node/watch-only backup does not contain signing keys. An unencrypted network-settings backup may reveal saved credentials.
 - Full mainnet sync, hardware compatibility and every external disk adapter have not been tested in this exact public release.
