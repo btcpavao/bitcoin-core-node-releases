@@ -1,5 +1,7 @@
 # Bitcoin Core Node — Debian image releases
 
+[Build a Node ISO from public source and compare two independent builds](docs/REBUILD.md). The candidate recipe has its own output and verification instructions.
+
 An independently developed online Bitcoin Core Node environment for ordinary amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
 **Current test release candidate: v0.1.0-rc.2.** [Release assets, ISO, checksums and source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2). This is not an official Bitcoin Core or Debian release, nor an independently audited or independently reproducible ISO. Evaluate it on noncritical hardware with disposable wallets.
