@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+"""Thunar custom action: only scoped, confirmed Bitcoin Core wallet deletion."""
+import os
+import sys
+if os.geteuid()==0:
+    raise SystemExit('Open the context menu from the normal Node desktop.')
+sys.path.insert(0,'/usr/lib/bitcoin-core-node')
+from wallet_delete_ui import main
+raise SystemExit(main())

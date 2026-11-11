@@ -1,0 +1,24 @@
+[Unit]
+Description=Read-only desktop view of Bitcoin Core data
+ConditionPathExists=/etc/bitcoin-core-node/installed
+After=systemd-tmpfiles-setup.service systemd-modules-load.service
+Before=lightdm.service
+RequiresMountsFor=/var/lib/bitcoin-core-node/data
+
+[Service]
+Type=exec
+RuntimeDirectory=core-node-files
+RuntimeDirectoryMode=0755
+ExecStartPre=/usr/libexec/core-node-files-prepare
+ExecStart=/usr/bin/bindfs -f -r --force-user=node --force-group=node --perms=0000:u=rD -o nodev,nosuid,noexec,default_permissions,subtype=bindfs,fsname=/var/lib/bitcoin-core-node/data /var/lib/bitcoin-core-node/data /run/core-node-files/Core
+ExecStartPost=/usr/libexec/core-node-files-ready
+ExecStop=/usr/bin/fusermount3 -u -z /run/core-node-files/Core
+TimeoutStopSec=10
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETUID CAP_SETGID
+RestrictAddressFamilies=AF_UNIX
+# This view must join the desktop's mount namespace. Filesystem sandboxing here
+# would make an otherwise successful mount invisible to the desktop.
+
+[Install]
+WantedBy=multi-user.target

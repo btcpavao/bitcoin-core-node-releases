@@ -1,0 +1,15 @@
+#!/usr/bin/python3
+"""Prepare only the fixed view target; Core's own files and modes are untouched."""
+import os
+from pathlib import Path
+import sys
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from state import load_setup, verify_data_mount
+
+if os.geteuid() != 0 or not Path('/etc/bitcoin-core-node/installed').is_file():
+    raise SystemExit('The Core files view requires the installed system context.')
+verify_data_mount(load_setup())
+target = Path('/run/core-node-files/Core')
+if target.is_symlink() or (target.exists() and not target.is_dir()):
+    raise SystemExit('Unexpected Core files view target.')
+target.mkdir(mode=0o755, exist_ok=True)

@@ -1,0 +1,19 @@
+[Unit]
+Description=Verify Bitcoin Core Node network policy before daemon startup
+After=network-online.target nftables.service
+Wants=network-online.target
+BindsTo=nftables.service
+Before=bitcoin-core-node.service
+ConditionPathExists=/etc/bitcoin-core-node/setup.json
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+RuntimeDirectory=bitcoin-core-node-policy
+RuntimeDirectoryMode=0755
+ExecStart=/usr/libexec/core-node-network apply
+ExecStop=/usr/libexec/core-node-network invalidate
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

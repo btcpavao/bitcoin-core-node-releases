@@ -1,0 +1,12 @@
+[Unit]
+Description=Install Debian and verified KeePassXC updates
+ConditionPathExists=/etc/bitcoin-core-node/installed
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/systemd-inhibit --what=shutdown:sleep --mode=block --who=Software\x20Updates --why=Installing\x20system\x20updates /usr/libexec/core-node-software-updates install
+TimeoutStartSec=infinity
+TimeoutStopSec=infinity
+KillMode=mixed
+UMask=0022

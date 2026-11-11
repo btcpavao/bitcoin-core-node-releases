@@ -1,0 +1,35 @@
+#!/usr/bin/python3
+"""Make deliberately shared public transfer files readable by Node and Core."""
+import os
+from pathlib import Path
+import pwd
+import grp
+import stat
+
+TRANSFER=Path('/run/core-node-private/psbt')
+
+def share(directory=TRANSFER, *, owners=None, group=None):
+    if owners is None:
+        owners={pwd.getpwnam(name).pw_uid for name in ('node','bitcoinnode')}
+    if group is None: group=grp.getgrnam('bitcoin-rpc').gr_gid
+    folder=os.open(directory,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        for name in os.listdir(folder):
+            try:
+                fd=os.open(name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK,dir_fd=folder)
+            except OSError: continue
+            try:
+                info=os.fstat(fd)
+                if (not stat.S_ISREG(info.st_mode) or info.st_nlink!=1
+                        or info.st_uid not in owners or info.st_gid!=group):
+                    continue
+                desired=stat.S_IMODE(info.st_mode)|0o060
+                if desired!=stat.S_IMODE(info.st_mode): os.fchmod(fd,desired)
+            finally: os.close(fd)
+    finally: os.close(folder)
+
+if __name__=='__main__':
+    if os.geteuid()!=0: raise SystemExit('Public transfer permission service requires its fixed system context.')
+    share()
+    private=Path('/run/core-node-private/workspace')
+    if private.is_dir(): share(private)

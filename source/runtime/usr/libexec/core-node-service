@@ -1,0 +1,20 @@
+#!/usr/bin/python3
+"""Fixed Core service controls for the signed-in local Node session."""
+import os
+import sys
+
+
+def main():
+    if os.geteuid() != 0 or len(sys.argv) != 2 or sys.argv[1] not in ('start', 'stop', 'restart'):
+        raise RuntimeError('Unsupported Core service operation.')
+    # Keep the existing service, session binding, maintenance lock and update
+    # inhibitor. Never accept a unit name, command, executable or extra option.
+    os.execv('/usr/libexec/core-node-admin', ['core-node-admin', sys.argv[1]])
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception:
+        print('The Core service operation could not be started.', file=sys.stderr)
+        sys.exit(1)

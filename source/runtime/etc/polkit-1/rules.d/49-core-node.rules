@@ -1,0 +1,18 @@
+// Login authenticates the local Node desktop once. Routine Node operations
+// are authorized for that session without asking for the login password again.
+// Exact actions/helpers only: never generic pkexec, a shell, or arbitrary sudo.
+polkit.addRule(function(action, subject) {
+    var helpers = {
+        "org.bitcoin-core-node.admin": "/usr/libexec/core-node-admin",
+        "org.bitcoin-core-node.login": "/usr/libexec/core-node-login",
+        "org.bitcoin-core-node.power": "/usr/libexec/core-node-power",
+        "org.bitcoin-core-node.service": "/usr/libexec/core-node-service"
+    };
+    if (!Object.prototype.hasOwnProperty.call(helpers, action.id)) return;
+    if (subject.user !== "node" || subject.local !== true ||
+        subject.active !== true || action.lookup("user") !== "root" ||
+        action.lookup("program") !== helpers[action.id]) return polkit.Result.NO;
+    // Fixed root-owned helpers still validate every request and serialize
+    // conflicting work. Login mode does not grant or revoke these actions.
+    return polkit.Result.YES;
+});

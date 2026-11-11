@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "theme": "elementary-xfce-hidpi",
+  "package": "elementary-xfce-icon-theme",
+  "version": "0.21-1",
+  "source_directory": "/usr/share/icons/elementary-xfce-hidpi/actions/48",
+  "render_size": 44,
+  "license": "GPL-3.0-or-later",
+  "files": {
+    "icons/system-reboot.svg": "adb5fcda8ef29b73de9e24481c1f439a92c29c8fa5952ae1a5c225f8a86da1df",
+    "icons/system-shutdown.svg": "6591117fa3fa622a1214f7fca180e39b138aeffca11cbef4913b5bfa0ba95144",
+    "licenses/elementary-xfce/copyright": "0d8480ec725c5e7817126e09aced20c5854586b1a783156e78278e060109f1f5",
+    "licenses/elementary-xfce/GPL-3.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "licenses/elementary-xfce/NOTICE.txt": "94b42ddf794bcd1ae8034ee22621b5b2e7600a5953a23ad0cee1a4291956b4a5"
+  }
+}

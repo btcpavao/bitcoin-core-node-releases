@@ -1,0 +1,10 @@
+#!/usr/bin/python3
+import sys
+import os
+from pathlib import Path
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+if not Path('/etc/bitcoin-core-node/installed').is_file():
+    os.execv('/usr/local/bin/core-node-installer-session', ['core-node-installer-session'])
+else:
+    from ui import main
+    main()

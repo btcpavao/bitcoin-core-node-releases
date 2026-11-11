@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "version": "20261103-vault-icons1",
+  "fix": "Original vectors rasterized as RGBA using librsvg instead of old ImageMagick gradient renderer",
+  "renderer": "Debian librsvg2-bin 2.60.0+dfsg-1+deb13u1: rsvg-convert -w 192 -h 192",
+  "upstream": "elementary-xfce-hidpi 0.21-1, power icons byte-identical to Bitcoin Core Vault",
+  "license": "GPL-3.0-or-later, bundled elementary-Xfce notices retained",
+  "files": {
+    "network-status": {
+      "source_svg_sha256": "3b4fe1ee5ed57b59d99ce8b1c370332cdcc579b9ab663fb3f35dcf84ea8e33dc",
+      "rendered_png_sha256": "32d9ef31bf703d83ed39445170eff9b4a6cdc8210e400ae3a604eb25dc742e61",
+      "width": 192,
+      "height": 192
+    },
+    "system-reboot": {
+      "source_svg_sha256": "adb5fcda8ef29b73de9e24481c1f439a92c29c8fa5952ae1a5c225f8a86da1df",
+      "rendered_png_sha256": "fd3bb0a2a764458d0b1e82b40ab92bd02565ea96e5819eebd1a52980e17057a7",
+      "width": 192,
+      "height": 192
+    },
+    "system-shutdown": {
+      "source_svg_sha256": "6591117fa3fa622a1214f7fca180e39b138aeffca11cbef4913b5bfa0ba95144",
+      "rendered_png_sha256": "c405b4e52cc5cfa2bb59e874263060797665ee6bbb6752e7f72cf24fc4d45ac0",
+      "width": 192,
+      "height": 192
+    }
+  }
+}

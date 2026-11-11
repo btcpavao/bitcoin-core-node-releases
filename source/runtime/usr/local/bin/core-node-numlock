@@ -1,0 +1,77 @@
+#!/usr/bin/python3
+"""Enable Num Lock once on the current X11 session, without key injection."""
+import ctypes as C
+import os
+import signal
+import sys
+
+XKB_CORE_KEYBOARD = 0x0100
+NUM_LOCK = 0xff7f
+
+
+class State(C.Structure):
+    # XkbStateRec from X11/extensions/XKBstr.h (libX11's public ABI).
+    _fields_ = [('group', C.c_ubyte), ('locked_group', C.c_ubyte),
+                ('base_group', C.c_ushort), ('latched_group', C.c_ushort),
+                ('mods', C.c_ubyte), ('base_mods', C.c_ubyte),
+                ('latched_mods', C.c_ubyte), ('locked_mods', C.c_ubyte),
+                ('compat_state', C.c_ubyte), ('grab_mods', C.c_ubyte),
+                ('compat_grab_mods', C.c_ubyte), ('lookup_mods', C.c_ubyte),
+                ('compat_lookup_mods', C.c_ubyte), ('ptr_buttons', C.c_ushort)]
+
+
+class Keyboard:
+    def __init__(self):
+        if not os.environ.get('DISPLAY'):
+            raise RuntimeError('The X11 session is unavailable.')
+        self.x = C.CDLL('libX11.so.6')
+        signatures = {
+            'XOpenDisplay': (C.c_void_p, [C.c_char_p]),
+            'XCloseDisplay': (C.c_int, [C.c_void_p]),
+            'XSync': (C.c_int, [C.c_void_p, C.c_int]),
+            'XkbKeysymToModifiers': (C.c_uint, [C.c_void_p, C.c_ulong]),
+            'XkbLockModifiers': (C.c_int, [C.c_void_p, C.c_uint, C.c_uint, C.c_uint]),
+            'XkbGetState': (C.c_int, [C.c_void_p, C.c_uint, C.POINTER(State)]),
+        }
+        for name, (result, arguments) in signatures.items():
+            function = getattr(self.x, name)
+            function.restype, function.argtypes = result, arguments
+        self.display = self.x.XOpenDisplay(None)
+        if not self.display:
+            raise RuntimeError('The X11 session is unavailable.')
+
+    def state(self):
+        result = State()
+        if self.x.XkbGetState(self.display, XKB_CORE_KEYBOARD, C.byref(result)) != 0:
+            raise RuntimeError('XKB keyboard state is unavailable.')
+        return result
+
+    def close(self):
+        self.x.XCloseDisplay(self.display)
+
+
+def enable():
+    keyboard = Keyboard()
+    try:
+        mask = keyboard.x.XkbKeysymToModifiers(keyboard.display, NUM_LOCK)
+        if not mask:
+            raise RuntimeError('The keyboard has no Num Lock modifier mapping.')
+        if not keyboard.x.XkbLockModifiers(keyboard.display, XKB_CORE_KEYBOARD, mask, mask):
+            raise RuntimeError('The Num Lock request was unavailable.')
+        keyboard.x.XSync(keyboard.display, 0)
+        if keyboard.state().locked_mods & mask != mask:
+            raise RuntimeError('Num Lock could not be enabled.')
+    finally:
+        keyboard.close()
+    print('Num Lock enabled for this X11 session.')
+
+
+if __name__ == '__main__':
+    # A stalled X server must not hold up login or the installer.
+    signal.signal(signal.SIGALRM, signal.SIG_DFL)
+    signal.alarm(3)
+    try:
+        enable()
+    except (OSError, AttributeError, RuntimeError) as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)

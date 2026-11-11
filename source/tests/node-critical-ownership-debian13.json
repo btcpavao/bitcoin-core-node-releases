@@ -1,0 +1,371 @@
+{
+  "schema": 1,
+  "baseline_iso_sha256": "974bf27da2b40fcc22eb7440a6cfc49337403b6b6b02a8fb34005c36f02cf787",
+  "required": {
+    "etc/gshadow": {
+      "uid": 0,
+      "gid": 42,
+      "mode": "-rw-r-----"
+    },
+    "etc/gshadow-": {
+      "uid": 0,
+      "gid": 42,
+      "mode": "-rw-r-----"
+    },
+    "etc/polkit-1/rules.d": {
+      "uid": 0,
+      "gid": 988,
+      "mode": "drwxrwxr-x"
+    },
+    "etc/shadow": {
+      "uid": 0,
+      "gid": 42,
+      "mode": "-rw-r-----"
+    },
+    "etc/shadow-": {
+      "uid": 0,
+      "gid": 42,
+      "mode": "-rw-r-----"
+    },
+    "run/systemd/netif": {
+      "uid": 998,
+      "gid": 998,
+      "mode": "drwxr-xr-x"
+    },
+    "run/systemd/netif/leases": {
+      "uid": 998,
+      "gid": 998,
+      "mode": "drwxr-xr-x"
+    },
+    "run/systemd/netif/links": {
+      "uid": 998,
+      "gid": 998,
+      "mode": "drwxr-xr-x"
+    },
+    "usr/bin/chage": {
+      "uid": 0,
+      "gid": 42,
+      "mode": "-rwxr-sr-x"
+    },
+    "usr/bin/crontab": {
+      "uid": 0,
+      "gid": 997,
+      "mode": "-rwxr-sr-x"
+    },
+    "usr/bin/expiry": {
+      "uid": 0,
+      "gid": 42,
+      "mode": "-rwxr-sr-x"
+    },
+    "usr/lib/dbus-1.0/dbus-daemon-launch-helper": {
+      "uid": 0,
+      "gid": 990,
+      "mode": "-rwsr-xr--"
+    },
+    "usr/lib/x86_64-linux-gnu/utempter/utempter": {
+      "uid": 0,
+      "gid": 43,
+      "mode": "-rwxr-sr-x"
+    },
+    "usr/sbin/unix_chkpwd": {
+      "uid": 0,
+      "gid": 42,
+      "mode": "-rwxr-sr-x"
+    },
+    "var/cache/apt/archives/partial": {
+      "uid": 42,
+      "gid": 0,
+      "mode": "drwx------"
+    },
+    "var/lib/apt/lists/auxfiles": {
+      "uid": 42,
+      "gid": 0,
+      "mode": "drwxr-xr-x"
+    },
+    "var/lib/apt/lists/partial": {
+      "uid": 42,
+      "gid": 0,
+      "mode": "drwx------"
+    },
+    "var/lib/bitcoin-core-node/data": {
+      "uid": 986,
+      "gid": 987,
+      "mode": "drwx------"
+    },
+    "var/lib/bitcoin-core-node/data/wallets": {
+      "uid": 986,
+      "gid": 987,
+      "mode": "drwx------"
+    },
+    "var/lib/bitcoin-core-node/gui": {
+      "uid": 986,
+      "gid": 987,
+      "mode": "drwx------"
+    },
+    "var/lib/bitcoin-core-node/transfer": {
+      "uid": 0,
+      "gid": 987,
+      "mode": "drwxrws---"
+    },
+    "var/lib/lightdm": {
+      "uid": 102,
+      "gid": 104,
+      "mode": "drwxr-x---"
+    },
+    "var/lib/systemd/network": {
+      "uid": 998,
+      "gid": 998,
+      "mode": "drwxr-xr-x"
+    },
+    "var/lib/tor": {
+      "uid": 101,
+      "gid": 102,
+      "mode": "drwx--S---"
+    },
+    "var/log/apt/term.log": {
+      "uid": 0,
+      "gid": 4,
+      "mode": "-rw-r-----"
+    },
+    "var/log/btmp": {
+      "uid": 0,
+      "gid": 43,
+      "mode": "-rw-rw----"
+    },
+    "var/log/journal": {
+      "uid": 0,
+      "gid": 999,
+      "mode": "drwxr-sr-x"
+    },
+    "var/log/lastlog": {
+      "uid": 0,
+      "gid": 43,
+      "mode": "-rw-rw-r--"
+    },
+    "var/log/tor": {
+      "uid": 101,
+      "gid": 4,
+      "mode": "drwxr-s---"
+    },
+    "var/log/wtmp": {
+      "uid": 0,
+      "gid": 43,
+      "mode": "-rw-rw-r--"
+    },
+    "var/mail": {
+      "uid": 0,
+      "gid": 8,
+      "mode": "drwxrwsr-x"
+    },
+    "var/spool/cron/crontabs": {
+      "uid": 0,
+      "gid": 997,
+      "mode": "drwx-wx--T"
+    },
+    "usr/libexec/core-node-admin": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rwxr-xr-x"
+    },
+    "usr/libexec/core-node-login": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rwxr-xr-x"
+    },
+    "usr/libexec/core-node-power": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rwxr-xr-x"
+    },
+    "usr/libexec/core-node-service": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rwxr-xr-x"
+    },
+    "usr/share/polkit-1/actions/org.bitcoin-core-node.login.policy": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/share/polkit-1/actions/org.bitcoin-core-node.power.policy": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/share/polkit-1/actions/org.bitcoin-core-node.service.policy": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/polkit-1/rules.d/49-core-node.rules": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/login.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/lightdm/lightdm.conf.d/50-core-node-session.conf": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/lightdm/lightdm-gtk-greeter.conf": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/share/bitcoin-core-node/greeter.css": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/share/bitcoin-core-node/bitcoin-ui.png": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/calamares/modules/partition.conf": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/sbin/lightdm-gtk-greeter": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rwxr-xr-x"
+    },
+    "usr/lib/bitcoin-core-node/settings_snapshot.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/settings_restore.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/settings_snapshot_ui.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/libexec/core-node-settings-restore": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rwxr-xr-x"
+    },
+    "etc/systemd/system/core-node-settings-restore.service": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/systemd/system/core-node-settings-time.service": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/systemd/system/NetworkManager.service.d/30-settings-restore.conf": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/systemd/system/bitcoin-core-node-policy.service.d/30-settings-restore.conf": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/systemd/system/bitcoin-core-node.service.d/30-settings-restore.conf": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/backup_restore_ui.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/encrypted_transfer.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/watch_backup.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/watch_backup_ui.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/watch_wallet_probe.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/chain_ui.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/local/bin/core-node-taskbar": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rwxr-xr-x"
+    },
+    "usr/lib/bitcoin-core-node/modeless.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/core_status_ui.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/operation_locks.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/core_details_ui.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/media_file_dialog.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/file_dialog_policy.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/removable_media.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/systemd/system/core-node-media.service": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "etc/systemd/system/bitcoin-core-node-transfer.path": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/home_backup.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    }
+  }
+}

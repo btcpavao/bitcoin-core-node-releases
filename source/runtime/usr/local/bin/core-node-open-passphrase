@@ -1,0 +1,217 @@
+#!/usr/bin/python3
+"""Open the stock KeePassXC generator through its owned native menu action.
+
+No global input, focus change, clipboard operation, database operation, generated
+text inspection, screenshot, or application patch. Uncertainty means no action.
+"""
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import signal
+import stat
+import time
+import warnings
+
+SERVICE = 'org.keepassxc.KeePassXC.MainWindow'
+EXECUTABLE = Path('/opt/keepassxc/current/usr/bin/keepassxc').resolve()
+
+
+def identity(pid):
+    proc = Path('/proc') / str(pid)
+    # KeePassXC deliberately makes /proc/PID/exe unreadable. Anchor identity to
+    # the launcher's known exec PID, D-Bus authenticated PID/UID and start time;
+    # retain KeePassXC's anti-dump protection rather than disabling it.
+    status = dict(line.split(':', 1) for line in (proc / 'status').read_text().splitlines() if ':' in line)
+    if (any(int(uid) != os.getuid() for uid in status['Uid'].split())
+            or (proc / 'cmdline').read_bytes().split(b'\0')[0] != bytes(EXECUTABLE)):
+        raise RuntimeError('Untrusted application identity')
+    executable = EXECUTABLE.stat()
+    if executable.st_uid != 0 or executable.st_mode & 0o022:
+        raise RuntimeError('Untrusted application executable')
+    return (proc / 'stat').read_text().rsplit(')', 1)[1].split()[19]
+
+
+def open_generator(expected_pid, expected_birth, timeout=10):
+    import gi
+    gi.require_version('Atspi', '2.0')
+    from gi.repository import Atspi, Gio, GLib
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    Atspi.set_timeout(400, 400)
+
+    def dbus(method, value, result_type):
+        return bus.call_sync('org.freedesktop.DBus', '/org/freedesktop/DBus',
+            'org.freedesktop.DBus', method, GLib.Variant('(s)', (value,)),
+            GLib.VariantType.new(result_type), Gio.DBusCallFlags.NONE, 500, None).unpack()[0]
+
+    def states(node, *required):
+        node.clear_cache()
+        state = node.get_state_set()
+        return all(state.contains(item) for item in required)
+
+    def children(node):
+        return [node.get_child_at_index(i) for i in range(node.get_child_count())]
+
+    def generator_showing(frame):
+        # Inspect container metadata only. Never descend into a generated
+        # password/text field or inspect its value.
+        pending = [(frame, 0)]
+        containers = (Atspi.Role.FRAME, Atspi.Role.FILLER,
+                      Atspi.Role.LAYERED_PANE, Atspi.Role.PANEL)
+        visited = 0
+        while pending and visited < 256:
+            node, depth = pending.pop()
+            visited += 1
+            if node.get_role() not in containers or depth > 10:
+                continue
+            if node.get_role() == Atspi.Role.FILLER and node.get_name() == 'Generated password':
+                return states(node, Atspi.StateType.VISIBLE, Atspi.StateType.SHOWING)
+            pending.extend((child, depth + 1) for child in children(node))
+        return False
+
+    desktop = None
+    attempted = False
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        while GLib.MainContext.default().pending():
+            GLib.MainContext.default().iteration(False)
+        try:
+            owner = dbus('GetNameOwner', SERVICE, '(s)')
+            pid = dbus('GetConnectionUnixProcessID', owner, '(u)')
+            if pid != expected_pid:
+                return 'another instance left unchanged'
+            if dbus('GetConnectionUnixUser', owner, '(u)') != os.getuid():
+                return 'application identity unavailable'
+            birth = identity(pid)
+            if birth != expected_birth:
+                return 'application changed before observation'
+            if desktop is None:
+                desktop = Atspi.get_desktop(0)
+            desktop.clear_cache()
+            apps = [desktop.get_child_at_index(i) for i in range(desktop.get_child_count())]
+            apps = [app for app in apps if app.get_process_id() == pid]
+            if len(apps) != 1:
+                time.sleep(.05)
+                continue
+            app = apps[0]
+            windows = [app.get_child_at_index(i) for i in range(app.get_child_count())]
+            visible = [window for window in windows
+                       if states(window, Atspi.StateType.VISIBLE, Atspi.StateType.SHOWING)]
+            if any(states(window, Atspi.StateType.MODAL)
+                   or window.get_role() in (Atspi.Role.DIALOG, Atspi.Role.ALERT) for window in visible):
+                return 'modal window left unchanged'
+            frames = [window for window in visible if window.get_role() == Atspi.Role.FRAME]
+            if len(frames) != 1:
+                time.sleep(.05)
+                continue
+            frame = frames[0]
+            toolbars = [frame.get_child_at_index(i) for i in range(frame.get_child_count())]
+            toolbars = [node for node in toolbars if node.get_role() == Atspi.Role.TOOL_BAR]
+            buttons = [bar.get_child_at_index(i) for bar in toolbars
+                       for i in range(bar.get_child_count())]
+            buttons = [button for button in buttons
+                       if button.get_role() == Atspi.Role.CHECK_BOX
+                       and button.get_name() == 'Password Generator'
+                       and states(button, Atspi.StateType.ENABLED, Atspi.StateType.VISIBLE,
+                                  Atspi.StateType.SHOWING)]
+            if len(buttons) != 1:
+                time.sleep(.05)
+                continue
+            button = buttons[0]
+            checked = states(button, Atspi.StateType.CHECKED)
+            showing = generator_showing(frame)
+            if checked != showing:
+                return 'generator control and page disagree'
+            if checked:
+                return 'generator already open'
+            bars = [node for node in children(frame) if node.get_role() == Atspi.Role.MENU_BAR]
+            tools = [node for bar in bars for node in children(bar)
+                     if node.get_role() == Atspi.Role.MENU_ITEM and node.get_name() == 'Tools']
+            popups = [node for menu in tools for node in children(menu)
+                      if node.get_role() == Atspi.Role.POPUP_MENU]
+            items = [node for popup in popups for node in children(popup)
+                     if node.get_role() == Atspi.Role.MENU_ITEM
+                     and node.get_name() == 'Password Generator'
+                     and states(node, Atspi.StateType.ENABLED)]
+            if len(items) != 1:
+                return 'generator menu action unavailable'
+            actions = items[0].get_action_iface()
+            presses = [i for i in range(actions.get_n_actions())
+                       if actions.get_action_name(i) == 'Press'] if actions else []
+            if len(presses) != 1:
+                return 'generator action unavailable'
+            if identity(pid) != birth or dbus('GetNameOwner', SERVICE, '(s)') != owner:
+                return 'application changed before action'
+            if any(states(window, Atspi.StateType.VISIBLE, Atspi.StateType.SHOWING)
+                   and (states(window, Atspi.StateType.MODAL)
+                        or window.get_role() in (Atspi.Role.DIALOG, Atspi.Role.ALERT))
+                   for window in [app.get_child_at_index(i) for i in range(app.get_child_count())]):
+                return 'modal window left unchanged'
+            # Recheck after the preceding round trips so an already-opened
+            # page is never toggled closed by this startup observer.
+            checked = states(button, Atspi.StateType.CHECKED)
+            showing = generator_showing(frame)
+            if checked != showing:
+                return 'generator control and page disagree'
+            if checked:
+                return 'generator already open'
+            # Qt 5 toolbar Toggle only changes QToolButton's visual check state.
+            # Menu Press triggers the native QAction and its real generator
+            # page. This cannot type into another app or secret field.
+            attempted = True
+            if not actions.do_action(presses[0]):
+                return 'generator action unavailable'
+            while time.monotonic() < end:
+                if identity(pid) != birth:
+                    return 'application closed'
+                if states(button, Atspi.StateType.CHECKED) and generator_showing(frame):
+                    return 'generator opened'
+                time.sleep(.05)
+            return 'generator action not confirmed'
+        except GLib.Error:
+            if attempted:
+                return 'generator action unconfirmed'
+            time.sleep(.05)
+    return 'application not ready'
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--pid', required=True, type=int)
+    args = parser.parse_args()
+    if args.pid <= 1:
+        raise RuntimeError('Invalid application PID')
+    if os.getuid() != 1000:
+        raise RuntimeError('Please use the Node desktop account')
+    runtime = Path(os.environ['XDG_RUNTIME_DIR'])
+    info = runtime.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+        raise RuntimeError('Unsafe runtime directory')
+    descriptor = os.open(runtime / 'core-node-open-passphrase.lock',
+                         os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        info = os.fstat(descriptor)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600):
+            raise RuntimeError('Unsafe observer lock')
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        def stop(_signal, _frame):
+            raise TimeoutError('Observation deadline')
+        signal.signal(signal.SIGALRM, stop)
+        signal.alarm(12)
+        warnings.filterwarnings('ignore', category=DeprecationWarning)
+        birth = (Path('/proc') / str(args.pid) / 'stat').read_text().rsplit(')', 1)[1].split()[19]
+        print('KeePassXC: ' + open_generator(args.pid, birth) + '.', flush=True)
+    finally:
+        os.close(descriptor)
+        signal.alarm(0)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception:
+        print('KeePassXC: generator startup unavailable; application remains usable.', flush=True)

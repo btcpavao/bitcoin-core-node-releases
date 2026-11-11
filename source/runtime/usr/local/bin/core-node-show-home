@@ -1,0 +1,175 @@
+#!/usr/bin/python3
+"""Iconify application windows on this local X desktop; never close applications.
+
+Called only by Node Home following a click on its non-interactive background.
+Uses Xlib/ICCCM, with EWMH window-type and desktop filtering. No root, shell,
+keyboard injection, wallet access, or file-content inspection.
+"""
+from __future__ import annotations
+import argparse
+import ctypes as C
+import json
+import os
+import re
+import sys
+import time
+
+MAX_CLIENTS = 4096
+XERROR = C.CFUNCTYPE(C.c_int, C.c_void_p, C.c_void_p)
+
+
+class X11:
+    def __init__(self):
+        if not re.fullmatch(r':\d+(?:\.\d+)?', os.environ.get('DISPLAY', '')):
+            raise RuntimeError('A local X display such as :0 is required.')
+        self.lib = C.CDLL('libX11.so.6')
+        definitions = {
+            'XOpenDisplay': ([C.c_char_p], C.c_void_p),
+            'XCloseDisplay': ([C.c_void_p], C.c_int),
+            'XDefaultRootWindow': ([C.c_void_p], C.c_ulong),
+            'XDefaultScreen': ([C.c_void_p], C.c_int),
+            'XInternAtom': ([C.c_void_p, C.c_char_p, C.c_int], C.c_ulong),
+            'XGetWindowProperty': ([C.c_void_p, C.c_ulong, C.c_ulong, C.c_long,
+                C.c_long, C.c_int, C.c_ulong, C.POINTER(C.c_ulong),
+                C.POINTER(C.c_int), C.POINTER(C.c_ulong), C.POINTER(C.c_ulong),
+                C.POINTER(C.POINTER(C.c_ubyte))], C.c_int),
+            'XFree': ([C.c_void_p], C.c_int),
+            'XIconifyWindow': ([C.c_void_p, C.c_ulong, C.c_int], C.c_int),
+            'XSync': ([C.c_void_p, C.c_int], C.c_int),
+            'XSetErrorHandler': ([C.c_void_p], C.c_void_p),
+        }
+        for name, (parameters, result) in definitions.items():
+            fn = getattr(self.lib, name)
+            fn.argtypes, fn.restype = parameters, result
+        self.display = self.lib.XOpenDisplay(None)
+        if not self.display:
+            raise RuntimeError('Cannot open the local X display.')
+        # A client may disappear while we examine it. Such an X error is local
+        # to this short-lived helper; do not terminate the desktop process.
+        self.handler = XERROR(lambda _d, _e: 0)
+        self.old_handler = self.lib.XSetErrorHandler(C.cast(self.handler, C.c_void_p))
+        self.root = int(self.lib.XDefaultRootWindow(self.display))
+        self.screen = self.lib.XDefaultScreen(self.display)
+        self.atoms = {}
+
+    def close(self):
+        if self.display:
+            self.lib.XSync(self.display, 0)
+            self.lib.XCloseDisplay(self.display)
+            self.lib.XSetErrorHandler(self.old_handler)
+            self.display = None
+
+    def atom(self, name):
+        if name not in self.atoms:
+            self.atoms[name] = int(self.lib.XInternAtom(self.display, name.encode('ascii'), 0))
+        return self.atoms[name]
+
+    def prop(self, window, name):
+        actual_type, nitems, remaining = C.c_ulong(), C.c_ulong(), C.c_ulong()
+        fmt = C.c_int()
+        pointer = C.POINTER(C.c_ubyte)()
+        try:
+            result = self.lib.XGetWindowProperty(
+                self.display, window, self.atom(name), 0, MAX_CLIENTS, 0, 0,
+                C.byref(actual_type), C.byref(fmt), C.byref(nitems),
+                C.byref(remaining), C.byref(pointer))
+            if result or fmt.value != 32 or remaining.value or nitems.value > MAX_CLIENTS:
+                return []
+            if not pointer:
+                return []
+            # Xlib expands 32-bit X properties to native unsigned longs.
+            values = C.cast(pointer, C.POINTER(C.c_ulong))
+            return [int(values[i]) & 0xffffffff for i in range(nitems.value)]
+        finally:
+            if pointer:
+                self.lib.XFree(pointer)
+
+    def minimized(self, window):
+        state = self.prop(window, 'WM_STATE')
+        return (bool(state) and state[0] == 3 or
+                self.atom('_NET_WM_STATE_HIDDEN') in self.prop(window, '_NET_WM_STATE'))
+
+    def candidates(self, home):
+        clients = self.prop(self.root, '_NET_CLIENT_LIST_STACKING')
+        if not clients:
+            clients = self.prop(self.root, '_NET_CLIENT_LIST')
+        if home not in clients or self.atom('_NET_WM_WINDOW_TYPE_DESKTOP') not in self.prop(home, '_NET_WM_WINDOW_TYPE'):
+            raise RuntimeError('Caller is not the managed Node desktop window.')
+        current = self.prop(self.root, '_NET_CURRENT_DESKTOP')
+        if len(current) != 1:
+            raise RuntimeError('Window manager did not report the current desktop.')
+        # Dialogs (especially modal ones) must never be hidden behind Home.
+        # An invisible modal dialog can retain its input grab, which makes the
+        # desktop look frozen after the Core window closes.
+        allowed = {self.atom('_NET_WM_WINDOW_TYPE_' + name)
+                   for name in ('NORMAL', 'UTILITY')}
+        protected = {self.atom('_NET_WM_WINDOW_TYPE_' + name)
+                     for name in ('DESKTOP', 'DOCK', 'SPLASH', 'TOOLTIP',
+                                  'NOTIFICATION', 'MENU', 'DROPDOWN_MENU',
+                                  'POPUP_MENU', 'COMBO', 'DND')}
+        result = []
+        for window in dict.fromkeys(reversed(clients)):
+            if window == home:
+                continue
+            types = set(self.prop(window, '_NET_WM_WINDOW_TYPE'))
+            modal = self.atom('_NET_WM_STATE_MODAL') in self.prop(window, '_NET_WM_STATE')
+            if modal or self.atom('_NET_WM_WINDOW_TYPE_DIALOG') in types:
+                continue
+            if types & protected or (types and not types & allowed):
+                continue
+            desktop = self.prop(window, '_NET_WM_DESKTOP')
+            if not desktop or desktop[0] not in (current[0], 0xffffffff):
+                continue
+            state = self.prop(window, 'WM_STATE')
+            if not state or state[0] != 1 or self.minimized(window):
+                continue
+            result.append(window)
+        return result
+
+    def minimize(self, home):
+        targets = self.candidates(home)
+        # Snapshot first: moving focus as one window minimizes does not affect
+        # which remaining windows are targeted.
+        for window in targets:
+            self.lib.XIconifyWindow(self.display, window, self.screen)
+        self.lib.XSync(self.display, 0)
+        deadline = time.monotonic() + 1.5
+        remaining = targets[:]
+        while remaining and time.monotonic() < deadline:
+            remaining = [w for w in remaining
+                         if self.prop(w, 'WM_STATE') and not self.minimized(w)]
+            if remaining:
+                time.sleep(0.04)
+        return {'requested': len(targets), 'not_minimized': len(remaining)}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--home-window', required=True, type=lambda value: int(value, 0))
+    parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--report', action='store_true')
+    options = parser.parse_args()
+    if not 0 < options.home_window <= 0xffffffff:
+        parser.error('Invalid X11 window identifier.')
+    x = X11()
+    try:
+        if options.dry_run:
+            print(json.dumps({'candidate_count': len(x.candidates(options.home_window))}))
+            return 0
+        result = x.minimize(options.home_window)
+        if options.report:
+            print(json.dumps(result))
+        if result['not_minimized']:
+            print('Node Show Home: some windows did not acknowledge minimization.', file=sys.stderr)
+            return 1
+        return 0
+    finally:
+        x.close()
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, ValueError) as exc:
+        print('Node Show Home:', exc, file=sys.stderr)
+        sys.exit(1)

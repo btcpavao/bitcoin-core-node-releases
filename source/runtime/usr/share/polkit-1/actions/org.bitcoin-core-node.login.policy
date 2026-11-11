@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>Bitcoin Core Node</vendor>
+  <action id="org.bitcoin-core-node.login">
+    <description>Change Bitcoin Core Node login settings</description>
+    <message>Please authenticate to change the login password or automatic login.</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>no</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/core-node-login</annotate>
+  </action>
+</policyconfig>

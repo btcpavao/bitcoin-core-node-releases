@@ -1,0 +1,22 @@
+[Unit]
+Description=Share public transfer files with the desktop and Bitcoin Core
+Requires=core-node-private.service
+After=core-node-private.service
+ConditionPathExists=/etc/bitcoin-core-node/installed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/core-node-transfer
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/run/core-node-private/workspace /run/core-node-private/psbt
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_FOWNER
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true

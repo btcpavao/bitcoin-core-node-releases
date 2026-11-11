@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+"""Recover only generated chain transactions before the installed Core starts."""
+import fcntl
+import os
+from pathlib import Path
+import re
+import shutil
+import sys
+sys.path.insert(0,'/usr/lib/bitcoin-core-node')
+from state import DATA,CONFIG,load_setup,verify_data_mount
+from chain_backup import recover,sync_dir
+
+try:
+    if os.geteuid()!=0 or len(sys.argv)!=1 or not (CONFIG/'installed').is_file():raise RuntimeError()
+    verify_data_mount(load_setup())
+    with open(DATA/'.core-node-chain.lock','a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        recover()
+        for path in DATA.iterdir():
+            if re.fullmatch(r'\.core-node-chain-[a-f0-9]{32}',path.name):
+                if path.is_symlink() or not path.is_dir() or path.stat().st_uid!=0:raise RuntimeError()
+                shutil.rmtree(path)
+        sync_dir(DATA)
+except Exception:
+    print('Blockchain maintenance is active or recovery needs attention. Bitcoin Core remains stopped.',file=sys.stderr)
+    sys.exit(1)

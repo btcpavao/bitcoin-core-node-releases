@@ -1,0 +1,15 @@
+elementary Xfce power icons
+
+Unmodified source SVGs copied from Debian elementary-xfce-icon-theme 0.21-1,
+theme elementary-xfce-hidpi, actions/48/system-reboot.svg and system-shutdown.svg.
+These are the exact artwork resources used by the host XFCE actions panel.
+The host renders the icons at 44 px; Bitcoin Core Vault uses the same size.
+
+Copyright 2007-2013 Daniel Foré <daniel@elementaryos.org>
+Copyright 2010-2022 Simon Steinbeiß <simon@xfce.org>
+License: GNU General Public License version 3 or later (GPL-3.0-or-later).
+The original Debian copyright file and complete GPL version 3 text accompany
+these SVG source files. No artwork changes have been made.
+
+Upstream source: https://github.com/shimmerproject/elementary-xfce
+Debian package: https://packages.debian.org/trixie/elementary-xfce-icon-theme

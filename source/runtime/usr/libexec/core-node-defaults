@@ -1,0 +1,47 @@
+#!/usr/bin/python3
+"""Initialize fresh installed defaults; never replace an existing privacy profile."""
+import json
+import os
+from pathlib import Path
+import pwd
+import sys
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from state import CONFIG, default_setup
+from network import core_config, firewall
+
+def main():
+    if os.geteuid() != 0 or not (CONFIG / 'installed').is_file():
+        raise RuntimeError('Installed defaults require the target root context.')
+    if (CONFIG / 'setup.json').exists():
+        raise RuntimeError('An existing privacy profile must not be replaced.')
+    setup = default_setup()
+    uid = pwd.getpwnam('bitcoinnode').pw_uid
+    for name, text in [('bitcoin.conf', core_config(setup)),
+                       ('firewall.nft', firewall(setup['profile'], uid)),
+                       ('setup.json', json.dumps(setup, sort_keys=True, indent=2) + '\n')]:
+        path = CONFIG / name
+        if path.is_symlink():
+            raise RuntimeError('Configuration must not be a symbolic link.')
+        path.write_text(text); path.chmod(0o644)
+    # Seed the native Core Intro once. No -datadir or -prune command-line override
+    # suppresses the normal upstream first-start dialog or its saved preference.
+    account = pwd.getpwnam('bitcoinnode')
+    home = Path('/var/lib/bitcoin-core-node/gui')
+    preferences = home / '.config/Bitcoin'
+    preferences.mkdir(parents=True, exist_ok=True)
+    initial = preferences / 'Bitcoin-Qt.conf'
+    # Both Intro choices must reach the managed chain directory. Otherwise
+    # selecting upstream's "default" silently puts blocks under gui/.bitcoin,
+    # outside Files, chain backup/import and the managed-disk checks.
+    from state import DATA
+    default_data = home / '.bitcoin'
+    default_data.symlink_to(DATA, target_is_directory=True)
+    initial.write_text('[General]\nstrDataDir=' + str(default_data) +
+                      '\nfReset=true\nfCoinControlFeatures=true\nenable_psbt_controls=true\n')
+    for path in [home, home/'.config', preferences, initial]:
+        os.chown(path, account.pw_uid, account.pw_gid)
+        path.chmod(0o600 if path.is_file() else 0o700)
+    (CONFIG / 'passwordless-login').write_text('node\n')
+    (CONFIG / 'passwordless-login').chmod(0o644)
+
+if __name__ == '__main__': main()

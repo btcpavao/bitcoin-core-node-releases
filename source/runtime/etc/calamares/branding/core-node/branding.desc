@@ -1,0 +1,30 @@
+---
+componentName: core-node
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+windowExpanding: fullscreen
+windowPlacement: center
+sidebar: widget,top
+navigation: widget,bottom
+strings:
+  productName: "Bitcoin Core Node"
+  shortProductName: "Bitcoin Core Node"
+  version: "Installer"
+  shortVersion: "candidate"
+  versionedName: "Bitcoin Core Node"
+  shortVersionedName: "Bitcoin Core Node"
+  bootloaderEntryName: "Bitcoin Core Node"
+  productUrl: "https://btcpavao.com/"
+  supportUrl: "https://btcpavao.com/"
+  knownIssuesUrl: "https://btcpavao.com/"
+images:
+  productIcon: bitcoin.png
+  productLogo: bitcoin.png
+  productWelcome: bitcoin.png
+style:
+  SidebarBackground: "#000000"
+  SidebarText: "#ffffff"
+  SidebarTextCurrent: "#ffffff"
+  SidebarBackgroundCurrent: "#000000"
+slideshow: "show.qml"
+slideshowAPI: 2

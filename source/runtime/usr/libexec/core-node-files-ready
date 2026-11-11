@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+import sys
+import time
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from file_browser import check_core_view, BrowserError
+
+for attempt in range(50):
+    try:
+        check_core_view()
+        break
+    except BrowserError:
+        time.sleep(0.1)
+else:
+    raise SystemExit('The read-only Core files view did not become available.')

@@ -1,0 +1,42 @@
+#!/usr/bin/python3
+"""Prepare fixed private directories after the dedicated noswap tmpfs is mounted."""
+import json
+import os
+from pathlib import Path
+import pwd
+import stat
+import subprocess
+
+root = Path('/run/core-node-private')
+rows = json.loads(subprocess.check_output(['/usr/bin/findmnt', '-J', '-M', str(root),
+    '-o', 'TARGET,FSTYPE,OPTIONS'], text=True))['filesystems']
+if (len(rows) != 1 or rows[0]['target'] != str(root) or rows[0]['fstype'] != 'tmpfs'
+        or not {'noswap', 'nodev', 'nosuid', 'noexec'}.issubset(rows[0]['options'].split(','))):
+    raise SystemExit('Private Workspace requires its dedicated protected RAM mount.')
+if Path('/proc/swaps').read_text().splitlines()[1:]:
+    raise SystemExit('Private Workspace requires inactive swap.')
+node = pwd.getpwnam('node'); core = pwd.getpwnam('bitcoinnode')
+os.umask(0o077)
+for name, mode, group in [('workspace', 0o2770, core.pw_gid), ('psbt', 0o2770, core.pw_gid), ('user', 0o700, node.pw_gid),
+    *[('user/'+name, 0o700, node.pw_gid) for name in
+      ('export', 'tmp', 'cache', 'config', 'data', 'state', 'gnupg')],
+    ('.Trash-'+str(node.pw_uid), 0o700, node.pw_gid)]:
+    path = root/name
+    if path.is_symlink() or (path.exists() and not path.is_dir()):
+        raise SystemExit('Unexpected private directory.')
+    path.mkdir(mode=mode, exist_ok=True)
+    os.chown(path, node.pw_uid, group)
+    path.chmod(mode)
+subprocess.run(['/usr/bin/setfacl', '-m', 'd:u::rwx,d:g::rwx,d:o::---', str(root/'workspace')], check=True)
+for home in [Path(node.pw_dir), Path('/var/lib/bitcoin-core-node/gui')]:
+    link = home/'Private Workspace'
+    if link.is_symlink() and link.readlink() == root/'workspace': continue
+    if os.path.lexists(link): raise SystemExit('Private Workspace shortcut conflicts with an existing file.')
+    link.symlink_to(root/'workspace')
+
+subprocess.run(['/usr/bin/setfacl', '-m', 'd:u::rwx,d:g::rwx,d:o::---', str(root/'psbt')], check=True)
+for home in [Path(node.pw_dir), Path('/var/lib/bitcoin-core-node/gui')]:
+    link=home/'PSBT Transfer Folder'
+    if link.is_symlink() and link.readlink()==root/'psbt':continue
+    if os.path.lexists(link):raise SystemExit('PSBT Transfer Folder shortcut conflicts with an existing file.')
+    link.symlink_to(root/'psbt')

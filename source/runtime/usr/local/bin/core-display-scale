@@ -1,0 +1,120 @@
+#!/usr/bin/python3
+"""Shared Node/Vault X11 scaling. Keep modes native; scale before applications start."""
+from __future__ import annotations
+import argparse
+import json
+import math
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+def displays(text):
+    """Read only active RandR outputs; disconnected/disabled outputs do not count."""
+    result = []
+    for line in text.splitlines():
+        match = re.match(r'^(\S+) connected (primary )?(\d+)x(\d+)\+(-?\d+)\+(-?\d+).*?(?:(\d+)mm x (\d+)mm)?$', line)
+        if not match:
+            continue
+        name, primary, width, height, x, y, _, _ = match.groups()
+        mm = re.search(r'(\d+)mm x (\d+)mm', line)
+        result.append(dict(name=name, primary=bool(primary), width=int(width),
+                           height=int(height), x=int(x), y=int(y),
+                           mm_width=int(mm[1]) if mm else 0,
+                           mm_height=int(mm[2]) if mm else 0))
+    return result
+
+def choose(outputs, override='auto'):
+    if not outputs:
+        return dict(scale=1.0, dpi=96, reason='no-active-output', output=None)
+    # A desktop-wide X11 scale cannot differ across monitors. Follow the primary
+    # output, otherwise the built-in laptop panel, otherwise the first active one.
+    screen = next((s for s in outputs if s['primary']), None)
+    screen = screen or next((s for s in outputs if re.match(r'^(eDP|LVDS|DSI)', s['name'])), outputs[0])
+    w, h, mw, mh = (screen[k] for k in ('width', 'height', 'mm_width', 'mm_height'))
+    density = None
+    if 100 <= mw <= 2000 and 60 <= mh <= 1500:
+        dx, dy = w * 25.4 / mw, h * 25.4 / mh
+        if 60 <= dx <= 400 and 60 <= dy <= 400 and abs(dx-dy)/max(dx,dy) < .15:
+            density = (dx + dy) / 2
+    if override != 'auto':
+        try:
+            scale = float(override)
+        except ValueError:
+            raise ValueError('Display scale must be auto or a number from 1 to 3.')
+        if not math.isfinite(scale) or not 1 <= scale <= 3:
+            raise ValueError('Display scale must be auto or a number from 1 to 3.')
+        reason = 'manual'
+    elif density is not None:
+        scale, reason = math.floor(density / 96 * 4 + .5) / 4, 'physical-density'
+    elif re.match(r'^(eDP|LVDS|DSI)', screen['name']):
+        scale = math.floor(min(w / 1366, h / 768) * 4 + .5) / 4
+        reason = 'internal-panel-resolution-fallback'
+    else:
+        scale, reason = 1, 'unknown-monitor-safe-default'
+    # Keep at least 800x600 logical pixels on every active output. Existing
+    # dialogs support this floor; unusual smaller screens stay at 100%.
+    fit = min(min(s['width']/800, s['height']/600) for s in outputs)
+    cap = max(1, math.floor(fit * 4) / 4)
+    scale = max(1, min(3, scale, cap))
+    return dict(scale=scale, dpi=round(96*scale), reason=reason,
+                physical_dpi=round(density, 1) if density else None,
+                output=screen, active_outputs=outputs,
+                logical_size=[round(w/scale), round(h/scale)])
+
+def probe():
+    output = subprocess.check_output(['/usr/bin/xrandr', '--query'],
+                text=True, timeout=5, env=dict(os.environ, LC_ALL='C'))
+    return displays(output)
+
+def apply(result):
+    # X resources also reach separately launched/root Qt programs and native Core.
+    subprocess.run(['/usr/bin/xrdb', '-nocpp', '-merge'],
+                   input=f"Xft.dpi: {result['dpi']}\n", text=True,
+                   timeout=5, check=True)
+    env = os.environ.copy()
+    env.update(CORE_DISPLAY_READY='1', QT_ENABLE_HIGHDPI_SCALING='1',
+               QT_SCALE_FACTOR_ROUNDING_POLICY='PassThrough')
+    # Xft.dpi is the sole Qt scale source, avoiding multiplying two scale factors.
+    for key in ('QT_SCALE_FACTOR', 'QT_SCREEN_SCALE_FACTORS', 'QT_FONT_DPI',
+                'QT_AUTO_SCREEN_SCALE_FACTOR', 'QT_USE_PHYSICAL_DPI'):
+        env.pop(key, None)
+    # GTK3 supports integer widget scaling; Xft keeps its text at the same size
+    # as Qt at fractional scales. Compensate only the integer widget multiplier.
+    integer = max(1, int(result['scale']))
+    env.update(GDK_SCALE=str(integer), GDK_DPI_SCALE=str(1 / integer))
+    runtime = os.environ.get('XDG_RUNTIME_DIR')
+    if runtime:
+        (Path(runtime) / 'core-display-scale.json').write_text(json.dumps(result, indent=2)+'\n')
+    return env
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--diagnose', action='store_true', help='Report only; do not change the desktop.')
+    parser.add_argument('--scale', default=None, help='auto, 1, 1.25, 1.5, 2, etc.')
+    parser.add_argument('command', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    override = args.scale or os.environ.get('CORE_UI_SCALE', 'auto')
+    if args.scale is None and 'CORE_UI_SCALE' not in os.environ:
+        config = Path('/etc/core-display-scale.conf')
+        if config.is_file():
+            override = config.read_text().strip()
+    try:
+        result = choose(probe(), override)
+        if args.diagnose:
+            print(json.dumps(result, indent=2))
+            return
+        env = apply(result)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        # Missing/broken EDID or X tools must never leave a blank desktop.
+        print('Display scaling unavailable; using desktop defaults:', exc, file=sys.stderr)
+        env = dict(os.environ, CORE_DISPLAY_READY='1')
+    command = args.command
+    if command[:1] == ['--']:
+        command = command[1:]
+    if command:
+        os.execvpe(command[0], command, env)
+
+if __name__ == '__main__':
+    main()

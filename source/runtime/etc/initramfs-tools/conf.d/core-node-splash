@@ -1,0 +1,2 @@
+# Make framebuffer support available to Plymouth before the desktop starts.
+FRAMEBUFFER=y

@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+"""Fixed root-only boot operations, no external arguments or imported code."""
+import os,sys
+from pathlib import Path
+sys.path.insert(0,'/usr/lib/bitcoin-core-node')
+try:
+    if os.geteuid()!=0 or sys.argv[1:] not in (['restore'],['time']):raise RuntimeError()
+    if not Path('/etc/bitcoin-core-node/installed').is_file():raise RuntimeError()
+    from settings_restore import apply_pending,apply_time
+    if sys.argv[1]=='restore':apply_pending()
+    else:apply_time()
+except Exception:
+    print('Node settings restore needs attention. No imported scripts were executed.',file=sys.stderr)
+    sys.exit(1)

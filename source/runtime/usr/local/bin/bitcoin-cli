@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+"""Use the CLI from the explicitly activated, verified Core release."""
+import os
+from pathlib import Path
+import sys
+sys.path.insert(0,'/usr/lib/bitcoin-core-node')
+from upgrades import active_release
+binary=Path(active_release()['path'])/'bin/bitcoin-cli'
+os.execv(binary,[str(binary),*sys.argv[1:]])

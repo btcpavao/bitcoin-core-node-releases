@@ -1,0 +1,6 @@
+[org.blueman.general]
+# Native passkey/confirmation dialogs also work without a desktop tray.
+notification-daemon=false
+# Keep network transport management in the existing Node network controls.
+# Reconnecting a paired mouse is silent; authentication prompts stay enabled.
+plugin-list=['!ConnectionNotifier', '!AutoConnect', 'NodeQuietAutoConnect', '!Networking', '!NMPANSupport', '!NMDUNSupport', '!PPPSupport', '!DhcpClient', '!TransferService']

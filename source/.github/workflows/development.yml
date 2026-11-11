@@ -1,0 +1,77 @@
+name: Development checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: node-development-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  source-and-core:
+    runs-on: ubuntu-24.04
+    container:
+      image: debian:13
+      # Native Core regression wallets deliberately live in tmpfs, never on a
+      # reused host datadir. Docker's 64 MiB default cannot hold Core block files.
+      options: --shm-size=2g
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install test dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 nodejs ca-certificates curl python3-pyside6.qtwidgets python3-gi gir1.2-nm-1.0 qt6-svg-plugins gnupg gpgv mtools dosfstools
+      - name: Source and boundary checks
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          bash -n build-iso.sh
+          sh -n prepare-image.sh
+      - name: Download pinned upstream Core
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --tlsv1.2 -o /tmp/core.tar.gz https://bitcoincore.org/bin/bitcoin-core-32.1/bitcoin-32.1-x86_64-linux-gnu.tar.gz
+          echo '61545c17c3120fb7412f896d248b11993af04ec8817aad3649c55b2afb044963  /tmp/core.tar.gz' | sha256sum --check
+          tar -xzf /tmp/core.tar.gz -C /tmp
+      - name: Real Core profile and restart contract
+        run: python3 tests/core_profiles.py --core-bin /tmp/bitcoin-32.1/bin
+      - name: Genuine signed Core maintenance verification
+        run: python3 tests/upgrades_integration.py --archive /tmp/core.tar.gz
+      - name: Native Core wallet/PSBT, GPG file recovery and watch-only dialog checks
+        run: python3 tests/wallet_integration.py --core-bin /tmp/bitcoin-32.1/bin --ui
+      - name: Native Home, privacy and Guide layout checks
+        run: python3 tests/ui_layout.py --output /tmp/node-ui-layout
+  development-image:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [source-and-core, kernel-network]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build in disposable Debian 13
+        run: |
+          sudo docker run --rm --privileged \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/work" \
+            --workdir /work --env NODE_DISPOSABLE_BUILDER=1 \
+            debian:13 /bin/bash ./build-iso.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bitcoin-core-node-development-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+  kernel-network:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install disposable network fixture dependencies
+        run: sudo apt-get update && sudo apt-get install -y nftables iproute2 wireguard-tools
+      - name: Exercise actual kernel paths in isolated namespaces
+        run: sudo env NODE_DISPOSABLE_NETWORK_TEST=1 unshare --mount --net --propagation private -- python3 tests/network_acceptance.py

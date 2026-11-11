@@ -1,0 +1,64 @@
+#!/usr/bin/python3
+"""Launch only the pinned Core after setup, firewall and persistent-storage checks."""
+import hashlib
+import os
+from pathlib import Path
+import sys
+import subprocess
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from state import load_setup, verify_data_mount, core_arguments, CORE_SHA256
+from upgrades import active_release
+from core_preferences import prepare_user_files
+from wallet_startup import clean_startup
+
+def main():
+    setup = load_setup()
+    verify_data_mount(setup)
+    ready = Path('/run/bitcoin-core-node-policy/ready')
+    if not ready.is_file() or ready.is_symlink() or ready.stat().st_uid != 0:
+        raise RuntimeError('Network policy has not been verified for this boot.')
+    # The policy attestation is invalidated whenever the settings change.
+    expected = hashlib.sha256(Path('/etc/bitcoin-core-node/setup.json').read_bytes()).hexdigest()
+    if ready.read_text().strip() != expected:
+        raise RuntimeError('Network policy does not match the confirmed settings.')
+    release = active_release()
+    binary = Path(release['path']) / 'bin/bitcoin-qt'
+    info = binary.stat()
+    if info.st_uid != 0 or info.st_mode & 0o022:
+        raise RuntimeError('Core executable ownership or permissions are unsafe.')
+    with binary.open('rb') as stream:
+        if hashlib.file_digest(stream, 'sha256').hexdigest() != release['gui_sha256']:
+            raise RuntimeError('Core executable does not match the verified pinned version.')
+    runtime = Path('/run/bitcoin-core-node/qt')
+    runtime.mkdir(mode=0o700, exist_ok=True)
+    os.environ['XDG_RUNTIME_DIR'] = str(runtime)
+    os.environ['TMPDIR'] = str(runtime)  # Native Qt payment IPC needs writable temporary storage.
+    # The official Core bundle disables Qt's QProcess. Qt 6.8's shell fallback
+    # converts system() success (0) to false, showing an error after opening a
+    # file. An explicitly present, empty SNAP variable selects Qt's supported
+    # D-Bus portal path without claiming a Snap installation directory.
+    # qtbase/src/gui/platform/unix/qgenericunixservices.cpp: launch/openDocument.
+    os.environ['SNAP'] = ''
+    prepare_user_files(network=setup['network'])
+    # Standard Qt chooser preferences only; official Core bytes stay untouched.
+    from file_dialog_policy import apply as prepare_dialogs
+    try:prepare_dialogs(core=True)
+    except (OSError,RuntimeError):print('Core file-dialog bookmarks could not be prepared; the node service is unchanged.',file=sys.stderr)
+    subprocess.Popen(['/usr/bin/python3','/usr/lib/bitcoin-core-node/file_dialog_policy.py','--watch-core'],
+                     stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    # The persistent data mount was verified above. Only absent direct local
+    # wallet folders are forgotten; external or damaged wallets stay registered.
+    clean_startup(Path('/var/lib/bitcoin-core-node/data/settings.json'),
+                  Path('/var/lib/bitcoin-core-node/data/wallets'),os.geteuid(),missing=True)
+    # The service's /tmp is read-only. A private session bus in the allowed
+    # runtime directory lets native Qt file opening launch the text editor.
+    os.execv('/usr/bin/dbus-run-session',
+             ['dbus-run-session','--dbus-daemon=/usr/libexec/core-node-session-bus',
+              '--',str(binary),*core_arguments(setup,gui=True)])
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:
+        print('Node startup refused: '+str(exc), file=sys.stderr)
+        sys.exit(1)

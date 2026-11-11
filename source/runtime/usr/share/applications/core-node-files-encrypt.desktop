@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Encrypt Files
+Comment=Create verified GPG files using private RAM
+Exec=/usr/local/bin/core-node-files-crypto create %F
+Icon=document-encrypt
+Terminal=false
+Categories=Utility;Security;

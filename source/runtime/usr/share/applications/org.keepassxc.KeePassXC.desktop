@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=KeePassXC
+Comment=Password manager with a private RAM profile
+Exec=/usr/local/bin/core-node-keepassxc %f
+Icon=/opt/keepassxc/current/node-icon.png
+Terminal=false
+Categories=Utility;Security;
+MimeType=application/x-keepass2;
+StartupWMClass=KeePassXC

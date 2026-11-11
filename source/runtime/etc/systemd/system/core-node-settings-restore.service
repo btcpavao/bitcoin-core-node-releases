@@ -1,0 +1,26 @@
+[Unit]
+Description=Apply or recover portable Node settings before networking
+DefaultDependencies=no
+After=local-fs.target
+Before=NetworkManager.service bitcoin-core-node-policy.service bitcoin-core-node.service display-manager.service
+RequiresMountsFor=/var/lib/core-node-settings /var/lib/bitcoin-core-node/data /home/node
+ConditionPathExists=/etc/bitcoin-core-node/installed
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/core-node-settings-restore restore
+RemainAfterExit=yes
+UMask=0077
+TimeoutStartSec=90
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

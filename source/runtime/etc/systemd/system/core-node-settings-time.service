@@ -1,0 +1,23 @@
+[Unit]
+Description=Restore the Node automatic time preference after D-Bus startup
+After=dbus.service core-node-settings-restore.service
+Requires=core-node-settings-restore.service
+ConditionPathExists=/etc/bitcoin-core-node/restored-time.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/core-node-settings-restore time
+UMask=0077
+TimeoutStartSec=45
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

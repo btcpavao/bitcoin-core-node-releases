@@ -1,0 +1,470 @@
+#!/usr/bin/python3
+"""Node's local X11 taskbar: user-requested window operations, never process kills.
+
+Uses the existing Home PySide6 dependency and EWMH/ICCCM window-manager requests.
+No wallet, application profile, shell command, keyboard injection, or network access.
+"""
+from __future__ import annotations
+import argparse
+import ctypes as C
+import fcntl
+import json
+import os
+from pathlib import Path
+import runpy
+import sys
+
+from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtGui import QIcon, QImage, QPixmap
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QMenu, QPushButton, QWidget
+
+VERSION = 'taskbar-controls-v3-restore-dialogs'
+HEIGHT = 40
+MAX_PROPERTY = 262144
+STYLE = '''
+QWidget#NodeTaskbar { background: #111111; border-top: 1px solid #333333; }
+QPushButton { background: transparent; border: none;
+    border-radius: 5px; color: #cccccc; padding: 3px 8px; text-align: left; }
+QPushButton:hover { background: #202020; }
+QPushButton:pressed { background: #171717; }
+QPushButton:focus { background: #333333; }
+QPushButton[active="true"] { background: #272727; color: white; }
+QPushButton[minimized="true"] { color: #999999; }
+QPushButton#HomeButton { padding: 0px; border-radius: 4px; text-align: center; }
+QMenu { background: #191919; border: 1px solid #484848; color: #f0f0f0; padding: 4px; }
+QMenu::item { padding: 7px 28px 7px 14px; }
+QMenu::item:selected { background: #333333; }
+QMenu::item:disabled { color: #777777; }
+'''
+
+class ClientMessageData(C.Union):
+    _fields_ = [('b', C.c_char * 20), ('s', C.c_short * 10), ('l', C.c_long * 5)]
+
+class ClientMessage(C.Structure):
+    _fields_ = [('type', C.c_int), ('serial', C.c_ulong), ('send_event', C.c_int),
+        ('display', C.c_void_p), ('window', C.c_ulong), ('message_type', C.c_ulong),
+        ('format', C.c_int), ('data', ClientMessageData)]
+
+class XEvent(C.Union):
+    _fields_ = [('xclient', ClientMessage), ('pad', C.c_long * 24)]
+
+X11Base = runpy.run_path(str(Path(__file__).with_name('core-node-show-home')),
+                        run_name='node_taskbar_x11')['X11']
+
+class Windows(X11Base):
+    def __init__(self):
+        super().__init__()
+        for name, params, result in (
+            ('XGetGeometry', [C.c_void_p, C.c_ulong, C.POINTER(C.c_ulong),
+                C.POINTER(C.c_int), C.POINTER(C.c_int), C.POINTER(C.c_uint),
+                C.POINTER(C.c_uint), C.POINTER(C.c_uint), C.POINTER(C.c_uint)], C.c_int),
+            ('XTranslateCoordinates', [C.c_void_p, C.c_ulong, C.c_ulong,
+                C.c_int, C.c_int, C.POINTER(C.c_int), C.POINTER(C.c_int),
+                C.POINTER(C.c_ulong)], C.c_int),
+            ('XMapRaised', [C.c_void_p, C.c_ulong], C.c_int),
+            ('XDeleteProperty', [C.c_void_p, C.c_ulong, C.c_ulong], C.c_int),
+            ('XSendEvent', [C.c_void_p, C.c_ulong, C.c_int, C.c_long, C.POINTER(XEvent)], C.c_int),
+            ('XChangeProperty', [C.c_void_p, C.c_ulong, C.c_ulong, C.c_ulong, C.c_int,
+                                C.c_int, C.POINTER(C.c_ubyte), C.c_int], C.c_int),
+        ):
+            fn = getattr(self.lib, name)
+            fn.argtypes, fn.restype = params, result
+
+    def property(self, window, name):
+        actual, count, remaining = C.c_ulong(), C.c_ulong(), C.c_ulong()
+        fmt, pointer = C.c_int(), C.POINTER(C.c_ubyte)()
+        try:
+            result = self.lib.XGetWindowProperty(self.display, window, self.atom(name),
+                0, MAX_PROPERTY, 0, 0, C.byref(actual), C.byref(fmt), C.byref(count),
+                C.byref(remaining), C.byref(pointer))
+            if result or remaining.value or not pointer or count.value > MAX_PROPERTY:
+                return None
+            if fmt.value == 8:
+                return C.string_at(pointer, count.value)
+            if fmt.value == 32:
+                values = C.cast(pointer, C.POINTER(C.c_ulong))
+                return [int(values[i]) & 0xffffffff for i in range(count.value)]
+            return None
+        finally:
+            if pointer:
+                self.lib.XFree(pointer)
+
+    def native_strut(self, window):
+        # Query actual X coordinates, including monitor offsets and fractional
+        # rounding, instead of guessing from Qt's device-independent geometry.
+        root, child = C.c_ulong(), C.c_ulong()
+        x, y = C.c_int(), C.c_int()
+        width, height, border, depth = (C.c_uint() for _ in range(4))
+        if not self.lib.XGetGeometry(self.display, window, C.byref(root),
+                C.byref(x), C.byref(y), C.byref(width), C.byref(height),
+                C.byref(border), C.byref(depth)):
+            raise RuntimeError('Taskbar geometry is unavailable.')
+        panel_width = width.value
+        if not self.lib.XTranslateCoordinates(self.display, window, self.root,
+                0, 0, C.byref(x), C.byref(y), C.byref(child)):
+            raise RuntimeError('Taskbar position is unavailable.')
+        left, top = x.value, y.value
+        if not self.lib.XGetGeometry(self.display, self.root, C.byref(root),
+                C.byref(x), C.byref(y), C.byref(width), C.byref(height),
+                C.byref(border), C.byref(depth)):
+            raise RuntimeError('Root geometry is unavailable.')
+        return max(0, height.value - top), max(0, left), max(0, left + panel_width - 1)
+
+    def set_cardinals(self, window, name, values):
+        data = (C.c_ulong * len(values))(*values)
+        self.lib.XChangeProperty(self.display, window, self.atom(name), self.atom('CARDINAL'),
+            32, 0, C.cast(data, C.POINTER(C.c_ubyte)), len(values))
+        self.lib.XSync(self.display, 0)
+
+    def clear_property(self, window, name):
+        self.lib.XDeleteProperty(self.display, window, self.atom(name))
+        self.lib.XSync(self.display, 0)
+
+    def send(self, window, name, values):
+        event = XEvent()
+        event.xclient.type, event.xclient.window = 33, window
+        event.xclient.display = self.display
+        event.xclient.message_type, event.xclient.format = self.atom(name), 32
+        event.xclient.data.l[:] = values
+        self.lib.XSendEvent(self.display, self.root, 0, (1 << 19) | (1 << 20), C.byref(event))
+        self.lib.XSync(self.display, 0)
+
+    def managed(self):
+        return self.prop(self.root, '_NET_CLIENT_LIST')
+
+    def ancestors(self, window, clients=None):
+        clients = set(self.managed() if clients is None else clients)
+        seen = {window}; result = []
+        for _ in range(32):
+            parent = self.prop(window, 'WM_TRANSIENT_FOR')
+            if not parent or parent[0] not in clients or parent[0] in seen:
+                break
+            window = parent[0]; seen.add(window); result.append(window)
+        return result
+
+    def node_dialog(self, window, clients):
+        # Qt dialogs can advertise SKIP_TASKBAR and inherit Home's desktop type.
+        # Home is not itself a task, so suppressing its transients loses the only
+        # way to restore a minimized backup/settings window.
+        for parent in self.ancestors(window, clients):
+            if (self.atom('_NET_WM_WINDOW_TYPE_DESKTOP') in self.prop(parent, '_NET_WM_WINDOW_TYPE')
+                    and self.title(parent) == 'Bitcoin Core Node'):
+                return True
+        return False
+
+    def task_windows(self):
+        current = self.prop(self.root, '_NET_CURRENT_DESKTOP')
+        if len(current) != 1:
+            return []
+        clients = self.managed()
+        allowed = {self.atom('_NET_WM_WINDOW_TYPE_' + name) for name in ('NORMAL', 'DIALOG', 'UTILITY')}
+        excluded = {self.atom('_NET_WM_WINDOW_TYPE_' + name) for name in
+            ('DESKTOP', 'DOCK', 'SPLASH', 'TOOLTIP', 'NOTIFICATION', 'MENU',
+             'DROPDOWN_MENU', 'POPUP_MENU', 'COMBO', 'DND')}
+        result = []
+        for window in dict.fromkeys(clients):
+            types = set(self.prop(window, '_NET_WM_WINDOW_TYPE'))
+            state = self.prop(window, '_NET_WM_STATE')
+            desktop = self.prop(window, '_NET_WM_DESKTOP')
+            owned = self.node_dialog(window, clients)
+            if not desktop and owned:
+                for parent in self.ancestors(window, clients):
+                    desktop = self.prop(parent, '_NET_WM_DESKTOP')
+                    if desktop: break
+            if (types & excluded or (types and not types & allowed) or
+                    (self.atom('_NET_WM_STATE_SKIP_TASKBAR') in state and not owned) or
+                    not desktop or desktop[0] not in (current[0], 0xffffffff) or
+                    self.prop(window, 'WM_STATE')[:1] not in ([1], [3])):
+                continue
+            result.append(window)
+        return result
+
+    def restore_task(self, window):
+        clients = self.managed()
+        if window not in self.task_windows():
+            return
+        # Restore parents before the requested child. Focus the deepest modal
+        # descendant instead of stranding input on its disabled Settings parent.
+        candidates = [w for w in clients if window in self.ancestors(w, clients)
+                      and self.atom('_NET_WM_STATE_MODAL') in self.prop(w, '_NET_WM_STATE')
+                      and self.prop(w, 'WM_STATE')[:1] in ([1], [3])]
+        if candidates:
+            window = max(candidates, key=lambda w: len(self.ancestors(w, clients)))
+        for target in [*reversed(self.ancestors(window, clients)), window]:
+            if self.atom('_NET_WM_WINDOW_TYPE_DESKTOP') in self.prop(target, '_NET_WM_WINDOW_TYPE'):
+                continue
+            if self.minimized(target): self.lib.XMapRaised(self.display, target)
+        self.lib.XSync(self.display, 0)
+        active = self.prop(self.root, '_NET_ACTIVE_WINDOW')
+        self.send(window, '_NET_ACTIVE_WINDOW', [2, 0, active[0] if active else 0, 0, 0])
+
+    def title(self, window):
+        value = self.property(window, '_NET_WM_NAME') or self.property(window, 'WM_NAME')
+        if not isinstance(value, bytes):
+            return 'Application'
+        return value.decode('utf-8', 'replace').replace('\0', '')[:512] or 'Application'
+
+    def icon(self, window):
+        values = self.property(window, '_NET_WM_ICON')
+        if not isinstance(values, list):
+            return QIcon()
+        position, best = 0, None
+        while position + 2 <= len(values):
+            width, height = values[position:position+2]
+            count = width * height
+            if not width or not height or width > 1024 or height > 1024 or position+2+count > len(values):
+                break
+            if best is None or abs(max(width, height)-24) < abs(max(best[0],best[1])-24):
+                best = (width, height, values[position+2:position+2+count])
+            position += 2 + count
+        if best is None:
+            return QIcon()
+        width, height, pixels = best
+        data = (C.c_uint32 * len(pixels))(*pixels)
+        image = QImage(bytes(data), width, height, width*4, QImage.Format_ARGB32).copy()
+        return QIcon(QPixmap.fromImage(image))
+
+    def minimize_task(self, window):
+        if window in self.task_windows():
+            self.lib.XIconifyWindow(self.display, window, self.screen)
+            self.lib.XSync(self.display, 0)
+
+    def close_task(self, window):
+        if window in self.task_windows():
+            # EWMH source 2 is a pager/taskbar. The WM honors WM_DELETE_WINDOW,
+            # allowing Core's own orderly shutdown and application confirmations.
+            self.send(window, '_NET_CLOSE_WINDOW', [0, 2, 0, 0, 0])
+
+    def toggle_task(self, window):
+        if window not in self.task_windows():
+            return
+        active = self.prop(self.root, '_NET_ACTIVE_WINDOW')
+        if active == [window] and not self.minimized(window):
+            self.minimize_task(window)
+        else:
+            self.restore_task(window)
+
+    def home(self):
+        desktops = [w for w in self.managed()
+                    if self.atom('_NET_WM_WINDOW_TYPE_DESKTOP') in self.prop(w, '_NET_WM_WINDOW_TYPE')
+                    and self.title(w) == 'Bitcoin Core Node']
+        if len(desktops) == 1:
+            self.minimize(desktops[0])
+
+class TaskButton(QPushButton):
+    def __init__(self, panel, window):
+        super().__init__(panel)
+        self.panel, self.window = panel, window
+        self.setIconSize(QSize(24, 24))
+        self.setFixedHeight(32)
+        self.clicked.connect(lambda: panel.x.toggle_task(window))
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.context_menu)
+        self.title, self.icon_signature = '', None
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MiddleButton and self.rect().contains(event.position().toPoint()):
+            self.panel.x.close_task(self.window)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def context_menu(self, point):
+        if self.window not in self.panel.x.task_windows():
+            return
+        menu = QMenu(self)
+        menu.addAction('Restore', lambda: self.panel.x.restore_task(self.window))
+        menu.addAction('Minimize', lambda: self.panel.x.minimize_task(self.window))
+        menu.addAction('Close', lambda: self.panel.x.close_task(self.window))
+        if self.panel.args.preview:
+            QTimer.singleShot(0, lambda: self.panel.report_menu(menu))
+        menu.exec(self.mapToGlobal(point))
+
+class Taskbar(QWidget):
+    def __init__(self, args):
+        super().__init__()
+        self.args, self.x, self.buttons, self.last_report = args, Windows(), {}, None
+        self.panel_active = False
+        self.setObjectName('NodeTaskbar')
+        self.setWindowTitle('Core Node Taskbar')
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus)
+        self.setAttribute(Qt.WA_X11NetWmWindowTypeDock, True)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
+        self.setStyleSheet(STYLE)
+        self.row = QHBoxLayout(self)
+        self.row.setContentsMargins(0, 0, 6, 0)
+        self.row.setSpacing(6)
+        self.home_button = QPushButton(self)
+        self.home_button.setObjectName('HomeButton')
+        self.home_button.setFixedSize(40, 40)
+        home_icon = QIcon(str(args.assets/'icons/debian-white.png'))
+        if home_icon.isNull():
+            raise RuntimeError('Bundled Debian Home icon could not be loaded.')
+        self.home_button.setIcon(home_icon)
+        self.home_button.setIconSize(QSize(28, 28))
+        self.home_button.setToolTip('Home')
+        self.home_button.setAccessibleName('Home')
+        self.home_button.clicked.connect(self.x.home)
+        self.row.addWidget(self.home_button)
+        self.row.addStretch(1)
+        self.screen = QApplication.primaryScreen()
+        self.screen.geometryChanged.connect(self.place)
+        self.place()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.refresh)
+        self.timer.start(250)
+        self.refresh()
+
+    def place(self, *_):
+        geometry = self.screen.geometry()
+        self.setGeometry(geometry.x(), geometry.y()+geometry.height()-HEIGHT, geometry.width(), HEIGHT)
+        self.sync_reservation()
+
+    def sync_reservation(self):
+        wid = int(self.winId())
+        # VAULT_TASKBAR_VISIBILITY_V2: no panel or reserved work area when only
+        # Home is open. Iconified applications remain managed tasks.
+        if self.panel_active:
+            QApplication.sync()  # Flush Qt/XCB geometry before querying via Xlib.
+            bottom, left, right = self.x.native_strut(wid)
+            short = [0, 0, 0, bottom]
+            partial = [0, 0, 0, bottom, 0, 0, 0, 0, 0, 0, left, right]
+            if self.x.prop(wid, '_NET_WM_STRUT') != short:
+                self.x.set_cardinals(wid, '_NET_WM_STRUT', short)
+            if self.x.prop(wid, '_NET_WM_STRUT_PARTIAL') != partial:
+                self.x.set_cardinals(wid, '_NET_WM_STRUT_PARTIAL', partial)
+        else:
+            self.x.clear_property(wid, '_NET_WM_STRUT')
+            self.x.clear_property(wid, '_NET_WM_STRUT_PARTIAL')
+
+    def update_visibility(self, open_tasks):
+        desired = bool(open_tasks)
+        if desired == self.panel_active:
+            return
+        self.panel_active = desired
+        if desired:
+            self.show()
+            self.place()
+        else:
+            self.place()
+            self.hide()
+
+    def refresh(self):
+        windows = self.x.task_windows()
+        for window in list(self.buttons):
+            if window not in windows:
+                button = self.buttons.pop(window)
+                self.row.removeWidget(button)
+                button.deleteLater()
+        for window in windows:
+            if window not in self.buttons:
+                button = TaskButton(self, window)
+                self.buttons[window] = button
+                self.row.insertWidget(self.row.count()-1, button)
+                button.show()
+            button = self.buttons[window]
+            title = self.x.title(window)
+            if button.title != title:
+                button.title = title
+                button.setToolTip(title)
+                button.setAccessibleName(title)
+            # Icons change rarely. Hash the bounded property to avoid continually
+            # allocating Qt images while still honoring application icon changes.
+            signature = hash(tuple(self.x.property(window, '_NET_WM_ICON') or ()))
+            if button.icon_signature != signature:
+                button.icon_signature = signature
+                button.setIcon(self.x.icon(window))
+        active = self.x.prop(self.x.root, '_NET_ACTIVE_WINDOW')
+        # VAULT_TASKBAR_NATURAL_WIDTH_V2: fit each full title and its icon.
+        # Only a genuinely crowded bar needs elision; unused space stays empty.
+        natural = {}
+        for window, button in self.buttons.items():
+            icon_space = 28 if not button.icon().isNull() else 0
+            natural[window] = max(32, button.fontMetrics().horizontalAdvance(button.title)+18+icon_space)
+            button.natural_width = natural[window]
+        available = max(24, self.width()-46-len(windows)*6)
+        total = sum(natural.values())
+        for window, button in self.buttons.items():
+            width = natural[window] if total <= available else max(24, int(natural[window]*available/total))
+            button.setFixedWidth(width)
+            icon_space = 28 if not button.icon().isNull() else 0
+            label = button.title if width >= natural[window] else button.fontMetrics().elidedText(
+                button.title, Qt.ElideRight, max(0, width-18-icon_space))
+            button.setText(label.replace('&', '&&'))
+            for name, value in (('active', active == [window]), ('minimized', self.x.minimized(window))):
+                if button.property(name) != value:
+                    button.setProperty(name, value)
+                    button.style().unpolish(button)
+                    button.style().polish(button)
+                    button.update()
+        self.update_visibility(windows)
+        self.row.activate()
+        # Mapping/configuration is asynchronous in X11. Re-read the settled
+        # native position instead of retaining a strut from the map-time frame.
+        # Publish only changes so the desktop does not receive layout churn.
+        if self.panel_active:
+            self.sync_reservation()
+        if self.args.preview:
+            self.report()
+
+    def report(self):
+        def rect(widget):
+            point = widget.mapToGlobal(widget.rect().topLeft())
+            return [point.x(), point.y(), widget.width(), widget.height()]
+        report = dict(version=VERSION, pid=os.getpid(), window_id=hex(int(self.winId())),
+                      panel=rect(self), home=rect(self.home_button), visible=self.isVisible(),
+                      strut=self.x.prop(int(self.winId()), '_NET_WM_STRUT_PARTIAL'),
+                      tasks={hex(w):dict(title=b.title, text=b.text().replace('&&', '&'),
+                                        natural_width=b.natural_width, rect=rect(b)) for w,b in self.buttons.items()})
+        if report != self.last_report:
+            path = Path(os.environ['XDG_RUNTIME_DIR'])/'core-node-taskbar-geometry.json'
+            temporary = path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(report)+'\n')
+            temporary.replace(path)
+            self.last_report = report
+
+    def report_menu(self, menu):
+        # Test-only geometry lets owned fixtures click the real native menu.
+        values = {}
+        for action in menu.actions():
+            rect = menu.actionGeometry(action)
+            point = menu.mapToGlobal(rect.topLeft())
+            values[action.text()] = [point.x(), point.y(), rect.width(), rect.height()]
+        path = Path(os.environ['XDG_RUNTIME_DIR'])/'core-node-taskbar-menu.json'
+        path.write_text(json.dumps(values)+'\n')
+
+    def closeEvent(self, event):
+        # The managed panel remains present until its session process exits.
+        event.ignore()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--preview', action='store_true')
+    parser.add_argument('--assets', type=Path)
+    args = parser.parse_args()
+    if args.assets and not args.preview:
+        parser.error('--assets is restricted to the isolated preview.')
+    args.assets = args.assets or Path('/usr/share/bitcoin-core-node')
+    if os.environ.get('QT_QPA_PLATFORM', 'xcb') != 'xcb':
+        raise RuntimeError('The taskbar requires the local X11 desktop.')
+    runtime = Path(os.environ['XDG_RUNTIME_DIR'])
+    lock = (runtime/'core-node-taskbar.lock').open('a')
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return 0
+    app = QApplication(['core-node-taskbar'])
+    app.setQuitOnLastWindowClosed(False)
+    app.setStyle('Fusion')
+    panel = Taskbar(args)
+    QTimer.singleShot(0, panel.refresh)
+    app.aboutToQuit.connect(panel.x.close)
+    return app.exec()
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, KeyError, ValueError) as exc:
+        print('Node taskbar:', exc, file=sys.stderr)
+        sys.exit(1)

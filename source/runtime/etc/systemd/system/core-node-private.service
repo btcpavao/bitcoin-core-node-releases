@@ -1,0 +1,16 @@
+[Unit]
+Description=Prepare a fresh RAM-only Private Workspace
+ConditionPathExists=/etc/bitcoin-core-node/installed
+Requires=run-core\x2dnode\x2dprivate.mount
+After=run-core\x2dnode\x2dprivate.mount systemd-tmpfiles-setup.service
+Before=lightdm.service bitcoin-core-node.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/swapoff --all
+ExecStart=/usr/libexec/core-node-private-prepare
+RemainAfterExit=yes
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target

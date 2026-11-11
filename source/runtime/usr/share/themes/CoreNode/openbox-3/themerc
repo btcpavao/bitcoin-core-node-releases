@@ -1,0 +1,96 @@
+# Bitcoin Core Node — Openbox theme
+# Minimal dark appliance chrome. Application content is left to each app.
+
+border.width: 1
+padding.width: 4
+padding.height: 3
+window.handle.width: 2
+window.client.padding.width: 0
+window.client.padding.height: 0
+
+window.active.border.color: #3a3a3a
+window.inactive.border.color: #2a2a2a
+window.active.client.color: #333333
+window.inactive.client.color: #222222
+
+window.active.title.bg: Solid Flat
+window.active.title.bg.color: #111111
+window.inactive.title.bg: Solid Flat
+window.inactive.title.bg.color: #171717
+window.active.label.bg: Parentrelative
+window.inactive.label.bg: Parentrelative
+window.active.label.text.color: #ffffff
+window.inactive.label.text.color: #c8c8c8
+window.label.text.justify: Left
+
+window.active.handle.bg: Solid Flat
+window.active.handle.bg.color: #111111
+window.inactive.handle.bg: Solid Flat
+window.inactive.handle.bg.color: #171717
+window.active.grip.bg: Parentrelative
+window.inactive.grip.bg: Parentrelative
+
+window.active.button.unpressed.bg: Parentrelative
+window.active.button.unpressed.image.color: #ffffff
+window.active.button.hover.bg: Solid Flat
+window.active.button.hover.bg.color: #2a2a2a
+window.active.button.hover.image.color: #ffffff
+window.active.button.pressed.bg: Solid Flat
+window.active.button.pressed.bg.color: #333333
+window.active.button.pressed.image.color: #ffffff
+window.active.button.disabled.bg: Parentrelative
+window.active.button.disabled.image.color: #777777
+window.active.button.toggled.unpressed.bg: Parentrelative
+window.active.button.toggled.unpressed.image.color: #ffffff
+window.active.button.toggled.hover.bg: Solid Flat
+window.active.button.toggled.hover.bg.color: #2a2a2a
+window.active.button.toggled.hover.image.color: #ffffff
+window.active.button.toggled.pressed.bg: Solid Flat
+window.active.button.toggled.pressed.bg.color: #333333
+window.active.button.toggled.pressed.image.color: #ffffff
+
+window.inactive.button.unpressed.bg: Parentrelative
+window.inactive.button.unpressed.image.color: #b8b8b8
+window.inactive.button.hover.bg: Solid Flat
+window.inactive.button.hover.bg.color: #242424
+window.inactive.button.hover.image.color: #e0e0e0
+window.inactive.button.pressed.bg: Solid Flat
+window.inactive.button.pressed.bg.color: #303030
+window.inactive.button.pressed.image.color: #e0e0e0
+window.inactive.button.disabled.bg: Parentrelative
+window.inactive.button.disabled.image.color: #666666
+window.inactive.button.toggled.unpressed.bg: Parentrelative
+window.inactive.button.toggled.unpressed.image.color: #b8b8b8
+window.inactive.button.toggled.hover.bg: Solid Flat
+window.inactive.button.toggled.hover.bg.color: #242424
+window.inactive.button.toggled.hover.image.color: #e0e0e0
+window.inactive.button.toggled.pressed.bg: Solid Flat
+window.inactive.button.toggled.pressed.bg.color: #303030
+window.inactive.button.toggled.pressed.image.color: #e0e0e0
+
+menu.border.width: 1
+menu.overlap.x: 0
+menu.overlap.y: 0
+menu.border.color: #333333
+menu.title.bg: Solid Flat
+menu.title.bg.color: #111111
+menu.title.text.color: #ffffff
+menu.items.bg: Solid Flat
+menu.items.bg.color: #171717
+menu.items.text.color: #eeeeee
+menu.items.disabled.text.color: #777777
+menu.items.active.bg: Solid Flat
+menu.items.active.bg.color: #2a2a2a
+menu.items.active.text.color: #ffffff
+menu.separator.color: #444444
+
+osd.border.width: 1
+osd.border.color: #444444
+osd.bg: Solid Flat
+osd.bg.color: #111111
+osd.label.bg: Parentrelative
+osd.label.text.color: #ffffff
+osd.hilight.bg: Solid Flat
+osd.hilight.bg.color: #2a2a2a
+osd.unhilight.bg: Solid Flat
+osd.unhilight.bg.color: #171717

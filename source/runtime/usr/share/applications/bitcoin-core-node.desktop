@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Bitcoin Core Node
+Exec=/usr/local/bin/bitcoin-core-node
+Terminal=false
+Categories=Network;Finance;

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=KeePassXC
+Comment=Generate random passphrases and open password databases
+Exec=/usr/local/bin/core-node-keepassxc %f
+TryExec=/usr/local/bin/core-node-keepassxc
+Icon=keepassxc
+Terminal=false
+Categories=Utility;Security;
+MimeType=application/x-keepass2;
+StartupWMClass=KeePassXC
+StartupNotify=true

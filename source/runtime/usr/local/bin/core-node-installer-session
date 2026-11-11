@@ -1,0 +1,35 @@
+#!/bin/sh
+# Vault's retry/diagnostic loop: closing the installer never leaves a blank desktop.
+set -eu
+: "${XDG_RUNTIME_DIR:?Missing local runtime directory}"
+LOG="$XDG_RUNTIME_DIR/core-node-installer-launch.log"
+while :; do
+    RC=0
+    : > "$LOG"
+    /usr/bin/pkexec /usr/bin/calamares -d >>"$LOG" 2>&1 || RC=$?
+    STATE="$(/usr/bin/systemctl is-system-running 2>/dev/null || true)"
+    if [ "$STATE" = stopping ]; then
+        while :; do sleep 10; done
+    fi
+    if [ "$RC" -ne 0 ]; then
+        /usr/bin/zenity --text-info --title="Bitcoin Core Node Installer — Diagnostic Log" \
+            --width=1000 --height=700 --filename="$LOG" --ok-label="Close log" || true
+    fi
+    if /usr/bin/zenity --question --no-markup --width=620 \
+        --title="Bitcoin Core Node Installer" --ok-label="Open installer again" \
+        --cancel-label="Power off" \
+        --text="The installer has closed (status $RC).
+
+No installation is restarted automatically.
+
+If the installer failed, inspect the diagnostic log before retrying."; then
+        continue
+    fi
+    if /usr/bin/systemctl --no-block poweroff >>"$LOG" 2>&1; then
+        while :; do sleep 10; done
+    fi
+    /usr/bin/zenity --error --no-markup --text="Power-off request failed.
+
+See:
+$LOG" || true
+done

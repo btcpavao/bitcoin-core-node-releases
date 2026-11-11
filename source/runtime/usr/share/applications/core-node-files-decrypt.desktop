@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Decrypt Files
+Comment=Decrypt GPG files into RAM-only Private Workspace
+Exec=/usr/local/bin/core-node-files-crypto decrypt %f
+Icon=document-decrypt
+Terminal=false
+NoDisplay=true
+MimeType=application/pgp-encrypted;application/x-gpg;
+Categories=Utility;Security;

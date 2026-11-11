@@ -1,0 +1,23 @@
+{
+  "version": "32.1",
+  "source_url": "https://bitcoincore.org/bin/bitcoin-core-32.1/",
+  "verified_signers": [
+    "152812300785C96444D3334D17565732E08E5E41",
+    "0AD83877C1F0CD1EE9BD660AD7CC770B81FD22A8",
+    "CFB16E21C950F67FA95E558F2EEB9F5CC09526C1",
+    "F4FC70F07310028424EFC20A8E4256593F177720",
+    "E61773CD6E01040E2F1BD78CE7E2984B6289C93A",
+    "F2CFC4ABD0B99D837EEBB7D09B79B45691DB4173",
+    "ED9BDF7AD6A55E232E84524257FF9BDBCC301009",
+    "A0083660F235A27000CD3C81CE6EC49945C17EA6"
+  ],
+  "archives": {
+    "bitcoin-32.1-x86_64-linux-gnu.tar.gz": "61545c17c3120fb7412f896d248b11993af04ec8817aad3649c55b2afb044963",
+    "bitcoin-32.1.tar.gz": "a5f2f61e32cf7f790641c9ec306a3c88ca7b5a556946956b1f35ffd7e27813f9"
+  },
+  "binaries": {
+    "bitcoin-qt": "d43632a3e54dfb181ba045db2a5b1ec2396a1acdda010e3b6d07b2e21c69c183",
+    "bitcoin-cli": "83dad233fb62b1b2931efd446f7c66fe02585055143e0f0087c742732c75b52d"
+  },
+  "keys_source": "Existing Node repository release-keys.asc"
+}

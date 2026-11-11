@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Bitcoin Core Node
+Comment=Bitcoin Core Node desktop
+Exec=/usr/local/bin/core-node-session
+Type=Application
+DesktopNames=CoreNode

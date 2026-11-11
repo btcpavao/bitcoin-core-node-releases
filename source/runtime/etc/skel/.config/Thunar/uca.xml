@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+ <action><icon>document-encrypt</icon><name>Encrypt with GPG</name><unique-id>node-gpg-encrypt</unique-id><command>/usr/local/bin/core-node-files-crypto create %F</command><description>Create verified encrypted copies</description><patterns>*</patterns><directories/><audio-files/><image-files/><other-files/><text-files/><video-files/></action>
+ <action><icon>document-decrypt</icon><name>Decrypt into Private Workspace</name><unique-id>node-gpg-decrypt</unique-id><command>/usr/local/bin/core-node-files-crypto decrypt %f</command><description>Authenticate and decrypt into RAM</description><patterns>*.gpg;*.pgp;*.asc</patterns><other-files/><text-files/></action>
+ <action><icon>edit-delete</icon><name>Permanently Delete Bitcoin Core Wallets…</name><unique-id>node-wallet-shred-delete</unique-id><command>/usr/local/bin/core-node-wallet-delete %F</command><description>Permanently delete one or multiple unloaded Bitcoin Core wallet folders (best effort on SSDs)</description><patterns>*</patterns><directories/></action>
+</actions>

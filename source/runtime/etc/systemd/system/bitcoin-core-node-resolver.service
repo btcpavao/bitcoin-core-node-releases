@@ -1,0 +1,13 @@
+[Unit]
+Description=Connect application DNS to systemd-resolved before NetworkManager
+Requires=systemd-resolved.service
+After=systemd-resolved.service
+Before=NetworkManager.service bitcoin-core-node-policy.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ln -sfn /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

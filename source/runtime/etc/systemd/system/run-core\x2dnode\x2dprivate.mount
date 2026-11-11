@@ -1,0 +1,13 @@
+[Unit]
+Description=Bitcoin Core Node RAM-only Private Workspace
+ConditionPathExists=/etc/bitcoin-core-node/installed
+Before=core-node-private.service
+
+[Mount]
+What=tmpfs
+Where=/run/core-node-private
+Type=tmpfs
+Options=noswap,nodev,nosuid,noexec,mode=0755,size=50%
+
+[Install]
+WantedBy=multi-user.target

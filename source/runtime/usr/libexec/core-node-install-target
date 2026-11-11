@@ -1,0 +1,99 @@
+#!/usr/bin/python3
+"""Finalize only a separate mounted Debian target after Calamares confirmation."""
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+def main():
+    if os.geteuid() != 0 or len(sys.argv) != 2:
+        raise RuntimeError('Invalid installation context.')
+    root = Path(sys.argv[1])
+    if not root.is_absolute() or root == Path('/') or root.resolve() != root or not os.path.ismount(root):
+        raise RuntimeError('Refusing a non-target filesystem.')
+    if 'boot=live' not in Path('/proc/cmdline').read_text().split():
+        raise RuntimeError('The installer requires a live environment.')
+    def target(name):
+        path = root / name
+        if not path.resolve(strict=False).is_relative_to(root):
+            raise RuntimeError('Target path escapes installation.')
+        return path
+    def call(*args):
+        subprocess.run(['/usr/sbin/chroot', str(root), *args], check=True, timeout=120)
+    if 'VERSION_ID="13"' not in target('etc/os-release').read_text():
+        raise RuntimeError('Debian 13 is required.')
+    if any(line.startswith('node-live:') for line in target('etc/passwd').read_text().splitlines()):
+        call('/usr/sbin/userdel', '--force', 'node-live')
+    for name in ['etc/sudoers.d/live', 'etc/sudoers.d/zz-live',
+                 'etc/lightdm/lightdm.conf.d/22-live-autologin.conf']:
+        target(name).unlink(missing_ok=True)
+    main_lightdm = target('etc/lightdm/lightdm.conf')
+    if main_lightdm.exists():
+        lines = main_lightdm.read_text().splitlines()
+        main_lightdm.write_text('\n'.join(line for line in lines if not line.strip().startswith('autologin-user=')) + '\n')
+    for path in target('etc/sudoers.d').glob('*'):
+        if path.is_file() and 'NOPASSWD' in path.read_text():
+            raise RuntimeError('Unexpected passwordless sudo remains.')
+    call('/usr/bin/systemd-sysusers')
+    if any(line.startswith('node:') for line in target('etc/passwd').read_text().splitlines()):
+        raise RuntimeError('The installation image unexpectedly contains the target account.')
+    # The password is locked, not empty. LightDM autologin is the only default
+    # password-free login path; no generic passwordless sudo is installed.
+    call('/usr/sbin/useradd', '--create-home', '--shell', '/bin/bash',
+         '--comment', 'Bitcoin Core Node',
+         '--groups', 'bitcoin-rpc,netdev,sudo,video,audio', 'node')
+    target('home/node').chmod(0o700)
+    target('etc/hostname').write_text('bitcoin-core-node\n')
+    hosts = target('etc/hosts')
+    lines = hosts.read_text().splitlines()
+    hosts.write_text('\n'.join(line for line in lines if not line.startswith('127.0.1.1')) +
+                     '\n127.0.1.1 bitcoin-core-node\n')
+    target('etc/lightdm/lightdm.conf.d').mkdir(parents=True, exist_ok=True)
+    target('etc/lightdm/lightdm.conf.d/99-node-login.conf').write_text(
+        '[Seat:*]\nautologin-user=node\nautologin-user-timeout=0\nuser-session=core-node\n')
+    call('/usr/bin/systemd-tmpfiles', '--create')
+    if target('etc/systemd/system/home-vault.mount').exists():
+        raise RuntimeError('Unexpected Vault persistence policy.')
+    target('etc/bitcoin-core-node/installed').write_text('Bitcoin Core Node development installation\n')
+    target('etc/bitcoin-core-node/installed').chmod(0o644)
+    # The installed system uses the shipped, signed Debian 13 source file.
+    # Remove live-build's duplicate lists and its local installer-only repo.
+    for name in ('etc/apt/sources.list.d/packages.list', 'etc/apt/sources.list.d/zz-sources.list'):
+        target(name).unlink(missing_ok=True)
+    # A startup password must remain necessary: never embed an unlock key.
+    if target('crypto_keyfile.bin').exists():
+        raise RuntimeError('Unexpected automatic disk-unlock key in the installation.')
+    crypttab=target('etc/crypttab')
+    entries=[line.split() for line in crypttab.read_text().splitlines()
+             if line.strip() and not line.lstrip().startswith('#')] if crypttab.exists() else []
+    if entries:
+        if any(len(fields)<3 or fields[2] not in ('none','-') for fields in entries):
+            raise RuntimeError('Encrypted installation must require an entered disk password.')
+        if not os.path.ismount(target('boot')):
+            raise RuntimeError('Encrypted root requires a separate boot partition.')
+        # Keep the unlock prompt available after typing mistakes instead of
+        # dropping behind the graphical splash after three failed attempts.
+        lines=[]
+        for line in crypttab.read_text().splitlines():
+            if line.strip() and not line.lstrip().startswith('#'):
+                fields=line.split()
+                if len(fields)==3: fields.append('luks')
+                options=[option for option in fields[3].split(',')
+                         if option and not option.startswith('tries=')]
+                fields[3]=','.join(options+['tries=0'])
+                line='\t'.join(fields)
+            lines.append(line)
+        crypttab.write_text('\n'.join(lines)+'\n')
+    # Save the selected keyboard map for the disk-unlock prompt in initramfs.
+    call('/usr/bin/setupcon', '--save-only')
+    # Generate matching Core and firewall configuration before first boot.
+    call('/usr/libexec/core-node-defaults')
+    call('/usr/bin/systemctl', 'enable', 'nftables.service', 'systemd-resolved.service',
+         'bitcoin-core-node-resolver.service', 'NetworkManager.service',
+         'lightdm.service', 'bitcoin-core-node-policy.service')
+    call('/usr/bin/systemctl', 'disable', 'bitcoin-core-node.service')
+    # Record clean defaults after installer-selected settings, before user login.
+    call('/usr/bin/python3', '-c', "import sys; sys.path.insert(0, '/usr/lib/bitcoin-core-node'); from home_backup import capture_defaults; capture_defaults()")
+
+if __name__ == '__main__': main()

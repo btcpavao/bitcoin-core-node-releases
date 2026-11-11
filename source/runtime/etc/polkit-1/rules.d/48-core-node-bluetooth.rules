@@ -1,0 +1,8 @@
+// Only the active local Node desktop may toggle the Bluetooth radio.
+// Blueman's rfkill mechanism changes RFKILL_TYPE_BLUETOOTH, never Wi-Fi.
+polkit.addRule(function(action, subject) {
+    if (action.id === "org.blueman.rfkill.setstate" && subject.local && subject.active &&
+        (subject.user === "node" || subject.user === "node-live")) {
+        return polkit.Result.YES;
+    }
+});

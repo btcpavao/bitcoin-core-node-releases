@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Install Bitcoin Core Node
+Exec=pkexec calamares
+Terminal=false
+Categories=System;

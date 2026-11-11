@@ -1,0 +1,34 @@
+#!/usr/bin/python3
+"""Narrow, separately authorized login settings entry point."""
+import fcntl
+import json
+import os
+import sys
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from login import configure, passwordless
+from wallets import WalletError
+
+def main():
+    if len(sys.argv) != 2:
+        raise WalletError('Unsupported login operation.')
+    if sys.argv[1] == 'passwordless-status':
+        print('yes' if passwordless() else 'no')
+        return
+    if sys.argv[1] != 'configure' or os.geteuid() != 0:
+        raise WalletError('Unsupported login operation.')
+    os.umask(0o077)
+    with open('/run/lock/bitcoin-core-node-admin.lock', 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        raw = sys.stdin.buffer.read(4097)
+        if len(raw) > 4096:
+            raise WalletError('Login settings are too large.')
+        result = configure(json.loads(raw))
+    print(json.dumps(result))
+
+if __name__ == '__main__':
+    try:
+        main()
+    except WalletError as exc:
+        print(str(exc), file=sys.stderr); sys.exit(1)
+    except Exception:
+        print('Login settings could not be changed.', file=sys.stderr); sys.exit(1)

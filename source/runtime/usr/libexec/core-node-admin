@@ -1,0 +1,200 @@
+#!/usr/bin/python3
+"""Narrow polkit entry point. Fixed operations; bounded stdin; no shell execution."""
+import fcntl
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import hashlib
+import re
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from state import CONFIG, DATA, load_setup, validate_setup
+from network import core_config, wireguard, firewall
+
+ENV={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8','DEBIAN_FRONTEND':'noninteractive'}
+
+def run(args, timeout=360):
+    subprocess.run(args,check=True,capture_output=True,timeout=timeout,env=ENV)
+
+def atomic(path, text, mode=0o644):
+    path.parent.mkdir(parents=True,exist_ok=True,mode=0o755)
+    fd, name=tempfile.mkstemp(prefix='.node-',dir=path.parent)
+    try:
+        with os.fdopen(fd,'w') as stream:
+            os.fchmod(stream.fileno(),mode)
+            stream.write(text);stream.flush();os.fsync(stream.fileno())
+        os.replace(name,path)
+        fd=os.open(path.parent,os.O_DIRECTORY)
+        try:os.fsync(fd)
+        finally:os.close(fd)
+    finally:
+        if os.path.exists(name):os.unlink(name)
+
+def bind_desktop():
+    # At shutdown Core must flush before logind closes its X11 session.
+    # Read the fixed account's session from logind, never from caller input.
+    from desktop_session import active_desktop_scope
+    scope = active_desktop_scope()
+    path = Path('/run/systemd/system/bitcoin-core-node.service.d/desktop-session.conf')
+    text = '[Unit]\nAfter=' + scope + '\nBindsTo=' + scope + '\n'
+    if not path.exists() or path.read_text() != text:
+        atomic(path, text)
+        run(['/usr/bin/systemctl', 'daemon-reload'])
+
+
+def configure(request):
+    if not isinstance(request,dict) or set(request)-{'setup','wireguard','confirm_prune'}:
+        raise RuntimeError('Invalid configuration request.')
+    setup=validate_setup(request.get('setup'))
+    previous=load_setup() if (CONFIG/'setup.json').exists() else None
+    if previous and previous['data_uuid']!=setup['data_uuid']:
+        raise RuntimeError('Moving existing node data requires an explicit maintenance migration.')
+    if previous and previous['prune_mib']!=setup['prune_mib'] and request.get('confirm_prune') is not True:
+        raise RuntimeError('Changing retained block history requires explicit confirmation.')
+    tunnel=None;endpoint=port=None
+    if setup['profile']=='wireguard':
+        tunnel, endpoint, port=wireguard(request.get('wireguard'))
+    import pwd
+    rules=firewall(setup['profile'],pwd.getpwnam('bitcoinnode').pw_uid,endpoint,port)
+    # Validate the complete boot ruleset before changing service/config state.
+    subprocess.run(['/usr/sbin/nft','--check','--file','-'],
+                   input='flush ruleset\n'+rules,check=True,capture_output=True,text=True,timeout=30,env=ENV)
+    was_running = subprocess.run(['/usr/bin/systemctl','is-active','--quiet','bitcoin-core-node.service'],env=ENV).returncode == 0
+    run(['/usr/bin/systemctl','stop','bitcoin-core-node.service'])
+    run(['/usr/bin/systemctl','stop','bitcoin-core-node-policy.service'])
+    # Remove startup attestation before altering any settings. A partial update
+    # leaves Core unable to start; never roll back into a less private profile.
+    Path('/run/bitcoin-core-node-policy/ready').unlink(missing_ok=True)
+    if Path('/sys/class/net/core-node').exists():
+        run(['/usr/bin/wg-quick','down','/etc/wireguard/core-node.conf'])
+    if setup['data_uuid'] is not None and previous is None:
+        if any(p.name!='wallets' or any(p.iterdir()) for p in DATA.iterdir()):
+            raise RuntimeError('The existing data directory is not empty; automatic migration is refused.')
+        device=Path('/dev/disk/by-uuid')/setup['data_uuid']
+        if not device.exists():raise RuntimeError('The selected data SSD is unavailable.')
+        kind=subprocess.run(['/usr/sbin/blkid','-s','TYPE','-o','value',str(device)],check=True,
+                            capture_output=True,text=True,timeout=10,env=ENV).stdout.strip()
+        if kind!='ext4':raise RuntimeError('V1 external data storage requires an existing ext4 filesystem. No formatting is performed.')
+        run(['/usr/bin/mount','-t','ext4','-o','nodev,nosuid',str(device),str(DATA)])
+        # A selected filesystem containing unrelated data is never chowned.
+        contents=[p for p in DATA.iterdir() if p.name!='lost+found']
+        if contents:raise RuntimeError('Please use an empty data filesystem dedicated to Node.')
+        import pwd
+        account=pwd.getpwnam('bitcoinnode')
+        os.chown(DATA,account.pw_uid,account.pw_gid);DATA.chmod(0o700)
+        (DATA/'wallets').mkdir(mode=0o700)
+        os.chown(DATA/'wallets',account.pw_uid,account.pw_gid)
+        fstab=Path('/etc/fstab')
+        text=fstab.read_text()
+        if any(len(line.split())>1 and line.split()[1]==str(DATA) for line in text.splitlines() if not line.startswith('#')):
+            raise RuntimeError('The data mount already has an fstab entry; please inspect it before setup.')
+        atomic(fstab,text+'\nUUID='+setup['data_uuid']+' '+str(DATA)+' ext4 defaults,nodev,nosuid,nofail,x-systemd.device-timeout=10 0 2\n')
+        run(['/usr/bin/systemctl','daemon-reload'])
+    if tunnel is not None:
+        atomic(Path('/etc/wireguard/core-node.conf'),tunnel,0o600)
+    atomic(CONFIG/'firewall.nft',rules)
+    atomic(CONFIG/'bitcoin.conf',core_config(setup))
+    atomic(CONFIG/'setup.json',json.dumps(setup,sort_keys=True,indent=2)+'\n')
+    run(['/usr/bin/systemctl','start','bitcoin-core-node-policy.service'])
+    if was_running:
+        bind_desktop()
+        run(['/usr/bin/systemctl','start','bitcoin-core-node.service'])
+
+def main():
+    if os.geteuid()!=0 or len(sys.argv)!=2 or sys.argv[1] not in ('configure','start','stop','restart','debian-updates','software-check','software-install','core-update','time-settings','chain-backup','chain-import','wallet-delete','reboot','poweroff','settings-backup','core-settings-backup','settings-preview','core-settings-preview','settings-import','core-settings-import','settings-status','core-settings-status','settings-cancel','core-settings-cancel','watch-backup','watch-preview','watch-import'):
+        raise RuntimeError('Unsupported administration operation.')
+    if not (CONFIG/'installed').is_file():
+        raise RuntimeError('Please install Bitcoin Core Node before starting persistent operation.')
+    os.umask(0o077)
+    from operation_locks import guard
+    with guard(sys.argv[1]):
+        action=sys.argv[1]
+        result={'ok':True}
+        from system_updates import busy, start as start_updates
+        from keepass_updates import UpdateError
+        if action in ('configure','start','stop','restart','core-update','chain-backup','chain-import','wallet-delete','reboot','poweroff','settings-backup','core-settings-backup','settings-preview','core-settings-preview','settings-import','core-settings-import','settings-cancel','core-settings-cancel','watch-backup','watch-preview','watch-import') and busy():
+            raise UpdateError('Software maintenance is running. Please wait for it to finish before changing Core, restarting or shutting down.')
+        if action=='wallet-delete':
+            # Bounded list of wallet *names*, never arbitrary file paths.
+            # Validation happens again in the trusted root backend before
+            # stopping Bitcoin Core or modifying any wallet data.
+            raw=sys.stdin.buffer.read(8193)
+            if len(raw)>8192:
+                raise RuntimeError('Invalid wallet delete request.')
+            from wallet_delete import perform
+            result=perform(json.loads(raw))
+        elif action in ('watch-backup','watch-preview','watch-import'):
+            from watch_backup import perform as watch_perform
+            from chain_backup import Events
+            raw=bytearray()
+            while len(raw)<16385:
+                part=os.read(0,1)
+                if not part:break
+                raw.extend(part)
+                if part==b'\n':break
+            if len(raw)>16384 or not raw.endswith(b'\n'):raise RuntimeError('Invalid watch-only transfer request.')
+            result=watch_perform(action,json.loads(raw),int(os.environ.get('PKEXEC_UID','0')),Events(sys.stdin.buffer))
+            result={'event':'result',**result}
+        elif action in ('settings-backup','core-settings-backup','settings-preview','core-settings-preview','settings-import','core-settings-import','settings-status','core-settings-status','settings-cancel','core-settings-cancel'):
+            from settings_snapshot import perform as settings_perform
+            from chain_backup import Events
+            raw=bytearray()
+            while len(raw)<16385:
+                part=os.read(0,1)
+                if not part:break
+                raw.extend(part)
+                if part==b'\n':break
+            if len(raw)>16384 or not raw.endswith(b'\n'):raise RuntimeError('Invalid settings transfer request.')
+            result=settings_perform(action,json.loads(raw),int(os.environ.get('PKEXEC_UID','0')),Events(sys.stdin.buffer))
+            result={'event':'result',**result}
+        elif action in ('chain-backup','chain-import'):
+            from chain_backup import perform,Events
+            raw=bytearray()
+            while len(raw)<8193:
+                part=os.read(0,1)
+                if not part:break
+                raw.extend(part)
+                if part==b'\n':break
+            if len(raw)>8192 or not raw.endswith(b'\n'):raise RuntimeError('Invalid chain copy request.')
+            result=perform(action,json.loads(raw),int(os.environ.get('PKEXEC_UID','0')),Events(sys.stdin.buffer))
+            result={'event':'result',**result}
+        elif action in ('configure','core-update','time-settings'):
+            raw=sys.stdin.buffer.read(32769)
+            if len(raw)>32768:raise RuntimeError('Configuration is too large.')
+            if action=='configure':configure(json.loads(raw))
+            elif action=='time-settings':
+                from system_time import apply_settings
+                result=apply_settings(json.loads(raw))
+            else:
+                from upgrades import install_bundle
+                result=install_bundle(json.loads(raw),int(os.environ.get('PKEXEC_UID','0')))
+        elif action in ('debian-updates','software-check','software-install'):
+            result=start_updates('check' if action=='software-check' else 'install')
+        elif action in ('reboot','poweroff'):
+            run(['/usr/bin/systemctl','stop','bitcoin-core-node.service'],timeout=330)
+            run(['/usr/bin/systemctl',action])
+        else:
+            if action in ('start','restart'):bind_desktop()
+            run(['/usr/bin/systemctl',action,'bitcoin-core-node.service'])
+    print(json.dumps(result))
+
+if __name__=='__main__':
+    from wallets import WalletError
+    from system_time import TimeError
+    from chain_backup import ChainError
+    from settings_snapshot import SettingsError
+    from gpg_backend import GPGError
+    from rpc import CoreError
+    from operation_locks import OperationBusy
+    from keepass_updates import UpdateError
+    from wallet_delete import WalletDeleteError
+    try:main()
+    except (WalletError,TimeError,ChainError,UpdateError,WalletDeleteError,SettingsError,GPGError,CoreError,OperationBusy) as exc:
+        print(str(exc),file=sys.stderr)
+        sys.exit(1)
+    except Exception:
+        # No imported WireGuard key/config or subprocess payload is printed.
+        print('The operation did not complete. Please inspect local service status; no automatic network fallback or data repair was performed.',file=sys.stderr)
+        sys.exit(1)

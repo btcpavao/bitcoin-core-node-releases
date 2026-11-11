@@ -1,0 +1,18 @@
+[Unit]
+Description=Watch the RAM-only PSBT transfer folder
+# RAM preparation is a normal service after basic.target. A path unit's
+# automatic Before=paths.target would create a cycle through basic.target.
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=shutdown.target
+Requires=core-node-private.service
+After=basic.target systemd-tmpfiles-setup.service core-node-private.service
+ConditionPathExists=/etc/bitcoin-core-node/installed
+
+[Path]
+PathChanged=/run/core-node-private/psbt
+PathChanged=/run/core-node-private/workspace
+Unit=bitcoin-core-node-transfer.service
+
+[Install]
+WantedBy=multi-user.target

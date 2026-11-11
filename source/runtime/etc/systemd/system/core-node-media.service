@@ -1,0 +1,22 @@
+[Unit]
+Description=Verified removable file access for Bitcoin Core
+ConditionPathExists=/etc/bitcoin-core-node/installed
+After=systemd-tmpfiles-setup.service udisks2.service
+Before=bitcoin-core-node.service
+Wants=udisks2.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/lib/bitcoin-core-node/removable_media.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETUID CAP_SETGID
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=true
+# Like core-node-files, this fixed removable-media bridge must share the host mount
+# namespace. Source device identities and mount IDs are checked. No raw-device access is granted.
+
+[Install]
+WantedBy=multi-user.target

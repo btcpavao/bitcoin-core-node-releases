@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+"""Run file encryption with volatile Qt/GPG state and no persistent transcript."""
+import os
+import sys
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from private_workspace import private_environment, WorkspaceError
+try:
+    os.environ.update(private_environment())
+except WorkspaceError as exc:
+    import subprocess
+    subprocess.run(['/usr/bin/zenity', '--error', '--no-markup', '--text='+str(exc)])
+    raise SystemExit(1)
+from file_crypto import main
+raise SystemExit(main())

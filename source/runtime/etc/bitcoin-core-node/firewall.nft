@@ -1,0 +1,14 @@
+table inet core_node {
+  chain input {
+    type filter hook input priority -10; policy drop;
+    iifname "lo" accept
+    ct state established,related accept
+    udp sport 67 udp dport 68 accept
+    icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-advert, packet-too-big, destination-unreachable, time-exceeded } accept
+  }
+  chain output {
+    type filter hook output priority -10; policy accept;
+    oifname "lo" accept
+    meta skuid "bitcoinnode" reject
+  }
+}

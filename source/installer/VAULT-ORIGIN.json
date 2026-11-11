@@ -1,0 +1,28 @@
+{
+  "repository": "https://github.com/btcpavao/bitcoin-core-offline",
+  "commit": "110f8ccd651408145de6ec4acd6a1ad70b84309c",
+  "files_sha256": {
+    "tools/core-vault/calamares/base_patch.py": "e0583514085980d1694193479c2a083d7801df9fcd7685da4d1ab73be9ecd0ef",
+    "tools/core-vault/calamares/patch_calamares_source.py": "107246b0f15d7fd5dc88013b3afb9d84b355eb54743e501e44c2f30b7ec1a7f2",
+    "tools/core-vault/calamares/visual_polish.py": "f598f215868a6c2ea38985833e06eadca8e7ee6d90c1e080da45dc6e8d065e22",
+    "tools/core-vault/calamares/CoreOfflineGuard.h": "8f794c083809b2f66bf437b18c9ac46f1c59e09df2e6c6adf71f1b0d4c6a8ea9",
+    "config/includes.chroot/etc/calamares/branding/core-offline/branding.desc": "969e97d94c32e4c99736317696027ccb72ec8e20510f8d51e4edc4b3e29fdf00",
+    "config/includes.chroot/etc/calamares/branding/core-offline/stylesheet.qss": "d8f7bc14a53e76fbe22a9fddb971a997598d347f5c5a73d7309c4b1d5f415e0f",
+    "config/includes.chroot/etc/calamares/branding/core-offline/show.qml": "91cc3df16e2f3204b616f294465bbca37c07f1d2acca46789fbde163b2be0a5b",
+    "config/includes.chroot/etc/calamares/branding/core-offline/bitcoin.png": "e1f590cf72ce1c681ccb6ae411dd662f8fe0b75af95c9975766d543a0190e0be",
+    "config/includes.chroot/etc/calamares/branding/core-offline/debian.png": "9f0c95cf0513bb583d189ce48035358eec0d7addda7c52503425f8cbb1f6b584",
+    "config/includes.chroot/etc/calamares/branding/core-offline/checkmark.png": "ce514c685e80396aa365b7e785b9df53fbfe88d9c55fa7df64ac0bee8d81ebab",
+    "config/includes.chroot/etc/calamares/branding/core-offline/checkmark.svg": "ff62ea1e6e836899b7cc07340194c7acc828a8fb16dae0369a4daa7a4bf03972",
+    "config/includes.chroot/etc/calamares/modules/keyboard.conf": "42bb96a7eeda3bc96034b280ad9b0c45567608709252fb0be47b663727e4efa7",
+    "config/includes.chroot/etc/calamares/modules/summary.conf": "c7f37a84b04f696bb4688a3c35cb9bab599ed3b5436ff16d324c2ce8bedc057d",
+    "config/includes.chroot/etc/calamares/modules/finished.conf": "bd87649faaeb7d099d0485d48c0d9de1686ad5595d77a0a79e44d87c81f30786",
+    "config/includes.chroot/usr/lib/core-vault-installer/disk_safety.py": "95f45f35d96ce7c549051f07c9c7daf905c65a9773539433b9841c6d3c108265",
+    "config/includes.chroot/usr/local/bin/core-vault-taskbar": "37cefdaecebaf3deb945c0da7524b1c896e141a1302394574bab9f39b05a6aa7",
+    "config/includes.chroot/usr/local/bin/core-vault-show-home": "c8ed8791e041ce6e2de6af785f0755912bd260bc76e82991d3b12adbb34c5647",
+    "config/includes.chroot/usr/local/bin/core-vault-numlock": "df2608ee735f44b991a2f011b17015041a095fc8242c58206f30ce22265ac432",
+    "config/includes.chroot/usr/share/core-vault/openbox.xml": "c7c7f4ea7c46dea6ed4c9051bfc464cbe32a587209c5bb45c0de5ecd5aca4d9f",
+    "config/includes.chroot/usr/share/themes/CoreVault/openbox-3/themerc": "41844d5c1fcaaf0b208b15d4441d1fff5f114d6e3fc705ed874d8ecbc059fc1e",
+    "config/includes.chroot/usr/share/core-vault/icons/debian-white.png": "67f08dcd08aab0655e8b630a7594d1ee4138b46412283247ed23e25374b9effd",
+    "config/includes.chroot/usr/local/bin/core-vault-home": "368e162d37ac204afa964e9aafc19df8a334ff572dc8602a2121ee62e90a29bd"
+  }
+}

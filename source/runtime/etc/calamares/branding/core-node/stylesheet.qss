@@ -1,0 +1,162 @@
+/* Bitcoin Core Node installer UI */
+QWidget {
+  background-color: #000000;
+  color: #ffffff;
+  font-family: "DejaVu Sans";
+  font-size: 14px;
+}
+QLabel { background: transparent; }
+QLabel#coreOfflineProductTitle { font-size: 23px; font-weight: 600; color: #ffffff; }
+QLabel#coreOfflineProductSubtitle { font-size: 14px; color: #b8b8b8; }
+QLabel#coreOfflinePageTitle { font-size: 22px; font-weight: 600; color: #ffffff; padding-top: 8px; }
+QLabel#coreOfflinePageDescription { font-size: 14px; color: #b8b8b8; padding-bottom: 8px; }
+QLabel#coreOfflineFieldLabel { font-size: 13px; font-weight: 600; color: #d8d8d8; padding: 2px 4px; }
+QLabel#coreOfflineEraseWarning {
+  color: #ffffff; background: #171717; border: 1px solid #454545;
+  border-radius: 7px; padding: 12px;
+}
+QLabel#coreOfflineReviewCard {
+  color: #ffffff; background: #121212; border: 1px solid #383838;
+  border-radius: 7px; padding: 14px;
+}
+QLabel#coreOfflineTechnicalDetails { color: #888888; font-size: 12px; padding: 4px 8px; }
+QLabel#coreOfflineStepSeparator { color: #444444; }
+QLabel#coreOfflineDebianCredit { font-size: 12px; color: #ffffff; }
+QLabel#summaryTitle { font-size: 22px; font-weight: 600; color: #ffffff; padding: 6px 24px; }
+QLabel#summaryItemTitle { font-size: 14px; font-weight: 600; color: #b8b8b8; padding-left: 24px; }
+QWidget#summaryStep QScrollArea { background: #000000; border: none; }
+QLineEdit, QComboBox, QListView, QTreeView, QTextEdit, QTextBrowser {
+  background: #121212; color: white; border: 1px solid #4a4a4a; border-radius: 6px;
+  selection-background-color: #343434; selection-color: white; padding: 6px;
+}
+QComboBox { min-height: 30px; }
+QListView { outline: 0; }
+QListView::item { padding: 4px 7px; }
+QListView::item:selected { background: #343434; color: #ffffff; }
+QPushButton {
+  background: #171717; color: white; border: 1px solid #696969;
+  border-radius: 6px; padding: 9px 18px; min-height: 22px;
+}
+QPushButton:hover { background: #292929; }
+QPushButton:focus { border: 2px solid #f7931a; }
+QPushButton:disabled { color: #777777; border-color: #303030; background: #151515; }
+QPushButton#view-button-next { background: #ffffff; color: #000000; border-color: #ffffff; font-weight: 600; }
+QPushButton#view-button-next:disabled { background: #303030; color: #888888; border-color: #303030; }
+QPushButton#view-button-cancel { min-width: 110px; }
+QProgressBar { border: 1px solid #454545; border-radius: 4px; background: #151515; text-align: center; min-height: 18px; }
+QProgressBar::chunk { background: #ffffff; }
+QScrollBar:vertical { background: #111111; width: 13px; }
+QScrollBar::handle:vertical { background: #555555; min-height: 28px; border-radius: 5px; }
+QToolTip { background: #222222; color: #ffffff; border: 1px solid #666666; }
+
+
+/* CORE_OFFLINE_POLISH_V2_BEGIN */
+
+QPushButton#view-button-back,
+QPushButton#view-button-next,
+QPushButton#view-button-cancel {
+  min-width: 140px;
+  min-height: 30px;
+}
+
+QWidget#slideshow,
+QTabWidget,
+QTabWidget::pane,
+QWidget#coreOfflineExecutionPanel {
+  background: #000000;
+  border: none;
+}
+
+QLabel#coreOfflineExecutionTitle {
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+QLabel#coreOfflineExecutionDescription {
+  color: #c0c0c0;
+  font-size: 14px;
+}
+
+QLabel#coreOfflineExecutionStages {
+  color: #8f8f8f;
+  font-size: 13px;
+  padding-top: 6px;
+}
+
+QLabel#exec-message {
+  color: #b8b8b8;
+  font-size: 14px;
+  padding-top: 8px;
+}
+
+QToolBar {
+  background: transparent;
+  border: none;
+}
+
+QToolButton#coreOfflineToggleLog {
+  background: #171717;
+  color: #d8d8d8;
+  border: 1px solid #4a4a4a;
+  border-radius: 6px;
+  padding: 8px 14px;
+  min-width: 150px;
+}
+
+QToolButton#coreOfflineToggleLog:hover {
+  background: #292929;
+  color: #ffffff;
+}
+
+/* CORE_OFFLINE_POLISH_V2_END */
+
+QCheckBox#coreVaultEraseConsent { color: #ffffff; spacing: 10px; padding: 12px 24px; }
+QCheckBox::indicator { width: 20px; height: 20px; border: 1px solid #888888; background: #111111; }
+QCheckBox::indicator:checked { background: #ffffff; border: 2px solid #f7931a; }
+
+
+/* CORE_VAULT_VISUAL_POLISH_V3 — compact controls, one aligned content column */
+QPushButton#view-button-back,
+QPushButton#view-button-next,
+QPushButton#view-button-cancel {
+  min-width: 0px; min-height: 0px; padding: 0px 12px; font-size: 13px;
+}
+QLabel#coreOfflinePageTitle { padding: 0px; font-size: 22px; }
+QLabel#coreOfflinePageDescription { padding: 0px; font-size: 14px; }
+QLabel#coreOfflineFieldLabel { padding: 0px; font-size: 13px; }
+QLabel#summaryTitle { padding: 0px; font-size: 22px; }
+QLabel#summaryItemTitle { padding: 0px; }
+QLabel#summaryItemBody { padding: 0px; margin: 0px; }
+QCheckBox#coreVaultEraseConsent { padding: 6px 0px; margin: 0px; spacing: 10px; }
+QLabel#coreOfflineDebianCredit { font-size: 13px; color: #b8b8b8; }
+QLabel#exec-message { padding: 0px; }
+QWidget#coreVaultWizardSurface { background: #000000; }
+
+/* CORE_VAULT_INSTALLER_ALIGNMENT_V4 — explicit native control states */
+QCheckBox#coreVaultEraseConsent::indicator {
+  width: 20px; height: 20px; border: 1px solid #888888; background: #111111;
+}
+QCheckBox#coreVaultEraseConsent::indicator:checked {
+  image: url(/etc/calamares/branding/core-node/checkmark.png);
+  background: #303030; border: 1px solid #b8b8b8;
+}
+QCheckBox#coreVaultEraseConsent::indicator:hover { border-color: #ffffff; }
+QCheckBox#coreVaultEraseConsent::indicator:focus { border: 2px solid #f7931a; }
+/* Use the list popup: native menu margins otherwise paint bright bands. */
+QComboBox { combobox-popup: 0; selection-background-color: #343434; selection-color: #ffffff; }
+QComboBox QAbstractItemView {
+  background: #121212; color: #ffffff; border: 1px solid #4a4a4a;
+  border-radius: 0px; padding: 4px; outline: 0;
+  selection-background-color: #343434; selection-color: #ffffff;
+}
+QComboBox QAbstractItemView::item:selected { background: #343434; color: #ffffff; }
+QComboBoxPrivateContainer { background: #121212; border: 1px solid #4a4a4a; padding: 0px; }
+QWidget#coreVaultWizardSurface[coreVaultCompact="true"] QLabel#coreOfflineReviewCard {
+  font-size: 13px; padding: 4px;
+}
+QWidget#coreVaultWizardSurface[coreVaultCompact="true"] QLabel#coreOfflineEraseWarning {
+  font-size: 13px; padding: 6px;
+}
+QWidget#coreVaultWizardSurface[coreVaultCompact="true"] QLabel#summaryItemTitle,
+QWidget#coreVaultWizardSurface[coreVaultCompact="true"] QLabel#summaryItemBody { font-size: 13px; }

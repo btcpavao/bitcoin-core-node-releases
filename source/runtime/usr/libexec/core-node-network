@@ -1,0 +1,72 @@
+#!/usr/bin/python3
+"""Root-only boot/switch policy controller. No user-configurable commands."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import pwd
+import subprocess
+import sys
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from state import CONFIG, load_setup
+from network import firewall, wireguard, core_config
+
+READY = Path('/run/bitcoin-core-node-policy/ready')
+ENV = {'PATH':'/usr/sbin:/usr/bin:/sbin:/bin', 'LANG':'C.UTF-8'}
+
+def run(args, **kwargs):
+    return subprocess.run(args, check=True, capture_output=True, text=True, timeout=45, env=ENV, **kwargs)
+
+def apply():
+    READY.unlink(missing_ok=True)
+    setup = load_setup()
+    uid = pwd.getpwnam('bitcoinnode').pw_uid
+    profile = setup['profile']
+    endpoint = port = None
+    if profile == 'wireguard':
+        conf = Path('/etc/wireguard/core-node.conf')
+        info = conf.lstat()
+        if conf.is_symlink() or info.st_uid != 0 or info.st_mode & 0o077:
+            raise RuntimeError('WireGuard key-file permissions are unsafe.')
+        canonical, endpoint, port = wireguard(conf.read_text())
+        if conf.read_text() != canonical:
+            raise RuntimeError('WireGuard configuration is not canonical.')
+    exists = subprocess.run(['/usr/sbin/nft','list','table','inet','core_node'],
+                            capture_output=True, env=ENV).returncode == 0
+    rules = firewall(profile,uid,endpoint,port,replace=exists)
+    persisted = CONFIG/'firewall.nft'
+    if (persisted.is_symlink() or persisted.stat().st_uid != 0 or
+            persisted.read_text() != firewall(profile,uid,endpoint,port)):
+        raise RuntimeError('The boot firewall does not match the confirmed profile.')
+    run(['/usr/sbin/nft','--check','--file','-'],input=rules)
+    run(['/usr/sbin/nft','--file','-'],input=rules)
+    # The fail-closed rule is installed before any tunnel setup. On failure it
+    # remains installed and the ready attestation remains absent.
+    if profile == 'wireguard':
+        if not Path('/sys/class/net/core-node').exists():
+            run(['/usr/bin/wg-quick','up','/etc/wireguard/core-node.conf'])
+        run(['/usr/bin/wg','show','core-node'])
+        routes = json.loads(run(['/usr/sbin/ip','-j','route','show','table','all']).stdout)
+        if not any(r.get('dev')=='core-node' and r.get('dst')=='default' for r in routes):
+            raise RuntimeError('The VPN default route is missing.')
+    elif Path('/sys/class/net/core-node').exists():
+        run(['/usr/bin/wg-quick','down','/etc/wireguard/core-node.conf'])
+    if profile == 'tor' or setup['private_broadcast']:
+        run(['/usr/bin/systemctl','start','tor@default.service'])
+    expected = core_config(setup)
+    config = CONFIG/'bitcoin.conf'
+    if config.is_symlink() or config.stat().st_uid != 0 or config.read_text() != expected:
+        raise RuntimeError('Core settings do not match the confirmed privacy profile.')
+    READY.parent.mkdir(mode=0o755,parents=True,exist_ok=True)
+    READY.write_text(hashlib.sha256((CONFIG/'setup.json').read_bytes()).hexdigest()+'\n')
+    READY.chmod(0o644)
+
+if __name__ == '__main__':
+    if os.geteuid() != 0 or len(sys.argv)!=2 or sys.argv[1] not in ('apply','invalidate'):
+        sys.exit('Only the root-owned Node service may administer this policy.')
+    try:
+        if sys.argv[1]=='invalidate': READY.unlink(missing_ok=True)
+        else: apply()
+    except Exception:
+        READY.unlink(missing_ok=True)
+        sys.exit('Network policy could not be verified. Bitcoin Core remains stopped; no fallback was enabled.')

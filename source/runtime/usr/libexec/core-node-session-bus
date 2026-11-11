@@ -1,0 +1,4 @@
+#!/bin/sh
+# Keep the Core-only session bus inside its writable private runtime directory.
+# dbus-run-session supplies the remaining reviewed session-daemon arguments.
+exec /usr/bin/dbus-daemon --address=unix:dir=/run/bitcoin-core-node/qt "$@"

@@ -1,0 +1,13 @@
+{
+  "package": "xinput",
+  "version": "1.6.4-1",
+  "architecture": "amd64",
+  "distribution": "Debian 13 Trixie",
+  "filename": "xinput_1.6.4-1_amd64.deb",
+  "url": "https://deb.debian.org/debian/pool/main/x/xinput/xinput_1.6.4-1_amd64.deb",
+  "sha256": "e70992ad0407ee4df76eea3871ee2e431a163c261942206db3b6e7f2787b6e9b",
+  "purpose": "Unprivileged XInput2 libinput pointer speed adjustment",
+  "source": "Debian official signed APT repository; package installed only as system package",
+  "dependencies": "libc6, libx11-6, libxi6, libxinerama1, libxrandr2",
+  "security_scope": "No root desktop pointer settings, no modification to Bitcoin Core daemon"
+}

@@ -1,0 +1,230 @@
+Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
+
+screen_width = Window.GetWidth();
+screen_height = Window.GetHeight();
+
+bitcoin_image = Image("bitcoin-ui.png");
+title_image = Image("boot-title.png");
+line1_image = Image("boot-line1.png");
+line2_image = Image("boot-line2.png");
+track_image = Image("progress-track.png");
+fill_original = Image("progress-fill.png");
+
+debian_image = Image("debian-ui.png");
+credit_image = Image("powered-by-debian.png");
+
+bitcoin_w = bitcoin_image.GetWidth();
+bitcoin_h = bitcoin_image.GetHeight();
+
+title_w = title_image.GetWidth();
+title_h = title_image.GetHeight();
+
+line1_w = line1_image.GetWidth();
+line1_h = line1_image.GetHeight();
+
+line2_w = line2_image.GetWidth();
+line2_h = line2_image.GetHeight();
+
+track_w = track_image.GetWidth();
+track_h = track_image.GetHeight();
+
+debian_w = debian_image.GetWidth();
+debian_h = debian_image.GetHeight();
+
+credit_w = credit_image.GetWidth();
+credit_h = credit_image.GetHeight();
+
+#
+# Main content is one centered block.
+#
+
+gap_logo_title = 14;
+gap_title_line1 = 12;
+gap_lines = 5;
+gap_text_bar = 22;
+
+cluster_height =
+    bitcoin_h +
+    gap_logo_title +
+    title_h +
+    gap_title_line1 +
+    line1_h +
+    gap_lines +
+    line2_h +
+    gap_text_bar +
+    track_h;
+
+y = (screen_height - cluster_height) / 2;
+
+bitcoin_sprite = Sprite(bitcoin_image);
+bitcoin_sprite.SetPosition(
+    (screen_width - bitcoin_w) / 2,
+    y,
+    10
+);
+
+y = y + bitcoin_h + gap_logo_title;
+
+title_sprite = Sprite(title_image);
+title_sprite.SetPosition(
+    (screen_width - title_w) / 2,
+    y,
+    10
+);
+
+y = y + title_h + gap_title_line1;
+
+line1_sprite = Sprite(line1_image);
+line1_sprite.SetPosition(
+    (screen_width - line1_w) / 2,
+    y,
+    10
+);
+
+y = y + line1_h + gap_lines;
+
+line2_sprite = Sprite(line2_image);
+line2_sprite.SetPosition(
+    (screen_width - line2_w) / 2,
+    y,
+    10
+);
+
+y = y + line2_h + gap_text_bar;
+
+track_x = (screen_width - track_w) / 2;
+track_y = y;
+
+track_sprite = Sprite(track_image);
+track_sprite.SetPosition(
+    track_x,
+    track_y,
+    10
+);
+
+#
+# Progress fill sits INSIDE the one track.
+#
+
+fill_sprite = Sprite();
+fill_sprite.SetPosition(
+    track_x + 1,
+    track_y + 1,
+    11
+);
+
+fun progress_callback(duration, progress)
+{
+    width = Math.Int(478 * progress);
+
+    if (width < 1)
+    {
+        width = 1;
+    }
+
+    fill_image = fill_original.Scale(width, 6);
+    fill_sprite.SetImage(fill_image);
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+#
+# Debian footer is anchored to the actual bottom of the screen.
+#
+
+footer_gap = 5;
+footer_bottom_margin = 24;
+
+footer_height =
+    debian_h +
+    footer_gap +
+    credit_h;
+
+footer_y =
+    screen_height -
+    footer_bottom_margin -
+    footer_height;
+
+debian_sprite = Sprite(debian_image);
+debian_sprite.SetPosition(
+    (screen_width - debian_w) / 2,
+    footer_y,
+    10
+);
+
+credit_sprite = Sprite(credit_image);
+credit_sprite.SetPosition(
+    (screen_width - credit_w) / 2,
+    footer_y + debian_h + footer_gap,
+    10
+);
+
+
+# A root LUKS volume is unlocked before the desktop starts. Keep its prompt
+# visible instead of leaving the ordinary progress screen over the input.
+unlock_prompt_sprite = Sprite();
+unlock_prompt_sprite.SetZ(100);
+unlock_entry_sprite = Sprite();
+unlock_entry_sprite.SetZ(100);
+
+fun restore_branding()
+{
+    bitcoin_sprite.SetImage(bitcoin_image);
+    title_sprite.SetImage(title_image);
+    debian_sprite.SetImage(debian_image);
+    credit_sprite.SetImage(credit_image);
+}
+
+fun disk_password_callback(prompt, bullets)
+{
+    restore_branding();
+    line1_sprite.SetOpacity(0);
+    line2_sprite.SetOpacity(0);
+    track_sprite.SetOpacity(0);
+    fill_sprite.SetOpacity(0);
+    prompt_image = Image.Text("Enter the disk password to unlock Bitcoin Core Node", 1, 1, 1);
+    unlock_prompt_sprite.SetImage(prompt_image);
+    unlock_prompt_sprite.SetPosition((screen_width - prompt_image.GetWidth()) / 2, track_y - 50, 100);
+    stars = "";
+    # Limit only the displayed mask width; Plymouth retains the entire input.
+    count = bullets;
+    if (count > 60) { count = 60; }
+    for (i = 0; i < count; i++) { stars = stars + "*"; }
+    entry_image = Image.Text(stars, 1, 1, 1);
+    unlock_entry_sprite.SetImage(entry_image);
+    unlock_entry_sprite.SetPosition((screen_width - entry_image.GetWidth()) / 2, track_y - 18, 100);
+    unlock_prompt_sprite.SetOpacity(1);
+    unlock_entry_sprite.SetOpacity(1);
+}
+
+fun normal_boot_callback()
+{
+    restore_branding();
+    unlock_message_sprite.SetOpacity(0);
+    unlock_prompt_sprite.SetOpacity(0);
+    unlock_entry_sprite.SetOpacity(0);
+    line1_sprite.SetOpacity(1);
+    line2_sprite.SetOpacity(1);
+    track_sprite.SetOpacity(1);
+    fill_sprite.SetOpacity(1);
+}
+Plymouth.SetDisplayPasswordFunction(disk_password_callback);
+Plymouth.SetDisplayNormalFunction(normal_boot_callback);
+
+# cryptsetup reports failed attempts through Plymouth messages.
+unlock_message_sprite = Sprite();
+unlock_message_sprite.SetZ(100);
+fun unlock_message_callback(text)
+{
+    message_image = Image.Text(text, 1, 0.7, 0.3);
+    if (message_image.GetWidth() > screen_width - 80)
+    {
+        message_image = message_image.Scale(screen_width - 80,
+            Math.Int(message_image.GetHeight() * (screen_width - 80) / message_image.GetWidth()));
+    }
+    unlock_message_sprite.SetImage(message_image);
+    unlock_message_sprite.SetPosition((screen_width - message_image.GetWidth()) / 2, track_y + 24, 100);
+    unlock_message_sprite.SetOpacity(1);
+}
+Plymouth.SetMessageFunction(unlock_message_callback);

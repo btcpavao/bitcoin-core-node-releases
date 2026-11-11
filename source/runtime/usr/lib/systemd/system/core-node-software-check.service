@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Debian and verified KeePassXC updates
+ConditionPathExists=/etc/bitcoin-core-node/installed
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/libexec/core-node-software-updates check
+TimeoutStartSec=infinity
+UMask=0022

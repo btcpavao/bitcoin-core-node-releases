@@ -1,0 +1,8 @@
+#!/usr/bin/python3
+import sys
+sys.path.insert(0, '/usr/lib/bitcoin-core-node')
+from system_updates import perform
+
+if len(sys.argv) != 2 or sys.argv[1] not in ('check', 'install'):
+    raise SystemExit('Unsupported software operation.')
+perform(sys.argv[1])

@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Bitcoin Core Node
+Description=Bitcoin Core Node boot progress
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/core-node
+ScriptFile=/usr/share/plymouth/themes/core-node/core-node.script

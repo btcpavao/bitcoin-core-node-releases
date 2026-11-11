@@ -1,0 +1,78 @@
+#!/bin/sh
+# Vault's single desktop session structure, with persistent Node storage/networking.
+set -eu
+# Resolve display density before any GUI starts; preserve the native video mode.
+if [ "${CORE_DISPLAY_READY:-}" != 1 ]; then
+    exec /usr/local/bin/core-display-scale -- "$0" "$@"
+fi
+umask 077
+ulimit -c 0
+: "${XDG_RUNTIME_DIR:?Missing local runtime directory}"
+export LANG=C.UTF-8 LC_ALL=C.UTF-8 LANGUAGE=en
+/usr/local/bin/core-node-numlock >"$XDG_RUNTIME_DIR/core-node-numlock.log" 2>&1 || true
+xset -dpms 2>/dev/null || true
+xset s off 2>/dev/null || true
+xset s noblank 2>/dev/null || true
+xsetroot -solid black
+OPENBOX_PID=
+PANEL_PID=
+HOME_PID=
+MEDIA_PID=
+POLKIT_PID=
+BLUETOOTH_PID=
+POINTER_PID=
+CHOOSER_PID=
+cleanup() {
+    for pid in "$HOME_PID" "$PANEL_PID" "$OPENBOX_PID" "$MEDIA_PID" "$POLKIT_PID" "$BLUETOOTH_PID" "$POINTER_PID" "$CHOOSER_PID"; do
+        [ -z "$pid" ] || kill "$pid" 2>/dev/null || true
+    done
+}
+trap cleanup EXIT
+trap 'exit 0' HUP INT TERM
+/usr/bin/openbox --config-file /usr/share/bitcoin-core-node/openbox.xml \
+    >"$XDG_RUNTIME_DIR/core-node-openbox.log" 2>&1 &
+OPENBOX_PID=$!
+tries=0
+until xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -Eq '0x[1-9a-fA-F][0-9a-fA-F]*'; do
+    kill -0 "$OPENBOX_PID" 2>/dev/null || exit 1
+    tries=$((tries + 1))
+    [ "$tries" -lt 100 ] || exit 1
+    sleep 0.1
+done
+/usr/bin/lxpolkit >"$XDG_RUNTIME_DIR/core-node-polkit.log" 2>&1 &
+POLKIT_PID=$!
+# Keep the native pairing agent alive in the installer and installed desktop.
+/usr/bin/blueman-applet >"$XDG_RUNTIME_DIR/core-node-bluetooth.log" 2>&1 &
+BLUETOOTH_PID=$!
+if [ ! -f /etc/bitcoin-core-node/installed ]; then
+    # Like Vault, installer mode has no desktop panel behind Calamares.
+    /usr/local/bin/core-node-installer-session
+    exit $?
+fi
+# Private file operations, editor/cache scratch and clipboard state stay volatile.
+export TMPDIR=/run/core-node-private/user/tmp TMP=/run/core-node-private/user/tmp TEMP=/run/core-node-private/user/tmp
+export XDG_CACHE_HOME=/run/core-node-private/user/cache
+# PSBT Transfer Folder shortcuts are prepared for both accounts on verified RAM.
+# Reapply mouse speed after Bluetooth reconnect or X11 restart without
+# changing networking, Core, or the Debian mouse defaults for unconfigured mice.
+/usr/bin/python3 /usr/lib/bitcoin-core-node/pointer_control.py --watch \
+    >"$XDG_RUNTIME_DIR/core-node-pointer.log" 2>&1 &
+POINTER_PID=$!
+/usr/local/bin/core-node-file-places --apply \
+    >"$XDG_RUNTIME_DIR/core-node-file-places.log" 2>&1 || true
+/usr/bin/udiskie --automount --no-notify --no-tray --no-file-manager \
+    >"$XDG_RUNTIME_DIR/core-node-udiskie.log" 2>&1 &
+MEDIA_PID=$!
+# Synchronize mounted volumes and readable widths for upstream Qt/GTK apps.
+/usr/bin/python3 /usr/lib/bitcoin-core-node/file_dialog_policy.py --watch-desktop \
+    >"$XDG_RUNTIME_DIR/core-node-file-dialogs.log" 2>&1 &
+CHOOSER_PID=$!
+/usr/local/bin/core-node-taskbar >"$XDG_RUNTIME_DIR/core-node-taskbar.log" 2>&1 &
+PANEL_PID=$!
+while kill -0 "$OPENBOX_PID" 2>/dev/null; do
+    /usr/local/bin/bitcoin-core-node >>"$XDG_RUNTIME_DIR/core-node-home.log" 2>&1 &
+    HOME_PID=$!
+    wait "$HOME_PID" || true
+    HOME_PID=
+    sleep 1
+done

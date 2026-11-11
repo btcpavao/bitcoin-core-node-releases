@@ -1,0 +1,19 @@
+#!/usr/bin/python3
+"""Power-only polkit entry point; never accepts general administration actions."""
+import os
+import sys
+
+
+def main():
+    if os.geteuid()!=0 or len(sys.argv)!=2 or sys.argv[1] not in ('reboot','poweroff'):
+        raise RuntimeError('Unsupported power operation.')
+    # Reuse the maintenance lock, update inhibitor and orderly Core stop in
+    # the existing broker, after constraining the entire argument list here.
+    os.execv('/usr/libexec/core-node-admin',['core-node-admin',sys.argv[1]])
+
+
+if __name__=='__main__':
+    try:main()
+    except Exception:
+        print('The power operation could not be started.',file=sys.stderr)
+        sys.exit(1)
