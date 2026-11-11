@@ -152,10 +152,33 @@ index fed5afc..2b8035c 100644
  
  
 diff --git a/tests/check_ownership.py b/tests/check_ownership.py
-index f4d9384..1aefa05 100644
+index f4d9384..eaa154e 100644
 --- a/tests/check_ownership.py
 +++ b/tests/check_ownership.py
-@@ -12,7 +12,11 @@ BASELINE=ROOT/'tests/node-critical-ownership-debian13.json'
+@@ -9,10 +9,34 @@ import argparse,json,re,subprocess,tempfile
+ ROOT=Path(__file__).resolve().parents[1]
+ BASELINE=ROOT/'tests/node-critical-ownership-debian13.json'
+ 
++def verify_ram_transfer(squashfs):
++    # Compare the bytes in the finished image with the reviewed RC2 units
++    # and preparer. The two GUI shortcuts are created by the preparer at boot.
++    mount = r'etc/systemd/system/run-core\x2dnode\x2dprivate.mount'
++    service = 'etc/systemd/system/core-node-private.service'
++    helper = 'usr/libexec/core-node-private-prepare'
++    for name in (mount, service, helper, 'etc/systemd/system/bitcoin-core-node-transfer.path',
++                 'etc/systemd/system/bitcoin-core-node.service'):
++        data = subprocess.check_output(['unsquashfs', '-cat', '-no-wildcards', str(squashfs), name])
++        if data != (ROOT / 'runtime' / name).read_bytes():
++            raise RuntimeError('RAM transfer input differs from reviewed source: ' + name)
++    settings = (ROOT / 'runtime' / mount).read_text().splitlines()
++    assert 'Type=tmpfs' in settings and 'Where=/run/core-node-private' in settings
++    options = next(line[8:].split(',') for line in settings if line.startswith('Options='))
++    assert {'noswap', 'nosuid', 'nodev', 'noexec'}.issubset(options)
++    assert 'Requires=' + Path(mount).name in (ROOT / 'runtime' / service).read_text().splitlines()
++    prepare = (ROOT / 'runtime' / helper).read_text()
++    assert "link=home/'PSBT Transfer Folder'" in prepare and "link.symlink_to(root/'psbt')" in prepare
++
++
  def verify(squashfs):
      p=Path(squashfs).resolve(strict=True)
      expected=json.loads(BASELINE.read_text())['required']
@@ -168,15 +191,17 @@ index f4d9384..1aefa05 100644
      result=subprocess.run(cmd,capture_output=True,text=True,timeout=90)
      if result.returncode:
          raise RuntimeError('SquashFS numeric ownership inspection failed: '+result.stderr[-500:])
-@@ -24,6 +28,8 @@ def verify(squashfs):
+@@ -24,7 +48,10 @@ def verify(squashfs):
              name=line.split('squashfs-root/',1)[1].split(' -> ')[0]
              found[name]={'uid':int(m[2]),'gid':int(m[3]),'mode':m[1]}
      bad=[(k,v,found.get(k)) for k,v in expected.items() if found.get(k)!=v]
 +    if legacy in found:
 +        raise RuntimeError('Unexpected persistent PSBT transfer directory in the freshly built ISO.')
      if bad:raise RuntimeError('Node ownership/mode regression: '+repr(bad[:10]))
++    verify_ram_transfer(p)
      helper=found['usr/lib/dbus-1.0/dbus-daemon-launch-helper']
      assert helper['mode']=='-rwsr-xr--',helper
+     assert helper['gid']==990 and helper['uid']==0,helper
 diff --git a/tests/node-critical-ownership-debian13.json b/tests/node-critical-ownership-debian13.json
 index 082801a..c792321 100644
 --- a/tests/node-critical-ownership-debian13.json
