@@ -1,6 +1,6 @@
 # Bitcoin Core Node — Debian image releases
 
-**Rebuild candidate `rebuild-e6519d7e5e95`.** [Download the candidate ISO and complete source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [Build it yourself (English)](docs/REBUILD.md) · [Recorded ISO hash and both build jobs](docs/proofs/rebuild-e6519d7e5e95.json).
+**Unsigned rebuild candidate `rebuild-e6519d7e5e95`.** [Download the candidate ISO and complete source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [Build it yourself (English)](docs/REBUILD.md) · [Recorded ISO hash and both build jobs](docs/proofs/rebuild-e6519d7e5e95.json).
 
 An independently developed online Bitcoin Core Node environment for ordinary amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
@@ -34,18 +34,36 @@ Built-in guidance for validation, watch-only wallets and PSBT workflows.
 
 ## How to verify downloads
 
-Download the ISO, `SHA256SUMS`, `SHA256SUMS.asc`, and `btcpavao-pgp.asc` from the same release. Independently validate that the signing key's fingerprint belongs to this publisher:
+### Rebuild candidate `rebuild-e6519d7e5e95`
+
+Download the ISO from the [candidate release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95). In the directory containing the download, run the following command.
+
+```sh
+echo '8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6  bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso' | sha256sum -c -
+```
+
+An `OK` result matches the recorded ISO hash. This candidate has an unsigned checksum manifest. For a check on your own machine, [rebuild the ISO from source and compare both complete files](docs/REBUILD.md).
+
+### Signed test release `v0.1.0-rc.2`
+
+Download the ISO, `SHA256SUMS`, `SHA256SUMS.asc` and `btcpavao-pgp.asc` from the [RC2 release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2) into one directory. Confirm the full primary fingerprint with the publisher through an independently trusted channel.
 
 `787A 2AAF B0D1 19CA 0522 B2A5 B9C9 9AF8 5788 96D0`
+
+In the download directory, import the key and display its fingerprint.
 
 ```sh
 gpg --import btcpavao-pgp.asc
 gpg --fingerprint 787A2AAFB0D119CA0522B2A5B9C99AF8578896D0
-gpg --verify SHA256SUMS.asc SHA256SUMS
-sha256sum -c SHA256SUMS
 ```
 
-The key and signature arriving together do *not* independently prove identity; compare the fingerprint through an independent trusted channel. If downloading just the ISO and checksum manifest, use `sha256sum -c SHA256SUMS --ignore-missing`.
+After confirming the fingerprint, verify the signature and then check the downloaded files. Look for a good signature from the expected key and an `OK` line for the RC2 ISO.
+
+```sh
+gpg --verify SHA256SUMS.asc SHA256SUMS &&
+  test -s bitcoin-core-node-v0.1.0-rc.2-core32.1-amd64.iso &&
+  sha256sum -c --ignore-missing SHA256SUMS
+```
 
 ## What it does
 
@@ -61,7 +79,7 @@ Backup categories include blockchain/chainstate, public watch-only wallets, port
 
 ## Limitations
 
-- The historical RC2 has no demonstrated bit-for-bit rebuild. Two fresh GitHub-hosted workers produced byte-identical rebuild candidates. [Run details](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147). A security audit and a third-party rebuild on separately administered infrastructure are distinct checks.
+- The historical RC2 has no demonstrated bit-for-bit rebuild. Six GitHub-hosted builds across three runs produced the candidate ISO hash above. Each run also compared its two ISOs byte for byte. [First pair](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43014184996) · [Release pair](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147) · [Main-branch pair](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43019152211/job/130527546091). A security audit and a third-party rebuild on separately administered infrastructure are distinct checks.
 - Apple Silicon/M-series Macs are not supported. Secure Boot, Intel Macs with T2 and certain Broadcom Wi-Fi cards are not certified.
 - A Node/watch-only backup does not contain signing keys. An unencrypted network-settings backup may reveal saved credentials.
 - Full mainnet sync, hardware compatibility and every external disk adapter have not been tested in this exact public release.

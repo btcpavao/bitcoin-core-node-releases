@@ -14,7 +14,7 @@ Open Terminal in the VM. Run each block in order.
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y ca-certificates curl docker.io git gnupg patch
+sudo apt-get install -y ca-certificates curl docker.io docker-cli git gnupg less patch python3
 sudo systemctl start docker
 git clone https://github.com/btcpavao/bitcoin-core-node-releases.git
 cd bitcoin-core-node-releases
