@@ -366,6 +366,26 @@
       "uid": 0,
       "gid": 0,
       "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/desktop_input.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/input_ui.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/guide_content.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
+    },
+    "usr/lib/bitcoin-core-node/chain_storage.py": {
+      "uid": 0,
+      "gid": 0,
+      "mode": "-rw-r--r--"
     }
   }
 }

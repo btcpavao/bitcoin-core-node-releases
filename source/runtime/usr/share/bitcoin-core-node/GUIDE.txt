@@ -1,521 +1,681 @@
+Start here: Node & Vault
+
+Use Node to receive, prepare payments and broadcast. Use Vault to keep the signing keys offline and approve spending. This walkthrough starts with your installed Node and a signing wallet created and backed up on Bitcoin Core Vault. The Vault Guide covers that first wallet and its separate Core/GPG passphrases.
+
+The online Node stores a watch-only wallet: public address information, labels and transaction history, without the private keys. A PSBT (Partially Signed Bitcoin Transaction) carries an unsigned payment and supporting information to Vault, and carries the signatures back. No signing wallet or signing secret needs to come online.
+
+1. Install and connect Node
+
+Boot the Node installation USB, choose the keyboard and target disk, and review the selection. Installation erases that disk. Please disconnect valuable backup drives before installing. After installation, restart without the installation USB. Use Network Status to connect to Wi-Fi, or connect an Ethernet cable.
+
+2. Choose how to protect access to this computer
+
+A watch-only wallet is stored persistently on Node. Someone using its unlocked desktop can inspect your financial history. Open Settings → Login Password to set an optional password for the next login. This prevents ordinary automatic access to the desktop; it does not encrypt the disk or protect an already-open session. Read Device privacy & login before leaving the device unattended.
+
+3. Choose block storage before downloading
+
+Open Bitcoin Core. In its first-start window, choose the intended data location and whether to limit block storage. Pruning retains less old block data after validation. Choose a target that leaves space for chainstate, indexes and maintenance, not the entire free disk. See Storage & pruning for a worked example. Import an existing trusted Node blockchain backup first if you intend to reuse one.
+
+4. Export the public wallet from Vault
+
+On offline Vault, select your signing wallet in Bitcoin Core and choose File → Export watch-only wallet. Save it as watch-only.dat in Private Workspace, then use Files to copy that public export to your transfer USB. Do not bring the original signing wallet.dat, a decrypted signing backup, or the Core/GPG passphrases protecting the Vault signing backup to Node.
+
+5. Restore the public copy into Node's Core
+
+Connect the transfer USB. In Bitcoin Core choose File → Restore Wallet, select watch-only.dat and give the restored wallet a clear new name. You can select it from the USB sidebar or first copy it to PSBT Transfer Folder. If the public export itself is GPG-encrypted, use Decrypt Files and select the recovered public .dat in Private Workspace. Core creates a persistent public wallet on Node's disk; the transfer copy remains temporary if it is in RAM.
+
+6. Finish synchronization and wallet scanning
+
+Let Core validate the blockchain and scan the wallet's transactions. These are separate operations. Resolve warnings about missing pruned history; an unfinished scan is not a reliable balance. Check that you restored a watch-only wallet and that it corresponds to the intended Vault wallet and Bitcoin network.
+
+7. Create a receiving address on Node
+
+Select the watch-only wallet, open Receive, add a useful label and choose Create new receiving address. Share the resulting address or QR code with the sender. Independently confirm that the address belongs to the corresponding Vault wallet before a significant deposit. Address requests advance a wallet's address index, so compare the same address/index rather than assuming that two separately generated requests must match. Receiving bitcoin does not require Vault to be powered on.
+
+8. Back up your online setup
+
+Open Settings → Backup and Restore. Save the watch-only collection and Node configuration to separate backup media. Node configuration already includes supported Core settings. A blockchain backup is optional: it saves download/validation time after a disk failure or move to another computer, but is not a signing-wallet backup. Keep another copy and do not rely on a backup stored only on this computer's own disk.
+
+9. Prepare an unsigned payment
+
+With Core synchronized and the watch-only wallet selected, open Send. Enter the recipient's address and amount, choose the fee and review the payment. Use Create Unsigned to make a PSBT; this does not spend or broadcast anything. Save it as an identifiable .psbt file in PSBT Transfer Folder or directly on a writable transfer USB.
+
+10. Move the PSBT to Vault
+
+If saved in a RAM folder, use Files to copy it to the USB before restarting Node. Finish writes and eject/unmount the USB. On Vault, use Files to copy the PSBT into Private Workspace and open Bitcoin Core → File → Load PSBT from file. Use the matching signing wallet.
+
+11. Review and sign offline
+
+In Vault, independently check the recipient address, amount, fee and change returned to your own wallet. Enter the Core wallet passphrase only there, when required, and select Sign Tx. Save the signed PSBT in Vault's Private Workspace, then copy it to the transfer USB with Files. Vault's Core USB view is read-only. Vault does not broadcast the transaction.
+
+12. Bring the signed transaction back and broadcast
+
+On Node, choose File → Load PSBT from file and open the returned signed PSBT. Check that it is the payment you approved and that signing is complete. Choose Broadcast Tx only when ready. The synchronized online Node sends it to Bitcoin peers. Watch the transaction in Core: broadcast is not a block confirmation, and a transaction ID alone is not proof of successful relay.
+
+13. Save necessary files before restarting
+
+The installed blockchain, restored watch-only wallets and Node settings persist. Private Workspace and PSBT Transfer Folder do not: they are RAM-only and clear at shutdown/restart or power loss. Save any unfinished PSBTs, recovered exports and notes you still need. Use normal Restart/Shut Down so Core can close cleanly.
+
+The remaining chapters explain these steps and the applications that support them. Keep the original signing-wallet backup and its redundant, separately stored secrets under your Vault recovery plan; Node's public backups do not replace them.
+
+Device privacy & login
+
+Watch-only does not mean publicly readable. It means the wallet lacks private spending keys. The public descriptors, address book, balances and transaction history stored on this Node can still reveal your finances.
+
+What someone with access can see
+
+Someone at an unlocked Node desktop can open Core and inspect loaded wallets. Closing a wallet window, stopping Core or restarting does not erase the persistent watch-only database. A person who can read the disk directly may copy the database and examine it on another computer. Screenshots, diagnostic output, watch-only exports and unencrypted wallet collections can reveal similar information.
+
+Without the Vault signing keys, the watch-only copy cannot independently sign a payment. However, a compromised online computer can propose false recipients, amounts or change outputs, or show a misleading receiving address. Independent checks on Vault remain part of the workflow.
+
+Optional desktop login password
+
+Open Settings → Login Password.
+
+Enter and repeat a password, then choose Set password. Choose a secret that is practical to use and not easily guessed. A random KeePassXC phrase is one option.
+
+At the next start or restart, enter it on the Bitcoin Core Node login screen and press Enter. The username is fixed; you do not create another account.
+
+Change password replaces the secret; Remove password returns to automatic login at the next login.
+
+These settings do not lock the current session. Anyone already using that desktop has its normal controls, including password settings. Shut down normally before leaving an unattended device in a place where others can use it. The current session must not be treated as protected just because you set a password.
+
+This login password is not disk encryption. It provides an ordinary login barrier, not protection against booting another operating system, removing the disk, an administrator or a compromised running system. Keep physical access controlled. The installer does not add full-disk encryption. Encrypting an exported backup protects that export only, not Core's active watch-only database.
+
+Different passwords have different jobs
+
+The login password is for entering this Node desktop, not for each routine operation. Built-in backups, restores, updates and settings retain their confirmations but do not repeatedly request it. A GPG passphrase opens a particular encrypted backup. The Core signing-wallet passphrase belongs on offline Vault. Do not reuse the Vault secrets as the Node login password. Advanced Terminal sudo commands retain normal Linux authentication.
+
+The Node configuration backup intentionally excludes the login password and account identity. Set a new login password on a replacement computer. Back up public wallet data privately; keep any encryption passphrase separately recoverable. Treat this as a dedicated Node rather than a computer for opening unrelated attachments, browsing or installing arbitrary software.
+
+Storage & pruning
+
+Choose how much old block history you keep, not how much checking Core performs. An archival node retains the historical blocks. A pruned node validates blocks under the same rules, then removes older block and undo files to stay near a storage target. Pruning reduces retained storage; it does not eliminate the initial download and validation work.
+
+What the storage bar measures
+
+Home's Blockchain storage bar shows percentage full and remaining usable space for blockchain data. Its capacity is allocated blocks, chainstate and indexes + free space available to Core. It excludes space already occupied by Debian, installed programs, wallets, other files and filesystem reservations.
+
+For example, 30 GiB used by blockchain data plus 60 GiB free gives 90 GiB capacity and 33.3% full. This is not a separate reserved partition. Saving unrelated files or installing updates can reduce the available space. The usage estimate refreshes periodically; it is not a promise about how large the blockchain will be when synchronization finishes.
+
+Set the target in Bitcoin Core
+
+Read the free/capacity figures for the actual disk where Core stores its data, not the capacity printed on the computer's packaging.
+
+In Core's first-start storage window, or later under Bitcoin Core → Settings → Options, enable the option to limit/prune block storage and enter the intended target.
+
+Use the unit displayed beside that field. Apply the setting and restart Core if it asks.
+
+Monitor the storage bar during synchronization and afterwards. Leave free space for database growth and maintenance rather than aiming for 100% full.
+
+A practical budget
+
+Block-file target ≤ usable blockchain capacity − chainstate/index allowance − free-space reserve. Chainstate is Core's database of currently unspent outputs; it remains needed even after old blocks are deleted. Indexes help Core find its data. These are not all controlled by the block pruning target.
+
+Illustrative example, not a measurement of today's chainstate: suppose the bar gives 90 GiB of usable capacity. Allow 20 GiB for chainstate and related indexes and leave another 20 GiB free. That leaves a ceiling of 50 GiB for retained block files; choosing less, such as 40 GiB, adds room. Replace those allowances with the actual usage and expected growth of your Node. An allowance that is adequate now may be too small later.
+
+Units matter: 1 GiB = 1,024 MiB ≈ 1.074 GB. A 40 GiB target is 40,960 MiB, approximately 43 GB. Use the field's displayed unit; entering 40 in a field labelled GB is a slightly smaller target than 40 GiB. Advanced bitcoin.conf settings use prune in MiB. Do not paste a GiB number directly into that configuration option.
+
+A larger target retains more recent history and gives more room for wallet rescans. It does not guarantee a fixed number of days or months: block sizes and transaction activity vary. A smaller target suits a smaller disk but requires more care with old or rarely opened wallets. No disk-size recommendation is permanent.
+
+Plan watch-only imports before old history disappears
+
+Restore your public wallet early and keep it loaded while Core synchronizes and prunes. A rescan looks through older blocks for that wallet's transactions. If needed blocks have already been removed, Core cannot reconstruct the missing history from a public descriptor alone. A pruned backup contains only retained blocks; copying it cannot restore blocks already deleted.
+
+For an old wallet or one left unloaded for a long time, recover a trusted copy with the needed history or use an archival node/re-download as required by Core. Do not invent a newer wallet creation date just to dismiss a warning. Wait until validation and wallet scanning have finished before trusting a balance.
+
+Changing your choice later
+
+Reducing the target may delete more old blocks. Increasing it retains more future blocks but does not automatically fetch all previously pruned history. Disabling pruning to return to archival operation can require downloading and rebuilding the complete history. Also leave extra temporary space when importing a blockchain backup: the current copy is kept until the incoming copy passes its restore checks.
+
+Technical source: Bitcoin Core's own -prune help in src/init.cpp and the pruning tests in test/functional/feature_pruning.py (github.com/bitcoin/bitcoin). The Node capacity formula is described above; it does not change Core's pruning rules.
+
 Bitcoin Core
 
-Bitcoin Core online node environment.
+Bitcoin Core is the application that validates the blockchain, stores the public wallet, creates receiving addresses, prepares unsigned PSBTs and broadcasts the transactions signed on Vault. Use its ordinary wallet menus for those jobs; Node's Home and Settings provide the surrounding system tools.
 
-This dedicated Debian environment validates Bitcoin, watches your public wallet and prepares transactions. Your separate offline Vault holds the signing keys.
+Start and control Core
 
-Install and sign in
+Open Bitcoin Core on Home to start it or return to its window. Use the wallet selector when more than one wallet is open. File → Open Wallet opens an existing wallet, and File → Close Wallet unloads one without deleting its database. Closing a window and ending the Core process are not always the same operation; use File → Exit or the Node Core-status controls to stop it cleanly.
 
-Boot the verified Node USB and choose the keyboard and installation disk. Please back up saved data first; installation erases the selected disk.
+The indicator beside the clock describes Bitcoin peer connections, not merely Wi-Fi association. It opens details and controls. Pause sync temporarily disconnects peers; Resume sync reconnects. Stop Bitcoin Core closes Core so it can finish saving. Restart there restarts Core, not this computer.
 
-Review the selected disk and complete installation.
+What the Home status area means
 
-Restart and remove the USB. The Node desktop opens automatically by default.
+The text and visible meters are centered between the launchers and the Debian logo. The upper meter follows Core's validation-progress estimate in 100 segments. The lower meter shows blockchain storage percentage full and available capacity. A stopped/error message occupies the same centered area without empty bars. A changing percentage is not a promised finishing time.
 
-Open Bitcoin Core. Its native first-start dialog lets you choose storage and pruning before synchronization begins.
+Keep signing separate
 
-Choose password or automatic login
+The intended Node/Vault setup uses only public watch-only wallets here. Creating a signing wallet in online Core is possible, but it is a different arrangement: its private keys would be on the online device. Do not restore the Vault signing database here merely to make a PSBT easier to use. Node's Watch-only wallets backup intentionally skips signing wallets.
 
-Open Settings → Login Password, enter the same password twice and choose Set password. At the next startup or restart, enter that password on the Bitcoin Core Node screen and press Enter. No user selection is needed. There is no minimum length or required mix of characters.
+Delete a local wallet deliberately
 
-Use Change password to replace it, or Remove password to restore automatic login. The signed-in local Node desktop can change this setting without re-entering the current password. Your current session stays open, and no reinstallation is needed.
+First keep any public wallet/label backup you need. Close the selected wallets in Core. In Files → Core → wallets, select their folders, right-click Permanently Delete Bitcoin Core Wallets…, review and use the red Permanently Delete button. Ctrl-click selects several. Loaded or invalid selections are refused. The batch stops Core once and restarts it after success; it does not delete the blockchain or unrelated wallets.
 
-The login password is used at sign-in, not to authorize each Node action. Backups, restores, software updates and Node settings do not ask for it again in the active local desktop. Anyone using an unlocked Node desktop can operate these controls and change the login setting. Confirmations, backup passphrases and wallet encryption remain separate. Arbitrary terminal sudo commands retain normal Linux authentication.
-
-A login password controls access to the desktop. It does not encrypt the disk or replace a Bitcoin Core wallet passphrase. Older encrypted installations retain their separate disk-unlock password.
-
-The installed Node keeps blockchain data, wallets and settings after restart. Private Workspace and PSBT Transfer Folder are cleared. Please shut down Core cleanly before disconnecting its data disk.
-
-Opening and closing Bitcoin Core do not ask for the login password again. Restart and Shut Down ask for confirmation without an additional authentication prompt. Login happens after the computer starts again.
-
-Blockchain progress and disk space
-
-The Home screen shows a fixed 100-segment progress bar. Each orange segment represents 1% of Bitcoin Core’s verified blockchain progress. The meter is based on Core’s own verificationprogress RPC and does not guess time remaining. Before header pre-sync completes, verified progress may remain at zero while the header count increases.
-
-Directly below is one simple storage bar for the actual mounted blockchain filesystem. The label displays percent and GiB available. The occupied space includes all files on that disk, not only blocks and chainstate. If the selected external disk is missing or cannot be verified, no misleading free-space figure is shown.
-
-Manage Bitcoin Core from the status indicator
-
-Click the online/offline indicator beside the clock to view peer details and Start, Pause sync, Stop or Restart controls. Pause sync uses Bitcoin Core setnetworkactive(false), temporarily disconnecting peers without stopping the process or changing the saved privacy configuration. Resume sync uses setnetworkactive(true). Stop performs a graceful Bitcoin Core shutdown; Restart affects Bitcoin Core only. All actions are explicit, and the Debian computer stays running.
-
-Delete wallet from Files
-
-Core files remain read-only. First close or unload every wallet you want to delete using Bitcoin Core → File → Close Wallet. In Files → Core → wallets, select one or multiple wallet folders (Ctrl-click to select multiple), right-click and choose Permanently Delete Bitcoin Core Wallets…. Review the exact selection in the same dialog style used by Vault, then click the red Permanently Delete button. You do not need to type wallet names. The helper refuses the entire batch if any selected wallet is invalid or still loaded. Bitcoin Core stops once and restarts after the whole batch succeeds. The operation only removes selected wallet folders, never blocks, chainstate or the wallets root. The progress window closes automatically on success and offers Close after an error. Deleting wallets is irreversible and can destroy funds without a verified separate backup. Overwriting is best effort only: SSDs, journaling and old backups may retain prior data.
+Deletion and overwriting are best effort, especially on SSDs and USB flash. Older copies or filesystem history may remain. Deleting a watch-only copy does not delete Bitcoin or the offline signing wallet; deleting the only signing wallet without a usable backup can lose access to funds. Keep the distinction explicit.
 
 Synchronization
 
-Blockchain synchronization
+Synchronization brings this Node up to date with the Bitcoin network. Core downloads blocks and checks them; its initial work depends on the disk, connection and processor. Keep the data disk connected and use normal shutdown rather than cutting power.
 
-Core downloads blocks and independently verifies Bitcoin's rules. During initial block download, the displayed blockchain progress is not a final wallet balance. Wallet scanning is a separate operation: it finds transactions related to your imported public descriptors.
+Validation and wallet scanning are separate
 
-Blockchain validationWallet scanning
+Blockchain validation checks the chain against Bitcoin's rules. Wallet scanning identifies transactions belonging to a particular wallet. Restoring a public wallet after the chain is downloaded may still require a scan. Wait for both before relying on the balance or preparing a spend. A temporary zero balance is not proof of no funds.
 
-Are these blocks and transactions valid?Which validated transactions belong to this public wallet?
+At first Core may download/check headers, the small block summaries, before the validation meter moves noticeably. Look at the header count, block count and peer connections rather than treating a slow percentage as a failure. Settings → Bitcoin Core Status → Show technical details opens a separate diagnostic window.
 
-Please finish both before preparing a payment in Core. Closing Home does not stop Bitcoin Core. Use Bitcoin Core → File → Exit, Bitcoin Core status indicator → Stop Bitcoin Core or a normal shutdown before disconnecting storage.
+Continue after an interruption
 
-Archive or pruned storage
+After a clean stop, the installed Node keeps the completed chain data and can continue on the next start. If the selected data disk is missing, reconnect it instead of choosing a new empty directory by accident. If Core reports corruption, preserve the existing data and investigate the actual error.
 
-Archive nodePruned node
-
-Keeps historical blocks. Requires more storage. Can rescan old wallet history.Validates the same rules but removes older block files. Requires less storage. Cannot rescan history it no longer has.
-
-Pruning does not weaken validation. It changes which historical block files remain available. If an older wallet needs missing blocks, read Core's rescan warning and restore the required block history. Please use an archive node or restore the required block history. A zero balance after an incomplete scan must never be treated as proof of no funds.
-
-Enabling pruning or reducing its target can delete downloaded block files. Disabling pruning can require reindexing and downloading history again. Choose pruning in the initial Bitcoin Core dialog or later in Bitcoin Core → Settings → Options, following its restart instructions.
-
-Progress without guesswork
-
-Home uses a fixed 100-segment validation meter based on Core's own estimate, with a separate storage bar. It does not guess a finish time. Before header pre-sync completes, the validation percentage can remain at zero.
-
-Settings → Bitcoin Core Status shows live blocks, headers, peers, mempool, network and storage information. A subtle pulse appears while Core reports initial validation with an active network and peers. Wallet rescans remain separate. Open Show technical details for an independent searchable snapshot window.
-
-To reuse downloaded blocks on another Node, open Settings → Backup and Restore → Blockchain. The Blockchain backup chapter explains the complete copy and import workflow.
-
-Status & diagnostics
-
- Settings → Bitcoin Core Status
-
-The dashboard reads local Core data. It shows version, validation percentage, block and header heights, peers, Bitcoin network, mempool, free storage and the selected privacy profile. It refreshes automatically; a stopped or unavailable Core shows unavailable values rather than fabricated success.
-
-Show technical details
-
-Click Show technical details to open a separate resizable, minimizable window. The dashboard stays compact. Details are grouped into Blockchain, Network and software, Mempool, Peer networks, transport protocols and wallet-rescan information when available.
-
-Use Find a field or value… to narrow the tree, Expand all or Collapse all to control it, and Raw JSON only when the unformatted snapshot is useful. Refresh takes a new local snapshot without continually moving the data while you read. Closing this window does not stop Core.
-
-Copy snapshot copies diagnostics to the clipboard, not to a server. Review them before sharing: wallet names and other information may be private. Core sync does not prove that unrelated HTTPS update servers are reachable.
-
-Networking
-
-The Network Status icon immediately left of Restart lists available Wi-Fi networks. Select your network, enter its password and click Connect. Saved networks reconnect automatically for this user. Ethernet connects automatically when a cable is plugged in. Use Advanced settings for hidden networks, enterprise Wi-Fi or manual IP settings. When Core is opened without an active connection, it offers this setup first; Use Core offline remains available. A connected local network does not guarantee Internet access. Bitcoin transport privacy stays in Settings → Bitcoin Core Network & Privacy. Changing a connection does not disable the selected firewall policy.
-
-Network privacy
-
-ProfileScope and limits
-
-ClearnetDirect Bitcoin peers over IPv4/IPv6. Peers see your public IP; your ISP may identify Bitcoin traffic.
-
-TorBitcoin P2P uses the local Tor proxy. Direct daemon traffic is blocked. Other OS traffic, including Debian updates, still uses the ordinary network.
-
-WireGuardWhole-device full tunnel. The kill switch blocks fallback and DNS/IPv6 leakage outside the tunnel, with exceptions for the configured VPN endpoint and essential link setup. The VPN operator is a trust point.
-
-WireGuard import accepts a standard full-tunnel configuration with numeric endpoint and explicit DNS. Configurations containing scripts or unsupported split routes are refused. Private tunnel keys are stored only in root-owned configuration. Neither Tor nor a VPN guarantees anonymity.
-
-Profile switches stop a running Core, replace the guarded network policy and verify it before restarting. If Core was stopped, it remains stopped. A failed switch leaves the node stopped rather than falling back to a less private profile. I2P and Tor bridges are not exposed in V1.
-
-Transaction broadcast privacy is separate
-
-The private transaction broadcast preference uses Core 32.1's privatebroadcast behavior for sendrawtransaction. It is separate from the ordinary peer-network profile. Private broadcast uses short-lived Tor/I2P connections and does not initially place the submitted transaction into the local mempool. This product exposes the Tor configuration.
-
-Enabling Tor for private broadcasting also makes it available for ordinary peer selection. An unavailable private route must not silently fall back to standard broadcast. A returned transaction ID does not establish successful relay. Please check the exact release's transport acceptance results.
-
-Bluetooth mouse and keyboard
-
-Open Settings → Bluetooth Devices, or press Ctrl+Alt+B. Turn on the adapter, put your mouse or keyboard in pairing mode, select Search, then pair and connect it. For a keyboard, enter the displayed code on that keyboard and press Enter when prompted. Mark your device as trusted for future connections.
-
-The installed system keeps pairing keys on disk. After restart, switch on or wake the paired device to reconnect. Devices paired only in the live installer must be paired again after installation. Use a built-in or USB keyboard/mouse for initial setup if needed; Ctrl+Alt+B also opens pairing during installation.
-
-The image includes Debian firmware for common adapters. If no adapter appears, check the computer's Bluetooth/airplane-mode switch and BIOS settings. Some hardware needs additional vendor firmware or a Debian-compatible USB Bluetooth adapter. Bluetooth network sharing and file transfers are not enabled by the Node setup.
-
-Mouse & Pointer speed
-
-After connecting a Bluetooth or USB mouse, open Settings → Mouse Speed. Select the device, adjust the slider to Slower or Faster, and press Apply and Save. The preference is saved per XInput mouse name and reapplied at Bluetooth reconnect and new desktop sessions. These settings affect only cursor acceleration and do not change Bitcoin Core, networking or keyboard pairing.
+Read Storage & pruning before choosing a retention target, especially for old wallet imports. Use Blockchain backup to move an already synchronized trusted copy to another Node. Even after importing it, Core must catch up with newer blocks; a copied tip is not today's network tip forever.
 
 Watch-only wallets
 
-One wallet, two roles
+A native watch-only export contains public descriptors, receiving/change-address state, labels, address-book entries and recorded transactions, without private keys. Descriptors are the instructions Core uses to recognize and derive the wallet's addresses. This lets Node follow the same wallet while Vault retains signing authority.
 
-The offline Vault holds signing keys. The online Node validates the blockchain, watches your public wallet and prepares transactions. Public wallet data reveal addresses and financial activity, but cannot authorize spending.
+Import the file exported by Vault
 
-Transfer a native watch-only wallet
+On Vault, choose Bitcoin Core → File → Export watch-only wallet from the intended signing wallet. Save the public watch-only.dat in Private Workspace and copy it to a USB with Files.
 
-On Vault, open Bitcoin Core 32.1, select your signing wallet and choose File → Export watch-only wallet. The signing wallet can remain locked.
+On Node, open Core and select File → Restore Wallet. Use the USB sidebar or a public copy in PSBT Transfer Folder. Give the wallet a new name.
 
-Save watch-only.dat in Private Workspace, then use Files to copy that public export to USB. Never copy the original signing wallet.dat to the Node.
+For a GPG-encrypted public export, use Decrypt Files first and restore the recovered .dat from Private Workspace. Do not decrypt a signing backup on Node.
 
-On Node, use Files to copy the public file from USB into PSBT Transfer Folder in your home folder. This folder is also visible in Core's file picker. If GPG-encrypted, use Decrypt Files and select the recovered database from Private Workspace in Core.
+Wait for Core's scan and resolve pruning warnings. Compare public address information with the corresponding Vault wallet and confirm the Bitcoin network.
 
-Open Bitcoin Core and choose File → Restore Wallet. Select the file from PSBT Transfer Folder and give the restored wallet a new name.
+Core's restore copies the public database into persistent wallet storage. Removing the transfer USB or clearing Private Workspace does not remove that active wallet.
 
-Wait for blockchain synchronization and the wallet rescan. Read any warnings from Core: if required historical blocks were pruned, recover the missing block history before relying on the balance.
+Use the correct import path
 
-Compare receiving addresses and labels with Vault. The native export retains public descriptors, receiving/change address state, labels and wallet transaction history, without signing keys.
+A single watch-only.dat from Vault belongs in Core → File → Restore Wallet. A .json/.gpg collection created by Node's watch-only backup belongs in Backup and Restore → Watch-only wallets → Restore. The formats are intentionally different; no manual descriptor JSON editing is needed for the native .dat flow.
 
-For the first public .dat file from Vault, Core performs the native restore. For a collection previously saved on Node, use Settings → Backup and Restore → Watch-only wallets → Restore. Watch-Only Wallets and the adjacent PSBT Transfer Folder launcher appear on Home after a loaded private-key-disabled descriptor wallet is detected. If a wallet is closed, open it through Bitcoin Core → File → Open Wallet.
+When Node detects a loaded supported public-only wallet, Watch-Only Wallets and PSBT Transfer Folder appear together on Home. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.
 
-Receive and prepare transactions
+Public information can reveal balances and transaction history. Use the optional login password and physical access precautions described in Device privacy & login. Protect public exports and backups too; watch-only does not make them nonsensitive.
 
-Use Core or Watch-Only Wallets to view balances, labels, addresses and history. Use Bitcoin Core itself to prepare, inspect and broadcast PSBT transactions. Until synchronization or the wallet scan finishes, balances are provisional. Please verify receiving addresses independently against Vault.
+Technical source: Bitcoin Core's offline-signing-tutorial.md and release-notes-32.0.md under github.com/bitcoin/bitcoin/doc describe exportwatchonlywallet and restorewallet. This Guide uses the corresponding GUI actions in the bundled Core.
 
-An incomplete legacy import is shown as incomplete in the wallet manager. Restore a fresh native public export under a new name in Core.
+Receiving bitcoin
+
+Once the correct watch-only wallet is restored, Node can generate receiving addresses without asking Vault to sign anything. The private keys remain offline. Vault does not need to be running to receive a payment.
+
+Open Bitcoin Core on Node and select the intended watch-only wallet.
+
+Open Receive. Add a label that will help identify the payment later. An optional requested amount is information for the payer, not a restriction on what that address can receive.
+
+Choose Create new receiving address. Copy the displayed address or show the QR code.
+
+Before a significant deposit, independently confirm the address belongs to your corresponding Vault wallet and the correct Bitcoin network. Checking only two displays on the online computer is not an independent check.
+
+Share the address with the sender. Use a fresh receiving address for a new payment when practical to reduce simple address reuse.
+
+Wait for the payment to appear and for confirmations. Keep Core synchronized and the wallet scan complete when checking status.
+
+Compare the same address, not different requests
+
+Both wallet copies can generate a sequence of addresses. Creating more requests on one side advances its next-address index, so the next request on Vault is not necessarily the same as the latest request on Node. For the initial pairing, compare corresponding addresses at the same index before making extra requests. For an address not already visible in Vault's address information, resolve that match using Core's wallet/address tools rather than accepting a visually similar address or a familiar wallet name.
+
+A receiving address is public but can link payments to you. Do not publish a whole watch-only export merely to request payment; share only the address needed. Labels/history are local useful records, so keep a watch-only backup after important changes. Backing up Node never substitutes for recovering the offline signing wallet.
 
 PSBT transactions
 
-Use Bitcoin Core directly
+Node prepares → Vault reviews and signs → Node broadcasts. A PSBT is a Partially Signed Bitcoin Transaction: it carries transaction details and supporting public data so the offline wallet can sign without connecting to the network. An unsigned PSBT has no authority to spend. A fully signed payment may be broadcast by anyone holding it, so handle the returned file deliberately.
 
-On Node, select the watch-only wallet in Bitcoin Core. Use the Send tab to enter recipients, amounts and a fee, review the transaction and create an unsigned PSBT.
+1. Prepare on the online Node
 
-Save the PSBT in PSBT Transfer Folder or Private Workspace. Use Files to copy it to a USB drive before restarting: both PSBT Transfer Folder and Private Workspace are RAM-only.
+Wait for blockchain synchronization and wallet scanning. Select the correct watch-only wallet in Core.
 
-On offline Vault, open Bitcoin Core and choose File → Load PSBT from file. Independently inspect recipients, amounts, fees and change before unlocking the signing wallet and signing. Save the signed PSBT to removable media.
+In Send, enter the recipient's address and amount. Review the fee; Coin Control is available when you want to choose specific outputs.
 
-On Node, copy the signed PSBT into PSBT Transfer Folder or Private Workspace. Choose Bitcoin Core → File → Load PSBT from file. Inspect the loaded transaction and confirm broadcast only when it matches the intended payment.
+Use Create Unsigned rather than expecting Node to sign. Save the .psbt to PSBT Transfer Folder or directly to writable USB. A filename such as payment-unsigned.psbt helps distinguish it from the returned file.
 
-Check the transaction in Core. Submission is not proof of propagation or confirmation.
+If the file is in a RAM working folder, use Files to copy it to the transfer USB. Finish writing and eject/unmount safely.
 
-PSBT creation, parsing, signing and broadcast are handled by Bitcoin Core. Node has no separate Create Transaction or Import Signed PSBT application and creates no custom proposal records. Please keep any PSBT files you still need on USB or persistent storage.
+2. Review and sign on offline Vault
 
-The offline signer must independently check the transaction: an online computer can propose an unwanted payment. A PSBT carries a transaction proposal and supporting public data, not the wallet's private keys.
+Copy the unsigned PSBT to Vault's Private Workspace. Open the corresponding signing wallet and choose File → Load PSBT from file.
+
+Independently verify every recipient, amount, fee and change output. Change is the unused part of the selected inputs returning to your own wallet.
+
+When satisfied, unlock the wallet with its Core passphrase if required and choose Sign Tx.
+
+Save the signed PSBT in Vault's Private Workspace. Then copy it to USB with Files; Vault's Core USB view itself is read-only. Keep the signing wallet and its secrets offline.
+
+3. Return to Node and broadcast
+
+Connect the USB to Node. Choose File → Load PSBT from file in Bitcoin Core and select the signed file. A RAM copy is optional.
+
+Recheck that the intended transaction is complete and matches the payment approved in Vault. An incomplete PSBT cannot be broadcast as a complete transaction.
+
+Choose Broadcast Tx. Node sends the signed transaction to its peers using the configured route.
+
+Inspect the transaction in Core afterwards. Broadcast does not guarantee inclusion in a block; confirmations arrive after miners include it. A fee estimate is not a guarantee of confirmation time.
+
+There is no extra custom Node transaction app or proprietary proposal file in this flow. Core handles the PSBT and transaction. Do not select an original signing wallet backup when asked for a PSBT.
+
+Keep unfinished payment files you still need outside RAM before shutdown. A PSBT is not your wallet recovery backup. If private broadcast is enabled and fails, inspect that route rather than silently switching to a different privacy setting.
+
+Technical source: Bitcoin Core doc/psbt.md and doc/offline-signing-tutorial.md (github.com/bitcoin/bitcoin). The standard separates transaction creation, signing and broadcast; the GUI combines the intermediate PSBT processing steps.
 
 Backups & recovery
 
-Settings → Backup and Restore is the single starting point for four separate kinds of backup. Each row has its own Backup and Restore buttons. Choose the data you need, not a whole-disk clone.
+Start at Settings → Backup and Restore. A backup is a separate saved copy; a restore uses that copy to recover something. The four rows keep different kinds of information separate. This is not a copy of the entire disk.
 
-CategoryPurpose
+Choose this rowTo keep this information
 
- BlockchainDownloaded blocks, block index and chainstate. No wallets or network passwords.
+ BlockchainYour existing blockchain data, so another Node can continue without downloading the same history again. No wallets or network passwords.
 
- Watch-only walletsPublic descriptors, labels, address state and transaction records. Signing wallets are skipped.
+ Watch-only walletsYour public wallet information, names, labels and transaction records. No signing keys.
 
- Bitcoin Core configurationSupported Core and GUI preferences, without network credentials or wallet registrations.
+ Bitcoin Core configurationSupported Core preferences, such as storage/cache and selected interface choices.
 
- Node configurationSaved Wi-Fi/Ethernet profiles, stored passwords, managed WireGuard/privacy, timezone and supported desktop preferences. Also includes portable Core preferences.
+ Node configurationSupported saved networks and passwords, managed VPN, time and desktop settings. This already includes the portable Core preferences.
 
-Optional encryption
+Export finishes after copying and saving
 
-Encrypt backup (optional) starts unchecked for watch-only and configuration backups. Plain backups use .json; encrypted backups use .gpg. Select encryption to enter and repeat a nonempty passphrase; even one character is accepted, but a long random passphrase protects better. There is no automatic switch to plaintext if encryption fails.
+All four Backup and Restore categories now finish after the backup is prepared, written and flushed to the destination. There is no second pass that reads the saved USB data back, decrypts a newly encrypted export to test it, or opens the outgoing watch-only collection in another Core process. A successful message means the copy/write operation completed, not that a recovery test was performed.
 
-Privacy warning: plain Node backups may contain Wi-Fi passwords and WireGuard private keys. Watch-only data can reveal addresses and balances. A checksum detects damaged files, not a malicious replacement. Keep backups private and restore only trusted files.
+Core still stops cleanly for a consistent blockchain copy. The tools still refuse unsafe paths, incomplete reads, failed writes, insufficient space and unsupported input. Checksums are calculated as data are already being copied or packaged, without another USB read pass. File formats remain compatible with existing backups. Restore checks remain enabled before existing data or settings are changed; GPG authentication is not disabled.
 
-Keep working while data is copied
+Keep at least two separate copies of important backups and periodically test recovery on another installation. A latent media fault may first be noticed on restore without export read-back testing. Wait for the saved confirmation and eject/unmount properly; flushing pending writes can still take time on a slow drive and is not a verification pass.
 
-Settings, this menu and progress windows are independent. Use the taskbar or Back to Backup and Restore while a job runs. Closing or minimizing a busy progress window does not cancel its job. Use Cancel operation explicitly when available. Node and Core configuration exports can run during blockchain copying. Watch-only transfer needs Core running, so it waits until chain copying finishes and you start Core manually.
+Choose whether to encrypt the backup
 
-Move to a different computer
+Encrypt backup (optional) starts unchecked for wallet collections and configuration backups. An unencrypted file ends in .json; a GPG-encrypted one ends in .gpg. JSON is structured text data, not encryption. With encryption selected, enter the same nonempty passphrase twice. The tool accepts even one character, but that is not a sensible way to protect valuable private information. A random passphrase from KeePassXC is much harder to guess. An encryption error never quietly saves plaintext instead.
 
-Save Node configuration, supported watch-only wallets and, optionally, the blockchain to USB.
+Privacy matters: a plain Node configuration may contain Wi-Fi passwords and VPN private keys. A public wallet can reveal addresses and balances. Keep these backups private and restore only a copy you trust. A checksum is a file fingerprint used to detect damage or a bad copy; by itself it cannot prove who created the file or that a stranger's replacement is trustworthy.
 
-Install a compatible Node on the new computer. Installation erases its selected disk.
+Find your USB
+
+The file chooser lists USB / External media on the left. Connect the drive, or use Refresh USB. Click it to open it; if needed, the tool first mounts it, which means making its files available. Configuration and wallet collections use a .json/.gpg file. Blockchain restore uses a whole completed backup folder or the USB root with Use latest backup. A read-only drive can supply a restore but cannot receive a new backup. Choosing a file does not immediately apply it: review and confirmation still follow.
+
+Continue using Settings while copying
+
+Settings, the backup menu and the progress windows are independent. Minimize a window or switch with the bottom taskbar. Closing or minimizing a busy progress window does not cancel its work. Use Cancel operation when offered. You can export Node and Core settings while blockchain data is being copied. A watch-only transfer needs running Core, so finish the blockchain copy and start Core manually first.
+
+Move to a new computer
+
+Back up Node configuration and supported watch-only wallets to USB. Add a blockchain backup if you want to reuse the downloaded history.
+
+Install a compatible Node on the other computer. Installation erases its selected disk.
 
 Restore Node configuration, review it and restart to apply it.
 
-Restore the blockchain copy.
+Restore the blockchain copy, if you made one.
 
-Start Bitcoin Core, restore watch-only wallets and check addresses, labels and scanning.
+Start Core, restore the watch-only collection, compare addresses and labels, and let any necessary scan finish.
 
-Keep the old backups until the new setup has been checked. Your offline Vault and its signing-wallet backups remain separate.
-
-Choose a backup from USB
-
-In all four Settings → Backup and Restore categories, the chooser shows USB / External media on the left. Plug in the drive while the chooser is open, or use Refresh USB. Select the drive; if needed, click to mount it. Configuration and watch-only restores select a .json or .gpg file. Blockchain restore selects the USB root for the latest completed copy, or a specific completed backup folder. Read-only media can be used for restore. Choosing a file or folder does not start restoration: review and confirmation still follow.
+Keep the old copies until the new setup works. Offline Vault and its signing-wallet backups remain a separate responsibility. Showing a balance on Node does not prove that you can restore the signing wallet.
 
 Backup and Restore on Home
 
-On a new installation, the shortcut stays in Settings → Backup and Restore.
-After a saved setup change — such as connecting Wi-Fi, changing time zone or mouse
-settings, starting Bitcoin Core or importing a wallet — a second Backup and
-Restore card appears on Home, immediately after Private Workspace and
-before Encrypt Files. Both open the same four-category menu, not a second
-backup operation.
-
-The Home shortcut stays after restart and after Core stops.
-It does not claim a backup is current, and it does not automatically create one.
-A changed setting is not necessarily portable: the existing category summaries
-still state what is included and excluded.
+After the first saved customization or use—such as connecting Wi-Fi, changing time zone/mouse settings, starting Core or importing a wallet—a second Backup and Restore shortcut appears on Home, after Private Workspace and before Encrypt Files. Settings keeps its entry. Both open the same menu and existing work. The Home shortcut stays after restart or after Core stops; it does not make a backup automatically or certify that an old backup is current.
 
 Blockchain backup
 
- Settings → Backup and Restore → Blockchain
+Use Settings → Backup and Restore → Blockchain to reuse downloaded and validated chain data on another Node, or to avoid repeating that work after a disk replacement. Chainstate is the current unspent-output database; this feature also copies the related retained blocks, block index, undo/XOR information and supported indexes. It is not just a loose copy of the chainstate folder.
 
-Copy the chain you already validated
+Create a backup
 
-Connect a USB drive with enough free space. Select Backup and USB / External Drive…, or choose a destination folder.
+Connect an external drive with enough free space for the retained data. Choose Blockchain → Backup and the destination through USB / External Drive… or the folder selector.
 
-Select I understand that Core will stop while the backup is created. Click Create backup.
+Check I understand that Core will stop while the backup is created. and choose Create backup.
 
-Core stops cleanly and flushes its data. The tool copies retained blocks, their index and XOR information, chainstate and any supported related chain data, then reads the copy back to check it.
+Core stops cleanly and finishes writing its databases. The tool copies the files once, calculating their restore checksums as those bytes pass through the copy.
 
-Wait for the completed backup confirmation. A new complete snapshot is saved; a previous completed copy is kept. Core remains stopped. Start it manually when ready.
+Wait for Blockchain backup saved. There is no separate read-back verification stage. Core remains stopped: open Bitcoin Core manually when ready.
 
-Each backup is a complete copy of the retained chain data, not just an incremental change. Allow enough extra USB space for another copy. A pruned Node backs up only the history it still has. An unfinished copy is never published as a completed backup.
+Finish other writes, eject/unmount the drive and keep the completed folder intact, including its manifest. Make another copy on different media as needed.
 
-Import onto another Node
+Each run creates a new complete snapshot of the retained data, not an incremental update. Earlier completed folders remain, so the drive needs space for another full copy. Cancelling or a failed write does not publish a partial folder as the latest completed backup. FAT32 cannot hold an individual file of 4 GiB or more; use a suitable filesystem such as exFAT, ext4 or NTFS when necessary.
 
-Use the same Core version and Bitcoin network. Open Blockchain → Restore.
+What it does not contain
 
-Select the USB root and Use latest backup, or select a particular completed bitcoin-chain folder. Keep the complete folder and its manifest together.
+No wallet databases, private keys, Wi-Fi passwords or full system configuration are included. Use the separate backup rows for public wallets and settings. Pruned blocks that have already been deleted cannot appear in the snapshot. A blockchain backup does not recover signing keys and is not a guarantee that an old wallet can rescan all its history.
 
-Confirm that it is your trusted backup. Files are verified and the candidate databases opened by isolated Core without peers or wallets before activation.
+Restore a trusted copy
 
-Allow internal space for the imported copy alongside the existing chain until validation succeeds. Local wallets are not replaced.
+Use a compatible Node with the same Core version and Bitcoin network. Keep the source drive connected.
 
-Start Core if it is stopped. It continues from the saved state, downloads missing later blocks and validates them. The import workflow may restart Core if it was already running; backup itself never does.
+Open Blockchain → Restore. Select the USB root and Use latest backup, or choose the specific completed bitcoin-chain folder.
 
-Keep the desktop usable
+Review and confirm. Core stops during import. The restore copies into a separate candidate area, checks the file checksums and opens the candidate databases with an isolated Core process.
 
-Minimize progress or return through the taskbar to Settings and Backup and Restore. Node/Core configuration exports can run in parallel. Another chain operation or watch-only transfer must wait. Use Cancel operation explicitly; cancellation is briefly disabled during the final activation step.
+Allow room for the incoming copy beside the current chain. Existing chain data is not replaced until those checks succeed; wallet data is not part of that replacement.
 
-Do not unplug the USB during copying. A checksum checks copy integrity, not the honesty of someone else's blockchain. Use your own trusted source. This feature is not a wallet backup and does not import loose chainstate folders or arbitrary UTXO dump files.
+Start Core if necessary. It continues from the saved tip and validates newer blocks. Restore restarts a Core that had been running before import; backup export never starts it automatically.
+
+Import can therefore still have verification stages. The change is to backup export, not to safeguards for applying data from removable media. A checksum detects damage but does not prove that a stranger's chain snapshot is trustworthy; use your own trusted source. Arbitrary UTXO dump files are not accepted by this workflow.
+
+You can minimize the copy window and continue using Settings, including exporting Node/Core configuration. Watch-only backup needs running Core and must wait. Avoid forcing shutdown, unplugging media or trying to start Core while its blockchain files are being copied.
 
 Watch-only backups
 
- Settings → Backup and Restore → Watch-only wallets
+Settings → Backup and Restore → Watch-only wallets saves a collection of supported public wallets from this Node. It is useful for moving addresses, labels and history to another Node. It deliberately excludes signing wallets and private keys.
 
-Create one portable public-wallet collection
+Make a collection
 
-Start Bitcoin Core and finish any conflicting chain-copy operation first.
+Start Core and finish any blockchain-copy operation.
 
-Choose Backup, select the destination folder and optionally enable encryption.
+Choose Backup and a destination folder. Turn on optional encryption if you need it.
 
-Click Create wallet backup. The tool checks supported descriptor wallets, uses Core's native public-only export, and skips signing or unsupported wallets.
+Choose Create wallet backup. The tool identifies supported watch-only wallets and asks Core to make a consistent native public-only export.
 
-Review the result and the count of skipped wallets. Keep the saved .json or .gpg collection private.
+Read the result, including any skipped-wallet count, and keep the saved .json or .gpg file private.
 
-An unloaded local wallet may be temporarily loaded for inspection and returned to its previous state. The public collection retains public descriptors, address state, labels/address book and transaction records. It contains no signing keys. It cannot replace the offline signing wallet.
+A wallet that was closed may be loaded briefly for inspection and then put back in its previous state. The collection keeps public descriptors, receiving/change-address state, labels, address-book entries and transaction records. Descriptors are the wallet's address instructions. The collection cannot authorize spending and cannot replace your original offline signing wallet.
 
-Restore the collection
+The export is packaged, optionally encrypted, written and flushed to the destination. It is not reopened in a second Core process and is not read back from USB before the saved confirmation. This avoids the extra export verification step; Core's native public-only export is still used rather than copying an active wallet database.
 
-Use a compatible Node with the same Bitcoin Core version and Bitcoin network, and start Core.
+Restore it
 
-Choose Restore in the Watch-only wallets row and select the collection. Encrypted collections require their passphrase.
+Use the same Core version and Bitcoin network, and start Core on the target Node.
 
-Click Review backup, inspect the wallet names, approve the review and click Restore wallets.
+Choose Restore in the Watch-only wallets row. Select the collection file; supply its passphrase only if it is encrypted.
 
-Existing same-name wallets are not overwritten; new restored names are created. Repeating the same backup resumes completed imports rather than duplicating them.
+Choose Review backup, check the wallet names, approve the review, then choose Restore wallets.
 
-Review the restored wallets in Core, compare addresses/labels and allow any required rescan.
+If a name already exists, a new restored name is used rather than overwriting the existing wallet. Repeating this backup's restore does not duplicate wallets already restored successfully.
 
-Restoration is resumable per wallet, not an all-or-nothing transaction across a collection: completed wallets remain if a later one fails. Initial bounds are 32 wallets, 32 MiB per public export and 64 MiB combined, subject to available private RAM. A pruned chain cannot supply blocks already deleted, and public exports cannot derive uncached hardened keys. Keep the original Vault.
+Compare addresses and labels in Core and let any needed scan finish.
 
-For a single public watch-only.dat exported directly from Vault, use Bitcoin Core → File → Restore Wallet instead. The Node collection menu expects its own verified .json/.gpg format, not an arbitrary wallet file.
+A multi-wallet restore can succeed partly: wallets already completed remain if a later one fails. Repeating the restore can continue the work. Limits are 32 wallets, 32 MiB for one public export and 64 MiB combined, also limited by free private RAM. MiB is a storage-size unit; those limits keep the temporary in-memory work bounded.
+
+A pruned chain cannot provide old blocks it no longer has. Public exports also cannot recreate missing hardened address derivations that require private-key information: please keep the original Vault and review any address/scan warning.
+
+A single watch-only.dat exported straight from Vault is different from this collection. Open that file with Bitcoin Core → File → Restore Wallet. This menu expects Node's .json/.gpg collection format.
 
 Core configuration
 
- Settings → Backup and Restore → Bitcoin Core configuration
+Configuration means settings, not your money or transaction history. Use Settings → Backup and Restore → Bitcoin Core configuration to transfer supported Core preferences without copying the operating system's network settings.
 
-This is the lightweight option when you only want Core preferences, not the operating-system network setup.
+What is included?
 
-Included settings
+Examples include the pruning limit; database cache, which is memory used to speed up data access; the number of verification threads, which are workers checking data; limits for pending transactions; maximum peer connections; and the upload target. Selected Core interface preferences include Coin Control, which lets you choose which available coins to spend, and the PSBT controls.
 
-Supported numeric options include pruning, database cache, script-verification threads, mempool size/expiry, maximum connections and upload target. Supported native GUI preferences include Coin Control and PSBT controls. This is a validated subset, not an unchecked copy of every bitcoin.conf line.
+Only recognized, validated options are copied. This is not an unchecked copy of every line in bitcoin.conf, Core's manual configuration file.
 
-Backup and restore
+Save and restore
 
-Choose Backup, select a USB folder and optionally enable encryption.
+Choose Backup, select a USB folder and choose whether to encrypt.
 
-Click Save backup; wait for saved-and-verified confirmation.
+Choose Save backup and wait for the saved confirmation; there is no read-back verification pass.
 
-On the target Node choose Restore, select the file and click Review backup.
+On the target Node choose Restore, select the file and choose Review backup.
 
-Check the option names, approve the displayed settings and select Restore on next restart.
+Read the settings, approve them and choose Restore on next restart.
 
-Restart and review the resulting Core settings.
+Restart normally, then check Core's settings.
 
-Wallet registrations, wallets, blocks, Wi-Fi/VPN secrets, source-machine data paths, executable hooks and unsupported options are excluded. A complete Node configuration backup already contains this portable subset. Reducing the pruning target can later remove old blocks; restoring settings does not restore missing block history.
+Wallets, wallet registrations, blocks, network credentials, source-computer data paths and commands/scripts are excluded. Unsupported options are not silently copied. A Node configuration backup already includes this portable Core subset, so a separate Core backup is optional when you also save Node configuration.
+
+Restoring a smaller pruning target can later remove older blocks. Restoring a setting does not bring back block files that are missing.
 
 Node configuration
 
- Settings → Backup and Restore → Node configuration
+This backup is a shortcut for setting up another Node the way you like it. Open Settings → Backup and Restore → Node configuration. A snapshot here means a saved selection of your current settings, not a complete copy of the computer's disk.
 
-What this snapshot includes
+What it keeps
 
-Saved Wi-Fi networks and stored passwords, Ethernet profiles, managed WireGuard and the Node privacy profile, timezone and automatic time, keyboard layout, display scale, matching mouse-name preferences and supported Bitcoin Core preferences. It does not save an old clock reading to replay later.
+It can keep supported saved Wi-Fi networks and their stored passwords, Ethernet profiles, the managed WireGuard VPN and privacy choice, time zone and automatic-time choice, keyboard layout, display scale, mouse speed for matching device names and supported Core preferences. New backups also keep Keyboard and Mouse repeat/Num Lock choices and supported mouse/touchpad options. Restore these newer backups on a Node with this feature; older Node versions may reject the new format. This Node still reads earlier configuration backups.
 
-Create the backup
+A network profile is the saved information needed to connect. Display scale controls how large interface elements look. The backup does not save an old clock reading to set the computer back to that time later.
 
-Finish applying the settings you want to keep. Plug in a USB drive.
+Create the copy
 
-Choose Backup on the Node configuration row, then Choose folder… and select the USB or a folder on it.
+Finish applying the settings you want to keep and connect a USB drive.
 
-Leave Encrypt backup (optional) off for a plain file, or enable it and enter the same passphrase twice.
+Choose Backup → Choose folder… and select the drive or a folder on it.
 
-Click Save backup or Save encrypted backup. Wait for the saved-and-verified confirmation and note the filename.
+Leave Encrypt backup (optional) off for a plain .json file, or turn it on and enter the same passphrase twice.
 
-The plain file can expose your Wi-Fi passwords and VPN private keys. Keep it private. Encryption protects the saved backup, not the active operating system. Do not keep the only required passphrase inside the encrypted file itself.
+Choose Save backup or Save encrypted backup. Wait for the saved confirmation and note the filename. There is no read-back verification pass.
 
-Restore on the new Node
+A plain Node backup can expose saved Wi-Fi passwords and VPN private keys. Keep it private. Encryption protects the saved file, not the running computer. Please do not store the only copy of the passphrase inside the file that needs that passphrase to open.
 
-Open the same row and choose Restore.
+Apply it to another Node
 
-Choose your .json or .gpg backup. Enter the passphrase only for an encrypted file.
+Open the same category and choose Restore.
 
-Click Review backup. Check the timezone, saved-network counts, privacy profile and omissions.
+Select the .json or .gpg file. Only an encrypted file needs its backup passphrase.
 
-Select I trust this backup and approve the settings shown above, then click Restore on next restart.
+Choose Review backup. Check the time zone, network counts, privacy profile and any omissions.
 
-Restart normally. Validated settings are applied before networking starts. Use Check pending restore to inspect the result; Cancel pending restore cancels staged settings before restart.
+Tick I trust this backup and approve the settings shown above, then choose Restore on next restart.
 
-Portable preferences, not machine identity
+Restart normally. The checked settings are applied before networking starts. Check pending restore shows the staged request or its result; Cancel pending restore cancels an unapplied request before restart.
 
-The restore preserves target-only network profiles and local wallets. It does not clone login passwords/accounts, disk encryption, disk identifiers, Bluetooth pairing keys, arbitrary scripts or external certificate/third-party VPN plug-ins. Pair Bluetooth devices again on a different adapter; mouse speed is reapplied only for matching device names. Unsupported values are reported rather than silently imported.
+What does not move
 
-If both computers remain online, the same static IP or WireGuard peer may conflict. Assign a suitable address or separate VPN peer to the new machine. Only passwords actually saved in supported profiles can be transferred; credentials held by unsupported agents are not invented.
+The restore keeps local wallets and network profiles found only on the target computer. It does not clone login passwords/accounts, disk encryption, disk identifiers, Bluetooth pairing keys, arbitrary scripts, external certificates or unsupported VPN plug-ins. Pair Bluetooth devices again on a different adapter. Mouse settings apply only when the device name matches, and only to capabilities that device offers.
 
-No blockchain or wallet databases are included. Use their separate rows. A separate Core configuration backup is optional because Node configuration already includes the portable Core subset.
+Only passwords actually stored in supported profiles can be transferred. Some workplace authentication tools store credentials elsewhere; missing passwords are not invented. Unsupported values and omissions are reported for you to review.
+
+If the old and new computers will be online together, they may need different manually assigned IP addresses and different WireGuard peers. Reusing the same address or tunnel identity can cause a conflict.
+
+This contains no blockchain or wallet database. Use those separate backup rows. You do not normally need a separate Core configuration backup because Node configuration already includes the supported Core settings.
+
+Networking
+
+Connect to Wi-Fi or a cable
+
+Click the Network Status icon just to the left of Restart. Choose your Wi-Fi network, enter its password and click Connect. Saved networks can reconnect automatically. Ethernet is a wired connection: connect the cable and the system normally sets it up automatically.
+
+Advanced settings is for hidden Wi-Fi names, workplace networks and manually assigned IP addresses. An IP address is the network address used to reach a computer. You usually do not need to set one manually on a home router. A connection to the router is not proof that the Internet is reachable.
+
+If you open Core without a connection, Node offers network setup first. Use Core offline still lets you inspect local data. Changing Wi-Fi does not remove your chosen network protection rules.
+
+Choose a privacy connection deliberately
+
+Open Settings → Bitcoin Core Network & Privacy. These choices affect how information leaves the computer; they do not make an unsafe computer safe.
+
+ChoiceWhat it does
+
+ClearnetCore connects directly to Bitcoin peers. They see your public IP address; your Internet provider may recognize Bitcoin traffic.
+
+TorCore's peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system's other traffic, including software updates, still uses its ordinary connection.
+
+WireGuard VPNThe computer routes traffic through the configured encrypted VPN tunnel. Its protection rules block ordinary fallback outside that tunnel, apart from reaching the VPN server and essential connection setup. The VPN provider becomes someone you must trust.
+
+A firewall is a set of rules allowing or blocking network traffic. The VPN's kill switch means these rules block fallback if the tunnel stops. DNS is the service that translates website names into network addresses. This Node's managed WireGuard setup protects against unintended traffic outside its tunnel, including ordinary DNS and IPv6 traffic. Neither Tor nor a VPN guarantees anonymity.
+
+Import a supported full-tunnel WireGuard configuration from your provider or own server. It must have a numeric server address and explicit DNS settings. Configurations containing scripts or unsupported split routes are refused. Tunnel private keys are stored in protected system files. A split route sends only some traffic through the VPN; this tool is designed for the supported whole-device configuration instead.
+
+Changing the privacy profile first stops a running Core, checks and replaces the network policy, then restarts it. If it was already stopped, it stays stopped. If the change fails, Core remains stopped rather than silently using a less-private route. I2P setup and Tor bridges are not exposed in this interface.
+
+Sending a transaction privately is a separate option
+
+Private transaction broadcast concerns the initial sending of a transaction, not every connection Core makes. It uses Core 32.1's private-broadcast route. The underlying feature can use short-lived Tor/I2P connections; this Node exposes the Tor configuration. The submitted transaction is not initially added to the local mempool by this route.
+
+Turning on Tor for this purpose also makes Tor available for ordinary peer selection. A failed private route must not silently fall back to standard sending. A returned transaction ID is a reference number, not proof that peers received the transaction or that a block confirmed it. Please check transaction status afterward.
+
+Connect a Bluetooth keyboard or mouse
+
+Open Settings → Bluetooth Devices or press Ctrl+Alt+B. Switch on the adapter, put the device into pairing mode, then choose Search, pair and connect. For a keyboard, type the displayed pairing code on that keyboard and press Enter when asked. Mark a device you own as trusted to help it reconnect.
+
+Pairing means the two devices remember each other. The installed Node saves those pairing details. After restart, wake or switch on the device. Pairing done only in the installation session must be repeated after installation. A wired or built-in keyboard and mouse are useful during setup; Ctrl+Alt+B also works in the installer. Bluetooth file transfer and network sharing are not enabled by this Node setup.
+
+If no Bluetooth adapter appears, please check any airplane-mode switch and the computer's firmware settings. Common adapter firmware is included, but some devices need different firmware or a compatible USB adapter.
+
+Keyboard and Mouse
+
+Open Settings → Keyboard and Mouse. On the Keyboard tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after Apply and Save; please do not type passwords there.
+
+The chosen layout applies to your current desktop and to the login screen after restart. Repeat and Num Lock preferences are applied when the desktop starts. They do not replace an older encrypted installation's disk-unlock keyboard configuration.
+
+On Mouse and Touchpad, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.
+
+Status & diagnostics
+
+Open Settings → Bitcoin Core Status for a live overview of this computer's Core. It reads information locally; it does not ask a public website to tell you what your node is doing.
+
+What the cards mean
+
+Version identifies the Core program you are running. Blocks are the blocks Core has checked. Headers are the block summaries it knows about. Peers are other Bitcoin computers it is connected to. Mempool means the transactions your node knows about that are waiting to be included in a block. Network distinguishes real Bitcoin, called mainnet, from testing networks. The privacy profile tells you whether the Node uses direct connections, Tor or the configured VPN.
+
+The storage figure is space on the actual blockchain filesystem—the storage area on its disk—not necessarily every disk attached to the computer. Values refresh automatically. When Core is stopped or cannot be reached, the dashboard says so rather than displaying a made-up success.
+
+Open details without crowding the dashboard
+
+Show technical details opens its own window. You can resize or minimize it while keeping the main dashboard tidy. The information is grouped by blockchain, network/software, pending transactions, peer connections and wallet scanning when available.
+
+Use Find a field or value… to look for a particular item. Expand all opens the groups; Collapse all closes them. Refresh takes a new snapshot—a copy of the current readings—so the list does not keep moving while you read. The Raw JSON tab shows the same information in a structured text format mainly useful for technical support.
+
+Copy snapshot copies it to the clipboard, not to a server. Please review it before sharing: wallet names and other details can reveal private information. Closing this window does not stop Core.
+
+A connected Core can keep synchronizing even if a separate software-download server is unavailable. The Updates chapter explains how to distinguish those situations.
 
 Encrypt & Decrypt Files
 
-Create a consistent file before encrypting it
+Encrypt means protect a file with a passphrase. Decrypt means recover its contents with that passphrase. These tools use GnuPG, usually called GPG. They do not encrypt the whole installed operating system or turn an online Node into an offline signer.
 
-In Bitcoin Core, select the wallet and choose File → Backup Wallet. Save the consistent database into Private Workspace, visible in Core's file picker. Do not copy a database that is being modified by Core.
+This separate general file-encryption tool retains its recovery checks. The copy-only change applies to the four categories in Backup and Restore, not to this utility or to authenticated decryption.
 
-Open Encrypt Files on Home, select that saved database, choose a new .gpg filename on USB or disk and enter and confirm your passphrase. Extra independent GPG layers are optional; a single verified Bitcoin Core SQLite wallet.dat is encrypted directly (no TAR), while other files use TAR. Node uses AES-256 CFB+MDC for broad interoperability. Each layer and the complete recovery are verified before the encrypted file is published.
+First make a proper wallet backup
 
-Keep independent encrypted copies and store their required passphrases separately. Original files remain unchanged.
+If the file is a wallet, use Bitcoin Core → File → Backup Wallet to save a consistent database in Private Workspace. A database is a structured file Core works with. Copying its live file while Core is changing it can produce an unusable copy; the built-in Backup Wallet command avoids that problem.
 
-Decrypt and restore
+Open Encrypt Files on Home and select the saved file.
 
-Open Decrypt Files and select the encrypted file. Supply the required passphrases; layered Node/Vault files can be recovered with passphrases in any order. For a normal single-layer AES-256 GPG file made outside these tools, select Recover one ordinary GPG layer only. Authenticated output is published only in a new folder in Private Workspace. A failed or cancelled operation publishes no partial plaintext.
+Choose a new .gpg destination on USB or persistent storage.
 
-After successful decryption and authentication, Files opens Private Workspace automatically, showing the new recovery folder. No extra success confirmation is required. Wrong passphrases, failed checks and cancellation do not open the folder. Recovered files remain in RAM until you deliberately copy or restore them elsewhere.
+Enter and repeat a passphrase. Extra independent layers are optional. Each layer is another encryption step with its own passphrase; all required passphrases must be available for recovery.
 
-Choose Bitcoin Core → File → Restore Wallet and select the recovered database. Restoring into Core creates a persistent wallet on the installed disk; it does not keep the active wallet in RAM. Compare addresses and labels, wait for synchronization and rescan, and resolve missing pruned history. Please perform a restore drill on another trusted machine at least once a year.
+Wait for verification to finish, then keep separate copies and store their required passphrases separately. Originals are not overwritten.
 
-For the Node/Vault arrangement, keep signing-wallet backups on offline Vault and public-wallet backups on Node. GPG is also available for files belonging to a wallet used directly on this online Node; it does not turn the Node into an offline signer or encrypt the installed system.
+A verified single Core SQLite wallet.dat is encrypted directly. Other files or folders may first be packed into a TAR archive, which keeps names and folders together but is not itself encryption. The output uses interoperable OpenPGP AES-256 CFB+MDC: AES protects the contents, and the integrity check helps detect damaged or altered encrypted data. The tool checks each layer and complete recovery before publishing the final file.
 
-USB media in both file pickers
+Open an encrypted file
 
-The input selectors for Encrypt Files and Decrypt Files, and the encrypted-file destination selector, show Places and USB / External media on the left. Attached supported filesystems appear automatically. Click an unmounted entry to mount it with the desktop's normal permissions; Refresh USB rescans without formatting anything.
+Choose Decrypt Files and select the .gpg file.
 
-Read-only USB drives may be used as input, not as an encryption destination. Encrypted disks that require unlocking should first be opened in Files, then refreshed. Decryption still publishes plaintext only into Private Workspace, never directly to the source USB. Selecting a USB input does not change that RAM-only recovery rule.
+Enter the needed passphrases. For layered Node/Vault files, their order does not matter to the recovery tool. For a normal single-layer AES-256 GPG file made elsewhere, choose Recover one ordinary GPG layer only.
 
-Files sidebar
+Wait for decryption and its integrity check. The recovered contents are placed in a new folder inside Private Workspace, not directly on the source USB.
 
-Files opens the read-only Core view with Core, Private Workspace and PSBT Transfer Folder visible on the left. The default sidebar is wider so names are readable; a wider user-adjusted width is preserved.
+Files opens Private Workspace automatically after successful decryption, showing the recovery folder without another success confirmation. Wrong passphrases, failed checks and cancellation do not open the folder as if recovery succeeded. Recovered files remain in RAM until you deliberately save or restore them elsewhere. No partial recovered plaintext is published after a failed or cancelled operation.
+
+To restore a public wallet file, use Bitcoin Core → File → Restore Wallet and select the recovered database. Core creates a persistent wallet on its installed disk; the active restored wallet is no longer just a RAM file. Check addresses and labels, wait for validation/scanning and resolve pruned-history warnings. In the Node/Vault setup, keep signing-wallet recovery on offline Vault, not this online computer. Practise recovery periodically, including on another trusted machine.
+
+Use the USB sidebar
+
+The input selectors and encrypted-file destination selector show Places and USB / External media. Click a listed drive to open or mount it. Refresh USB checks again without formatting anything. A read-only drive can be an input, not an output. Open and unlock encrypted media in Files first, then refresh.
+
+Files shows Core, Private Workspace and PSBT Transfer Folder in its widened sidebar. Core's data view is read-only; use Core's own commands to change wallets. Saving encrypted output to USB is different from decryption: decrypted output always goes to RAM first. Use Files to copy a recovered file elsewhere only deliberately.
 
 Persistent storage
 
-What remains on disk
+Persistent means “still there after restarting.” The installed Node keeps its blockchain, chainstate, wallets and ordinary settings on disk. Its two temporary working folders are different:
 
-Bitcoin Core's blockchain, chainstate, loaded wallets and settings remain on the installed filesystem. PSBT Transfer Folder and Private Workspace are RAM-only and cleared on restart/shutdown. Save required files to removable storage. Ordinary files saved on disk remain persistent. The installer does not ask for a password. To require a password at login, use Settings → Login Password after installation.
+PlaceAfter shutdown or restart
 
-Three immediately available Places in Files
+Core data and ordinary files saved on diskKept on disk.
 
-Files opens Core, a read-only view of Bitcoin Core data, including wallets, blocks, chainstate and logs. The left sidebar lists Core, Private Workspace and PSBT Transfer Folder in that order, with attached USB media under Devices. Its default width keeps these names readable. Use Bitcoin Core to change wallet settings or create a consistent backup with File → Backup Wallet. Copying a live wallet database directly from Files is not a substitute for that backup.
+Private WorkspaceCleared: recovered files and temporary work live in RAM.
 
-Private Workspace is the exception
+PSBT Transfer FolderCleared: public wallet/PSBT transfer files live in RAM.
 
-Private Workspace is a separate RAM filesystem, accessible from Home, Files and Core's file picker. Its files, recovery output and private temporary data disappear at restart or shutdown. An ordinary suspend keeps RAM powered and does not clear the workspace.
+A file copied to USBKept on that USB, if saving finished successfully.
 
-Node disables swap and hibernation and verifies the dedicated RAM filesystem before file encryption and decryption. If verification fails, the operation stops; there is no fallback to a folder on disk. The workspace has a memory limit and uses RAM as files are added. Please keep working sets small while Core synchronizes.
+Three Places in Files
 
-Saving or copying a file outside Private Workspace makes that copy persistent. Restoring a database into Core also makes a persistent copy. GPG protects the saved encrypted file, not any original or active wallet database.
+Files opens Core, a read-only view containing wallet folders, blocks, chainstate and logs. The left-hand Places list is Core, Private Workspace, PSBT Transfer Folder; connected drives appear under Devices. The default width is wide enough for names, and a wider manual choice is preserved.
 
-Power and storage
+Private Workspace and PSBT Transfer Folder are separate shared RAM locations available to the desktop and Core. Closing a window does not clear them; restarting or losing power does. Ordinary suspend leaves RAM powered and is not a way to clear the workspace. The old disk-based Public Wallet Transfer folder is not automatically erased; any old files left there remain persistent.
 
-If both Private Workspace and PSBT Transfer Folder are empty, Restart and Shut down show one ordinary confirmation. If either RAM folder contains anything, including hidden files or empty folders, two warnings are followed by a five-minute countdown. Cancel countdown, Esc or closing the window keeps the session open. Restart now or Shut down now skips the remaining wait. Core stops cleanly only after the countdown finishes or you choose the immediate action. Its saved blockchain and loaded wallets remain on disk.
+Before encryption/decryption, Node verifies that the private workspace really is on its dedicated RAM filesystem. If that check fails, it stops rather than silently writing plaintext to disk. Node disables swap and hibernation; swap is disk space an operating system might otherwise use to hold memory pages. The workspace is limited by available memory, so please keep temporary files small while Core is busy.
 
-Please finish or cancel any open encryption tool before using those controls. A sudden power cut also loses RAM files. Save verified encrypted copies you need before leaving the session. Shutdown confirmations do not verify backups.
+Copying outside RAM makes that new copy persistent. Restoring a wallet into Core also makes a persistent copy. Encrypting a backup does not erase or protect its original file or the active wallet database.
 
-The online operating system and applications can access files you open. RAM-only storage limits persistence; it does not protect against an already compromised running system or promise immediate physical RAM erasure.
+USB access and safe removal
 
-KeePassXC
+Node's backup and file tools, Core, KeePassXC, Editor and Files show removable media in their file sidebars. Node's own choosers refresh live and provide Refresh USB. If a USB is connected while Core's or KeePassXC's chooser is already open, reopen the chooser or select USB Media.
 
-Open KeePassXC on Home to generate random passphrases. As on Vault, its native generator opens on Passphrase with six EFF words. Choose another length when needed and generate each secret independently. A password database is not required to use the generator.
+Core can read and write through its checked USB view—for example a wallet backup or PSBT—without receiving write access to the rest of the operating system. Existing USB files keep their permissions; new Core exports belong to the desktop account on filesystems that support owners. A protected/read-only drive remains read-only. Unlock an encrypted drive in Files before using it in another program.
 
-Its temporary profile and cache stay in RAM. Automatic clipboard clearing starts off, as on Vault; use Tools → Settings → Security to enable it if preferred. Your choices survive relaunch during this session. A fresh boot restores the defaults. Please save any database you need to keep to USB or persistent storage; a database saved only in Private Workspace disappears at shutdown.
+For removal, finish saving and close files on that drive. Core's USB view can keep it busy while Core is open, so please stop Core normally, then use Files → Eject/Unmount. Eject asks the system to finish writes and release the drive. If another application still has a file open, close it and retry. Do not pull out the drive while copying. Reconnecting creates a fresh checked view, not a stale path to the old device.
 
-Date and time
+End a session
 
-The date and 24-hour time remain visible above the network, restart and shutdown controls, even before Core starts. Click the clock, or open Settings → Date & Time. Choose a time zone such as Europe/Zagreb and automatic network time, or switch automatic time off to enter the date and time manually. Apply and Save saves these operating-system settings across restart.
+If both RAM folders are empty, Restart and Shut Down show the ordinary confirmation. If either contains anything, including a hidden file or empty folder, two warnings are followed by a five-minute countdown. Cancel, Esc or closing that window keeps the session open. Restart now or Shut down now skips the remaining wait. Core stops carefully only when the countdown finishes or the immediate action is chosen.
 
-Automatic time may wait until a time server is reachable. It uses ordinary OS networking in the Tor P2P profile and follows the VPN policy in WireGuard mode. Manual time is available without a network.
+Please finish or cancel an open encryption job first and copy any RAM files you need. Shutdown warnings do not verify your backups. A sudden power loss also loses RAM contents. RAM-only storage limits leftovers on disk; it does not protect files from an already compromised running system or promise instant physical memory sanitization.
 
-PSBT Transfer Folder is also temporary
+KeePassXC and time settings
 
-Core and the desktop share this separate RAM folder for public wallet exports and PSBT exchange. Files are lost after restart or shutdown, not after merely closing a window. Save needed copies on USB. The former disk-based Public Wallet Transfer folder is not automatically erased; files left there remain persistent.
+KeePassXC opens its passphrase generator with six random EFF-list words as a starting choice. Choose a suitable length and generate each secret independently. You do not need a password database to use the generator. Its temporary profile/cache are in RAM; changes survive reopening during this session but reset after boot. Automatic clipboard clearing starts off. Enable it in Tools → Settings → Security if preferred. Save a password database you need to keep on USB or persistent storage, not only in RAM.
 
-USB access from every included file picker
-
-Node Backup and Restore, Encrypt/Decrypt, WireGuard import, Bitcoin Core,
-KeePassXC, Editor and Files show removable media in their Places/sidebar.
-The default sidebars are widened. Qt applications show mounted USB filesystems;
-if a drive is connected while an upstream dialog is already open, close and
-reopen that dialog, or open its USB Media entry. Node's own pickers have
-live device discovery and Refresh USB.
-
-Core can now read and write files through its verified USB view: restore or
-export a wallet, load or save a PSBT, and save backups directly on writable
-media. This does not permit writing to the rest of the operating system.
-The Files Core view remains read-only. Existing USB files keep their
-ownership and permissions; newly created Core exports belong to the desktop
-user on filesystems that support ownership.
-
-Safe removal: finish saving and close files using that drive. While
-Bitcoin Core is open, its USB view keeps the drive in use. Please stop Core
-normally, then use Files → Eject/Unmount. Never pull out a drive while
-copying or saving. If another application still uses it, close that file and
-retry. Reconnecting creates a freshly verified view rather than reusing a
-stale disk path.
-
-A hardware-write-protected or read-only filesystem stays read-only. Unlock
-an encrypted drive in Files before using it elsewhere. USB access does not
-change the decryption policy: Decrypt Files still recovers plaintext into
-Private Workspace RAM. Use Files to copy recovered output to USB when needed.
+Click the clock or use Settings → Date & Time. Choose your time zone, such as Europe/Zagreb, and automatic network time. Turn automatic time off to enter a date/time manually. Apply and Save preserves the settings after restart. Automatic time may wait for a reachable time server. In Tor peer mode, time synchronization uses ordinary operating-system networking; in WireGuard mode it follows the VPN policy. Manual time works offline.
 
 Updates
 
-Updates and maintenance
+Open Settings → Software Updates to check what is available before installing anything. Updates for Debian and applications are separate from changing Bitcoin Core's version. Checking does not automatically replace your software.
 
-Settings → Software Updates checks the official Debian and signature-verified KeePassXC packages, lists exact versions before installation, and displays live package-step progress. Debian/KeePassXC updates do not deliberately stop or restart the Bitcoin Core service. Debian package scripts may still briefly restart other operating-system services. An on-screen warning shows when the updated kernel/system requires or may require restarting. Bitcoin Core version upgrades remain a separate review-and-confirm process.
+Debian and KeePassXC
 
-Debian updates requires your explicit approval but does not ask for the login password again in the active local Node desktop. It retains the selected network policy. In Tor P2P mode, updates use clearnet; in WireGuard mode, the VPN policy remains enforced.
+Choose the system update check and read the proposed package versions. A package is an application or system component prepared for installation. Debian packages come through Debian's signed archive; the separately supplied KeePassXC package has its release signature verified. A signature is a cryptographic check against a trusted publisher's key, not just a matching filename.
 
-Settings → Software Updates displays the active verified Core version and can check Bitcoin Core's official stable-release record. These checks and downloads use the operating-system network: clearnet in the Tor P2P profile, or the enforced tunnel in WireGuard mode. Nothing is downloaded or replaced automatically.
+Installation needs your explicit confirmation but not another login-password prompt in the active Node desktop. The progress display shows actual package steps. These updates do not deliberately stop/restart Core, although a package may restart another system service. A message indicates when restarting the computer is required or may be needed, for example after a new kernel—the core of the operating system.
 
-To maintain Core, choose a supported Core 32 release and select Download and verify Core release. The archive must match the official signed checksums, with at least two distinct, currently valid signers from the bundled, pinned release-key set. Expired signers do not count. Please review the version, hashes and signer fingerprints before explicitly approving installation. The active local Node desktop does not re-enter the login password. Downgrades and new major versions are refused; a new major version requires a reviewed Node system update.
+Updates use operating-system networking: ordinary direct Internet access when the Bitcoin peer profile is Tor, or the enforced VPN in WireGuard mode. The selected privacy policy is retained.
 
-Activation stops Core and checks for clean service shutdown, copies wallet databases and settings into a protected local snapshot, and activates the verified release in a separate directory. A stopped Core remains stopped after activation; open Bitcoin Core when ready. Old binaries remain available. Startup continues to verify the exact selected Bitcoin Core GUI hash from the signed release. A health-check failure leaves Core stopped. Because database formats can change, the system never automatically rolls wallet data backward. Please keep an independent public recovery backup and use deliberate recovery if maintenance fails.
+Change Bitcoin Core only after review
 
-Restart computer requires confirmation without a desktop-password prompt. Save other work first. Core receives a graceful service stop before restart. A local snapshot protects maintenance consistency; it is not a replacement for a backup stored on a separate device.
+The update page shows the active verified Core version and can check the official stable-release record. Choose a supported Core 32 release and Download and verify Core release. Please read the version, file hashes and signing-key fingerprints before approving installation. A fingerprint identifies the full signing key.
 
-Use graceful shutdown and keep sufficient disk space. If Core reports database corruption, stop and preserve data before investigating. There is no automatic wallet deletion, repair or network-profile downgrade.
+The archive must match official signed checksums with at least two distinct currently valid signers from the bundled trusted key set. Expired signers do not count. Downgrades and a new major version are refused; moving to a new major Core version needs a reviewed Node system update.
 
-A connected node can still encounter an unavailable update server
+Activation stops Core cleanly, makes a protected local snapshot of wallet databases/settings and installs the verified program in a separate directory. Old binaries remain available. A stopped Core stays stopped; open it when ready. Startup checks the selected Core program hash. A failed health check leaves Core stopped. Database formats can change, so the system does not automatically roll wallet data backward. Keep an independent backup on another device: the local maintenance snapshot is not that backup.
 
-KeePassXC release discovery first uses its official GitHub release API. If that endpoint is unavailable or rate-limited, Node can read the stable x86-64 AppImage and matching signature links from the official KeePassXC download page. The source used is displayed. Installation still requires the pinned release signature; neither TLS nor signature verification is disabled.
+Why an update check can fail while Core still syncs
 
-HTTP 503 means a server or gateway returned an unavailable response. DNS, timeout, TLS certificate and local file-write failures are reported separately. A timezone choice only changes the clock display; an incorrect absolute date/time can matter for TLS, but it is not assumed to be the cause of every failed check.
+Different services use different servers. KeePassXC release lookup first contacts the project's official GitHub API, a machine-readable release listing. If that is unavailable or rate-limited, Node can use the official KeePassXC download page instead. It shows which source it used. Secure connection checks and package signature verification remain enabled.
 
-If both official sources fail, the check remains incomplete. Successful Debian findings remain visible, but installation is disabled until a fresh complete check succeeds. An older release record does not cause a downgrade or a false up-to-date claim.
+HTTP 503 means a server or gateway reported temporary unavailability. It is not automatically a Wi-Fi or clock error. DNS errors concern finding the server address; timeouts mean no answer arrived in time; TLS/certificate errors concern the secure connection; local write errors concern saving files on this computer. Changing your time zone only changes the displayed time. A wrong actual date/time can affect secure certificates, but do not reset a correct clock merely because a server returns 503.
+
+If both official sources fail, the check stays incomplete. Debian results already found remain visible, but installation is disabled until a fresh complete check succeeds. Old metadata does not trigger a downgrade or a false “up to date” result.
+
+Use normal restart/shutdown and keep free space. If Core reports database corruption, stop and preserve the data before investigating. There is no automatic wallet deletion, repair or fallback to a less-private network.
 
 Troubleshooting
 
-Troubleshooting
+Start with the message shown by the application. Please do not delete files, reset the clock or change privacy settings merely to make a warning disappear.
 
-ObservationNext step
+What you seeWhat to do
 
-Core is stopped after bootPlease check installation, the selected data SSD and local service status. Open Bitcoin Core to begin. It stays stopped until you open it.
+Core is stopped after bootThis can be normal: open Bitcoin Core to start it. If it fails, check that its selected data disk is connected, then use Bitcoin Core Status for the actual error.
 
-Public import refuses old historyPlease use an archive node or restore the required blocks. Do not override the warning with a newer timestamp.
+Sync percentage stays low while headers increaseHeaders are the small summaries checked early in download. Watch the header count and peer connections; the meter does not promise a finish time.
 
-Balance is provisionalPlease wait for blockchain validation and wallet scanning, or resume an incomplete import.
+A wallet balance is zero or provisionalLet blockchain checking and wallet scanning finish. If old blocks were pruned, recover the required history. Do not pretend an old wallet was created later to bypass the warning.
 
-PSBT cannot be openedPlease check the file in Bitcoin Core. Review recipients, amounts, fees and change before signing or broadcasting.
+A PSBT will not openCheck that you selected the intended file in Core. Independently review recipients, amount, fee and change before signing or broadcasting.
 
-Private broadcast is not observedPlease check Tor and transaction status. The application must not silently use a standard route.
+Private broadcast is not visibleCheck Tor and transaction status. A transaction ID does not prove successful relay. Do not silently switch to a standard route.
 
-Export filename already existsPlease choose a new filename. Existing exports are preserved.
+A backup filename already existsChoose a new name. Existing exports are deliberately preserved.
 
-Advanced diagnostics are available in Terminal using ordinary systemd and Bitcoin Core commands. Please avoid sharing logs or screenshots containing public wallet metadata without reviewing them first.
+Save seems inactiveSelect an output folder. If encryption is on, enter and repeat the passphrase. Read the visible feedback below the controls.
 
-Powered by Debian GNU/Linux · Official Bitcoin Core · No signing keys required on Node
+Backup no longer shows a verification stageThis is intentional for all four backup exports. Wait for writes to finish, keep multiple copies and test recovery separately. Restore still validates its input.
 
-Backup and file-transfer checks
+Core stays stopped after blockchain backupThis is intentional. Open Core manually after the operation finishes.
 
-ObservationWhat to check
+Watch-only backup is blocked during chain copyingWallet transfer needs running Core. Finish the chain job, start Core, then retry.
 
-Save seems inactivePlease select a destination. When encryption is selected, enter and repeat the passphrase. Read the visible feedback.
+A PSBT or recovered file is gone after restartBoth working folders are RAM-only. Recover your separate USB copy; restarting does not preserve those files.
 
-Core stopped after chain backupThis is intentional. Please open Bitcoin Core manually after the operation finishes.
+USB is not listed or cannot be writtenReconnect it, use Refresh USB and check Files. Unlock encrypted media there first. Reopen an already-open Core/KeePassXC chooser. A read-only drive cannot receive a backup.
 
-Watch-only backup blocked during chain copyingWallet transfer needs running Core. Please finish the chain operation, start Core, then retry.
+USB cannot be ejectedFinish writes, close files using it and stop Core normally, then choose Eject/Unmount in Files again.
 
-PSBT missing after restartThe transfer folder is RAM-only. Please recover the independent USB copy; restarting does not preserve it.
+A settings restore is staged, not appliedRestart normally, or use Check pending restore to inspect the saved request and result.
 
-USB not listedPlease reconnect it, use Refresh USB and check Files. Unlock encrypted media there first.
+KeePassXC reports HTTP 503The release server/gateway is unavailable. The official download-page fallback may work. This code alone is no reason to change a correct clock.
 
-Settings staged, not appliedPlease restart normally or use Check pending restore to inspect the result.
+Keyboard or mouse feels wrongOpen Keyboard and Mouse. Check the layout and variant in the typing test; select the correct mouse and use Refresh Devices after reconnect. Greyed options are unsupported by that device.
 
-KeePassXC HTTP 503The source server/gateway is unavailable. Node tries the official download page and reports the source; no clock reset is required just because of HTTP 503.
+Technical diagnostics are available in the separate details window and in Terminal. Terminal accepts advanced system and Core commands; do not paste commands you do not understand. Please inspect logs/screenshots before sharing them: public wallet data and device/network details may still be private.
+
+Powered by Debian GNU/Linux · Official Bitcoin Core · No signing keys required on Node.

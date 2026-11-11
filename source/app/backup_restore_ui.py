@@ -12,7 +12,7 @@ class BackupRestoreDialog(QDialog):
         self.setWindowFlag(Qt.WindowMinimizeButtonHint,True)
         layout=QVBoxLayout(self);layout.setContentsMargins(22,18,22,16);layout.setSpacing(12)
         title=QLabel('Backup and Restore');title.setObjectName('Title');layout.addWidget(title)
-        hint=QLabel('Move your setup to another Node. Choose a category. Encryption is optional for wallets and configuration backups.')
+        hint=QLabel('Move your setup to another Node. Choose a category. Encryption is optional for wallets and configuration backups. Backup export has no read-back verification pass; restore checks remain enabled.')
         hint.setWordWrap(True);layout.addWidget(hint)
         self.actions={}
         rows=[('Blockchain','Downloaded blocks, block index and chainstate. No wallets.','chain'),

@@ -162,9 +162,16 @@ def numeric_preferences(settings):
     return result
 
 def validate(data):
+    require(isinstance(data,dict))
+    version=data.get('version')
+    extra=('input',) if version==2 else ()
     object_fields(data,('format','version','created_utc','core_version','node','wireguard','clock','keyboard',
-                        'display_scale','pointer','core','core_gui','connections','not_included'))
-    require(data['format']==FORMAT and type(data['version']) is int and data['version']==1)
+                        'display_scale','pointer','core','core_gui','connections','not_included')+extra)
+    require(data['format']==FORMAT and type(version) is int and version in (1,2))
+    if version==2:
+        from desktop_input import validate as validate_input
+        try:data['input']=validate_input(data['input'])
+        except ValueError:raise SettingsError('Keyboard/mouse preferences are invalid.') from None
     require(isinstance(data['created_utc'],str) and re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ',data['created_utc']))
     require(isinstance(data['core_version'],str) and re.fullmatch(r'32\.\d{1,3}(?:\.\d{1,3})?',data['core_version']))
     object_fields(data['node'],('profile','network','prune_mib','private_broadcast'))
@@ -261,11 +268,14 @@ def collect():
     if skipped:notices.append(f'{skipped} network profile(s) use unsupported settings and were not copied.')
     if any(p['needs_secret'] for p in profiles):notices.append('Some network passwords are not stored in the system profile; those will need to be entered again.')
     wg=safe_read('/etc/wireguard/core-node.conf',owner=0,optional=True)
-    data=dict(format=FORMAT,version=1,created_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),
+    data=dict(format=FORMAT,version=2,created_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),
               core_version=active_release()['version'],node={k:setup[k] for k in ('profile','network','prune_mib','private_broadcast')},
               wireguard=wg.decode('utf-8') if wg else None,clock={k:clock[k] for k in ('timezone','automatic')},
               keyboard=keyboard,display_scale=scale,pointer=pointer,core=preferences,
               core_gui=gui_values(raw) if raw else {},connections=profiles,not_included=notices)
+    from desktop_input import DEFAULTS,validate as validate_input
+    input_raw=safe_read('/home/node/.config/bitcoin-core-node/input.json',owner=account.pw_uid,optional=True)
+    data['input']=validate_input(json_load(input_raw) if input_raw else DEFAULTS)
     return validate(data)
 
 def summary(data):
@@ -273,7 +283,8 @@ def summary(data):
                 wifi=sum(p['type']=='wifi' for p in data['connections']),ethernet=sum(p['type']=='ethernet' for p in data['connections']),
                 wireguard=data['wireguard'] is not None,privacy=data['node']['profile'],
                 keyboard=data['keyboard']['XKBLAYOUT'],created_utc=data['created_utc'],
-                not_included=data['not_included'],restart_required=True)
+                not_included=data['not_included'],restart_required=True,
+                desktop_input=data.get('input'))
 
 CORE_FORMAT = 'bitcoin-core-node-core-settings'
 
@@ -349,7 +360,7 @@ def save_encrypted(directory,secret,caller,events,*,core_only=False):
     data=collect_core() if core_only else collect()
     name=transfer.publish(canonical(data),directory,secret,caller,events,
             prefix='bitcoin-core-config' if core_only else 'bitcoin-node-settings',limit=MAX_PAYLOAD)
-    return dict(ok=True,directory=str(Path(name).parent),file=name,encrypted=bool(secret),summary=summary_any(data))
+    return dict(ok=True,directory=str(Path(name).parent),file=name,encrypted=bool(secret),readback_verified=False,summary=summary_any(data))
 
 def read_encrypted(filename,secret,caller,events):
     import encrypted_transfer as transfer

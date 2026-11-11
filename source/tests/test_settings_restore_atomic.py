@@ -59,6 +59,19 @@ class AtomicSettings(unittest.TestCase):
         self.assertEqual(os.readlink(self.root/'etc/localtime'),'../usr/share/zoneinfo/Europe/Zagreb')
         self.assertFalse((self.state/'rollback.json').exists());self.assertFalse((self.state/'pending.json').exists())
 
+    def test_v2_input_preferences_are_owned_by_target_user(self):
+        import desktop_input as inp
+        self.data.update(version=2,input=copy.deepcopy(inp.DEFAULTS))
+        self.data['input']['keyboard']['rate_hz']=30
+        self.data['input']['devices']={'Fixture Mouse':{'natural_scroll':True,'left_handed':False}}
+        s.atomic_private(self.state/'pending.json',self.data)
+        self.apply();self.preserved()
+        path=self.root/'home/node/.config/bitcoin-core-node/input.json'
+        self.assertEqual(json.loads(path.read_bytes()),self.data['input'])
+        self.assertEqual(path.stat().st_uid,self.node.pw_uid)
+        self.assertEqual(path.stat().st_mode & 0o777,0o600)
+        self.assertIn('"hr"',(self.root/'etc/X11/xorg.conf.d/90-core-node-keyboard.conf').read_text())
+
     def test_runtime_failure_rolls_back_every_prior_file(self):
         original=r.write_record;calls=0
         def fail_once(*args):

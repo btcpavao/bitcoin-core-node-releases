@@ -2,6 +2,7 @@
 
 An unencrypted checksum detects damage, not an attacker. Its sensitive contents
 are intentionally readable, as stated before export. No automatic downgrade.
+Exports finish after writing and flushing; imports still authenticate/check data.
 """
 import hashlib,json,os,time,uuid
 from pathlib import Path
@@ -40,21 +41,23 @@ def publish(raw,directory,secret,caller,events,*,prefix,limit):
     name=prefix+'-'+time.strftime('%Y%m%dT%H%M%SZ',time.gmtime())+'-'+uuid.uuid4().hex[:10]+('.gpg' if encrypted else '.json')
     try:
         with ss.ram_work() as work:
-            ss.require(os.statvfs(work).f_bavail*os.statvfs(work).f_frsize>len(raw)*4+16*1024**2,'Not enough private RAM to verify this backup.')
+            ss.require(os.statvfs(work).f_bavail*os.statvfs(work).f_frsize>len(raw)*4+16*1024**2,'Not enough private RAM to prepare this backup.')
             if encrypted:
                 source=work/'payload';source.write_bytes(raw);source.chmod(0o600)
-                out=work/'encrypted.gpg';events.update('Encrypting and verifying the backup',force=True)
-                encrypt_file(source,out,secret,ram_root=work,progress=events,max_output_bytes=limit+1024*1024)
+                out=work/'encrypted.gpg';events.update('Encrypting the backup',force=True)
+                encrypt_file(source,out,secret,ram_root=work,progress=events,max_output_bytes=limit+1024*1024,verify_roundtrip=False)
                 data=out.read_bytes()
             else:
-                events.update('Saving and verifying unencrypted backup',force=True)
+                events.update('Preparing unencrypted backup',force=True)
                 data=pack_plain(raw)
-                ss.require(unpack_plain(data,limit)==ss.canonical(json.loads(raw)))
+            events.check();events.update('Writing backup',force=True)
             with identity(caller):
                 dest=os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=fd)
-                with os.fdopen(dest,'wb') as f:f.write(data);f.flush();os.fsync(f.fileno())
-                check=regular_at(fd,temp)
-                with os.fdopen(check,'rb') as f:ss.require(hashlib.file_digest(f,'sha256').digest()==hashlib.sha256(data).digest(),'USB read-back verification failed.')
+                with os.fdopen(dest,'wb') as f:
+                    ss.require(f.write(data)==len(data),'The destination did not accept the complete backup write.')
+                    f.flush();os.fsync(f.fileno())
+                # No destination re-read. Checksums/authentication remain in the
+                # file format so restore can detect corruption before applying it.
                 events.check();events.cancel_allowed=False
                 reserve=os.open(name,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600,dir_fd=fd);os.close(reserve)
                 try:os.replace(temp,name,src_dir_fd=fd,dst_dir_fd=fd);os.fsync(fd)

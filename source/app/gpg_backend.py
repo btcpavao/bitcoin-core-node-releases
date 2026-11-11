@@ -236,7 +236,7 @@ def _run(mode, source_fd, output_fd, secret, work, executable, progress, deadlin
             os.close(fd)
 
 
-def _transform(mode, source, destination, password, *, ram_root, progress, executable, deadline, max_output_bytes, embedded_name=''):
+def _transform(mode, source, destination, password, *, ram_root, progress, executable, deadline, max_output_bytes, embedded_name='', verify_roundtrip=True):
     source_fd = root_fd = parent_fd = output_fd = None
     created = False; output_identity = None
     try:
@@ -257,7 +257,7 @@ def _transform(mode, source, destination, password, *, ram_root, progress, execu
         if not stat.S_ISREG(os.fstat(source_fd).st_mode):
             raise GPGError('Select one regular file for GPG encryption or recovery.')
         before = _identity(source_fd)
-        expected = _hash(source_fd, progress, deadline) if mode == 'encrypt' else None
+        expected = _hash(source_fd, progress, deadline) if mode == 'encrypt' and verify_roundtrip else None
         if _identity(source_fd) != before:
             raise GPGError('The input file changed during backup.')
         output_fd = os.open(dest.name, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
@@ -274,20 +274,21 @@ def _transform(mode, source, destination, password, *, ram_root, progress, execu
             if mode == 'encrypt':
                 if os.fstat(output_fd).st_size == 0:
                     raise GPGError('GPG did not create an encrypted backup.')
-                # Actual decrypt/authentication and byte comparison, not extension/status only.
-                recovered = work/'readback'
-                readback_profile = _transform('decrypt', dest, recovered, password,
-                    ram_root=root, progress=progress, executable=exe, deadline=deadline, max_output_bytes=max_output_bytes)
-                if readback_profile != ENCRYPTION_PROFILE:
-                    raise GPGError('The new backup does not use the required AES-256 MDC protection.')
-                fd = os.open(recovered, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
-                try:
-                    if _hash(fd, progress, deadline) != expected:
-                        raise GPGError('The encrypted backup did not recover the expected file.')
-                finally:
-                    os.close(fd)
-                if _identity(source_fd) != before:
-                    raise GPGError('The input file changed during backup verification.')
+                if verify_roundtrip:
+                    # Actual decrypt/authentication and byte comparison, not extension/status only.
+                    recovered = work/'readback'
+                    readback_profile = _transform('decrypt', dest, recovered, password,
+                        ram_root=root, progress=progress, executable=exe, deadline=deadline, max_output_bytes=max_output_bytes)
+                    if readback_profile != ENCRYPTION_PROFILE:
+                        raise GPGError('The new backup does not use the required AES-256 MDC protection.')
+                    fd = os.open(recovered, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+                    try:
+                        if _hash(fd, progress, deadline) != expected:
+                            raise GPGError('The encrypted backup did not recover the expected file.')
+                    finally:
+                        os.close(fd)
+                    if _identity(source_fd) != before:
+                        raise GPGError('The input file changed during backup verification.')
         _check(progress, deadline)
         created = False  # Successful provisional output belongs to the caller.
         return profile
@@ -306,17 +307,23 @@ def _transform(mode, source, destination, password, *, ram_root, progress, execu
 
 
 def encrypt_file(source, destination, password, *, ram_root, progress=None, executable=None,
-                 max_output_bytes=256*1024*1024, embedded_name=''):
+                 max_output_bytes=256*1024*1024, embedded_name='', verify_roundtrip=True):
     """Create authenticated AES256-MDC; optionally declare a generic inner file type.
 
+    Backup and Restore can explicitly skip a round-trip test with
+    verify_roundtrip=False. The normal Encrypt Files path keeps it enabled.
+    GPG completion, protected RAM output, full input consumption and write
+    errors are always checked. Decryption authentication cannot be disabled.
     No wallet name, filesystem path, source name or secret enters the packet.
     Layered Node/Vault archives contain an inner GPG, TAR, or a single wallet.dat.
     """
+    if type(verify_roundtrip) is not bool:
+        raise GPGError('Invalid backup verification mode.')
     if embedded_name not in ('', 'inner.gpg', 'payload.tar', 'wallet.dat'):
         raise GPGError('Unsupported encrypted payload filename.')
     return _transform('encrypt', source, destination, password, ram_root=ram_root,
         progress=progress, executable=executable, deadline=time.monotonic()+OPERATION_TIMEOUT,
-        max_output_bytes=max_output_bytes, embedded_name=embedded_name)
+        max_output_bytes=max_output_bytes, embedded_name=embedded_name, verify_roundtrip=verify_roundtrip)
 
 
 def decrypt_file(source, destination, password, *, ram_root, progress=None, executable=None, max_output_bytes=256*1024*1024):

@@ -9,24 +9,8 @@ from rpc import CoreRPC, CoreError
 
 
 def storage_usage():
-    """Read space on Core's VERIFIED persistent datadir mount, not the root disk.
-
-    Values include other files on that filesystem. Never present available
-    space from a disconnected external drive as if it were the data drive.
-    """
-    try:
-        from state import DATA, load_setup, verify_data_mount
-        setup=load_setup()
-        verify_data_mount(setup,DATA)
-        filesystem=os.statvfs(DATA)
-        total=filesystem.f_blocks*filesystem.f_frsize
-        free=filesystem.f_bavail*filesystem.f_frsize
-        if total<=0 or free<0 or free>total:
-            return None
-        return dict(total=total,free=free,used_percent=round(100*(total-free)/total),
-                    free_percent=round(100*free/total))
-    except (OSError,ValueError,RuntimeError,KeyError,TypeError):
-        return None
+    from chain_storage import storage_usage as measure_chain_storage
+    return measure_chain_storage()
 
 
 def node_activity():
@@ -134,7 +118,7 @@ class ActivityIndicator(QWidget):
 
 
 class StorageBar(QWidget):
-    """A simple disk used/available bar for the actual blockchain filesystem."""
+    """Allocated blockchain space as a share of its current usable capacity."""
     def __init__(self,parent=None):
         super().__init__(parent)
         self.setMaximumWidth(620)
@@ -142,12 +126,12 @@ class StorageBar(QWidget):
         layout=QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
         layout.setSpacing(3)
-        self.caption=QLabel('Checking blockchain disk space…')
+        self.caption=QLabel('Checking blockchain storage…')
         self.caption.setAlignment(Qt.AlignCenter)
         self.caption.setTextFormat(Qt.PlainText)
         self.caption.setStyleSheet('color:#bfbfbf;font-size:11px;')
         self.bar=QProgressBar(self)
-        self.bar.setRange(0,100)
+        self.bar.setRange(0,1000)
         self.bar.setTextVisible(False)
         self.bar.setFixedHeight(10)
         self.bar.setStyleSheet('QProgressBar { background:#353535; border:0; border-radius:3px; } '
@@ -160,14 +144,23 @@ class StorageBar(QWidget):
             self.setVisible(False)
             return
         free,total=reading['free'],reading['total']
-        free_percent=reading['free_percent']
+        used=reading.get('used', total-free)
+        percent=reading['used_percent']
         gib=1024**3
         self.caption.setText(
-            f'Blockchain disk · {free_percent}% free · {free/gib:.1f} GiB available of {total/gib:.1f} GiB')
+            f'Blockchain storage · {percent:.1f}% full · {free/gib:.1f} GiB free of {total/gib:.1f} GiB')
         self.caption.setAccessibleName(self.caption.text())
-        used=reading['used_percent']
-        self.bar.setValue(used)
-        color='#FF5151' if free_percent<=10 else '#f7931a'
+        self.bar.setValue(round(percent*10))
+        self.bar.setAccessibleName(f'Blockchain storage {percent:.1f}% full')
+        detail=(f'{used/gib:.2f} GiB used by retained blocks, chainstate and indexes. '
+                f'{free/gib:.2f} GiB remains available to Core. '
+                'Capacity = these blockchain files + currently available disk space. '
+                'Debian, apps, wallets, other files and filesystem-reserved space are excluded. '
+                'This is not a fixed reservation: other files can reduce the available space. '
+                'Usage is an estimate refreshed about every 15 seconds. '
+                'A pruning target limits blocks, not chainstate; leave space for maintenance.')
+        self.caption.setToolTip(detail);self.bar.setToolTip(detail)
+        color='#FF5151' if percent>=90 else '#f7931a'
         self.bar.setStyleSheet('QProgressBar { background:#353535; border:0; border-radius:3px; } '
                                f'QProgressBar::chunk {{ background:{color}; border-radius:3px; }}')
         self.setVisible(True)

@@ -2,8 +2,8 @@
 Retains its sidebar, responsive chapter picker, typography and local figure rendering.
 """
 from html import escape
-from PySide6.QtCore import Qt, QTimer, QUrl, QEvent, QSize
-from PySide6.QtGui import QFont, QTextOption, QTextDocument, QTextTable, QIcon
+from PySide6.QtCore import Qt, QTimer, QUrl, QEvent, QSize, QRect
+from PySide6.QtGui import QFont, QTextOption, QTextDocument, QTextTable, QIcon, QFontMetrics
 from PySide6.QtWidgets import (QDialog, QComboBox, QHBoxLayout, QLabel,
     QListWidget, QPushButton, QTextBrowser, QVBoxLayout)
 from guide_visuals import render_visual
@@ -46,586 +46,13 @@ pre { font-family:'DejaVu Sans Mono'; font-size:13pt; white-space:pre-wrap; }
 th, td { padding:9px; }
 """
 
-SECTIONS = {'Bitcoin Core': '<h2>Bitcoin Core</h2><p><b>Bitcoin Core online node environment.</b></p>\n'
-                 '<p>This dedicated Debian environment validates Bitcoin, watches your public wallet and '
-                 'prepares transactions. Your separate offline Vault holds the signing keys.</p>\n'
-                 '<h3>Install and sign in</h3>\n'
-                 '<ol><li>Boot the verified Node USB and choose the keyboard and installation disk. Please '
-                 'back up saved data first; installation erases the selected disk.</li><li>Review the '
-                 'selected disk and complete installation.</li><li>Restart and remove the USB. The Node '
-                 'desktop opens automatically by default.</li><li>Open <b>Bitcoin Core</b>. Its native '
-                 'first-start dialog lets you choose storage and pruning before synchronization '
-                 'begins.</li></ol>\n'
-                 '<h3>Choose password or automatic login</h3>\n'
-                 '<p>Open <b>Settings → Login Password</b>, enter the same password twice and choose <b>Set '
-                 'password</b>. At the next startup or restart, enter that password on the Bitcoin Core Node '
-                 'screen and press Enter. No user selection is needed. There is no minimum length or '
-                 'required mix of characters.</p>\n'
-                 '<p>Use <b>Change password</b> to replace it, or <b>Remove password</b> to restore '
-                 'automatic login. The signed-in local Node desktop can change this setting without re-entering the current password. '
-                 'Your current session stays open, and no reinstallation is needed.</p>\n'
-                 '<p>The login password is used at sign-in, not to authorize each Node action. Backups, restores, '
-                 'software updates and Node settings do not ask for it again in the active local desktop. '
-                 'Anyone using an unlocked Node desktop can operate these controls and change the login setting. '
-                 'Confirmations, backup passphrases and wallet encryption remain separate. Arbitrary terminal '
-                 'sudo commands retain normal Linux authentication.</p><p>A login password controls access to the desktop. It does not encrypt the disk or '
-                 'replace a Bitcoin Core wallet passphrase. Older encrypted installations retain their '
-                 'separate disk-unlock password.</p>\n'
-                 '<p>The installed Node keeps blockchain data, wallets and settings after restart. Private '
-                 'Workspace and PSBT Transfer Folder are cleared. Please shut down Core cleanly before '
-                 'disconnecting its data disk.</p>\n'
-                 '<p>Opening and closing Bitcoin Core do not ask for the login password again. Restart and '
-                 'Shut Down ask for confirmation without an additional authentication prompt. Login happens '
-                 'after the computer starts again.</p>\n'
-                 '<h3>Blockchain progress and disk space</h3><p>The Home screen shows a fixed 100-segment '
-                 'progress bar. Each orange segment represents 1% of Bitcoin Core’s verified blockchain '
-                 'progress. The meter is based on Core’s own verificationprogress RPC and does not guess '
-                 'time remaining. Before header pre-sync completes, verified progress may remain at zero '
-                 'while the header count increases.</p><p>Directly below is one simple storage bar for the '
-                 'actual mounted blockchain filesystem. The label displays percent and GiB available. The '
-                 'occupied space includes all files on that disk, not only blocks and chainstate. If the '
-                 'selected external disk is missing or cannot be verified, no misleading free-space figure '
-                 'is shown.</p><h3>Manage Bitcoin Core from the status indicator</h3><p>Click the '
-                 'online/offline indicator beside the clock to view peer details and Start, Pause sync, Stop '
-                 'or Restart controls. Pause sync uses Bitcoin Core setnetworkactive(false), temporarily '
-                 'disconnecting peers without stopping the process or changing the saved privacy '
-                 'configuration. Resume sync uses setnetworkactive(true). Stop performs a graceful Bitcoin '
-                 'Core shutdown; Restart affects Bitcoin Core only. All actions are explicit, and the Debian '
-                 'computer stays running.</p><h3>Delete wallet from Files</h3><p>Core files remain '
-                 'read-only. First close or unload every wallet you want to delete using <b>Bitcoin Core → '
-                 'File → Close Wallet</b>. In <b>Files → Core → wallets</b>, select one or multiple wallet '
-                 'folders (Ctrl-click to select multiple), right-click and choose <b>Permanently Delete '
-                 'Bitcoin Core Wallets…</b>. Review the exact selection in the same dialog style used by '
-                 'Vault, then click the red <b>Permanently Delete</b> button. You do not need to type wallet '
-                 'names. The helper refuses the entire batch if any selected wallet is invalid or still '
-                 'loaded. Bitcoin Core stops once and restarts after the whole batch succeeds. The operation '
-                 'only removes selected wallet folders, never blocks, chainstate or the wallets root. The '
-                 'progress window closes automatically on success and offers Close after an error. Deleting '
-                 'wallets is irreversible and can destroy funds without a verified separate backup. '
-                 'Overwriting is best effort only: SSDs, journaling and old backups may retain prior '
-                 'data.</p>',
- 'Synchronization': '<h2>Synchronization</h2><h3>Blockchain synchronization</h3>\n'
-                    "<p>Core downloads blocks and independently verifies Bitcoin's rules. During initial "
-                    'block download, the displayed blockchain progress is not a final wallet balance. Wallet '
-                    'scanning is a separate operation: it finds transactions related to your imported public '
-                    'descriptors.</p>\n'
-                    '<table border="1" cellpadding="14"><tr><th>Blockchain validation</th><th>Wallet '
-                    'scanning</th></tr><tr><td>Are these blocks and transactions valid?</td><td>Which '
-                    'validated transactions belong to this public wallet?</td></tr></table>\n'
-                    '<p>Please finish both before preparing a payment in Core. Closing Home does not stop '
-                    'Bitcoin Core. Use <b>Bitcoin Core → File → Exit</b>, <b>Bitcoin Core status indicator → '
-                    'Stop Bitcoin Core</b> or a normal shutdown before disconnecting storage.</p>\n'
-                    '<h3>Archive or pruned storage</h3>\n'
-                    '<table border="1" cellpadding="12"><tr><th>Archive node</th><th>Pruned '
-                    'node</th></tr><tr><td>Keeps historical blocks. Requires more storage. Can rescan old '
-                    'wallet history.</td><td>Validates the same rules but removes older block files. '
-                    'Requires less storage. Cannot rescan history it no longer has.</td></tr></table>\n'
-                    '<p>Pruning does not weaken validation. It changes which historical block files remain '
-                    "available. If an older wallet needs missing blocks, read Core's rescan warning and "
-                    'restore the required block history. Please use an archive node or restore the required '
-                    'block history. A zero balance after an incomplete scan must never be treated as proof '
-                    'of no funds.</p>\n'
-                    '<p>Enabling pruning or reducing its target can delete downloaded block files. Disabling '
-                    'pruning can require reindexing and downloading history again. Choose pruning in the '
-                    'initial Bitcoin Core dialog or later in <b>Bitcoin Core → Settings → Options</b>, '
-                    'following its restart instructions.</p>\n'
-                    '\n'
-                    '<h3>Progress without guesswork</h3>\n'
-                    "<p>Home uses a fixed 100-segment validation meter based on Core's own estimate, with a "
-                    'separate storage bar. It does not guess a finish time. Before header pre-sync '
-                    'completes, the validation percentage can remain at zero.</p>\n'
-                    '<p><b>Settings → Bitcoin Core Status</b> shows live blocks, headers, peers, mempool, '
-                    'network and storage information. A subtle pulse appears while Core reports initial '
-                    'validation with an active network and peers. Wallet rescans remain separate. Open '
-                    '<b>Show technical details</b> for an independent searchable snapshot window.</p>\n'
-                    '<p>To reuse downloaded blocks on another Node, open <b>Settings → Backup and Restore → '
-                    'Blockchain</b>. The <b>Blockchain backup</b> chapter explains the complete copy and '
-                    'import workflow.</p>',
- 'Status & diagnostics': '<h2>Status &amp; diagnostics</h2>\n'
-                         '<p><img src="bitcoin-ui.png" width="36" height="36"> <b>Settings → Bitcoin Core '
-                         'Status</b></p>\n'
-                         '<p>The dashboard reads local Core data. It shows version, validation percentage, '
-                         'block and header heights, peers, Bitcoin network, mempool, free storage and the '
-                         'selected privacy profile. It refreshes automatically; a stopped or unavailable '
-                         'Core shows unavailable values rather than fabricated success.</p>\n'
-                         '<h3>Show technical details</h3><p>Click <b>Show technical details</b> to open a '
-                         'separate resizable, minimizable window. The dashboard stays compact. Details are '
-                         'grouped into Blockchain, Network and software, Mempool, Peer networks, transport '
-                         'protocols and wallet-rescan information when available.</p>\n'
-                         '<p>Use <b>Find a field or value…</b> to narrow the tree, <b>Expand all</b> or '
-                         '<b>Collapse all</b> to control it, and <b>Raw JSON</b> only when the unformatted '
-                         'snapshot is useful. <b>Refresh</b> takes a new local snapshot without continually '
-                         'moving the data while you read. Closing this window does not stop Core.</p>\n'
-                         '<p><b>Copy snapshot</b> copies diagnostics to the clipboard, not to a server. '
-                         'Review them before sharing: wallet names and other information may be private. '
-                         'Core sync does not prove that unrelated HTTPS update servers are reachable.</p>',
- 'Networking': '<h2>Networking</h2><p>The <b>Network Status</b> icon immediately left of Restart lists '
-               'available Wi-Fi networks. Select your network, enter its password and click <b>Connect</b>. '
-               'Saved networks reconnect automatically for this user. Ethernet connects automatically when a '
-               'cable is plugged in. Use <b>Advanced settings</b> for hidden networks, enterprise Wi-Fi or '
-               'manual IP settings. When Core is opened without an active connection, it offers this setup '
-               'first; <b>Use Core offline</b> remains available. A connected local network does not '
-               'guarantee Internet access. Bitcoin transport privacy stays in <b>Settings → Bitcoin Core '
-               'Network &amp; Privacy</b>. Changing a connection does not disable the selected firewall '
-               'policy.</p><h3>Network privacy</h3>\n'
-               '<table border="1" cellpadding="12"><tr><th>Profile</th><th>Scope and '
-               'limits</th></tr><tr><td>Clearnet</td><td>Direct Bitcoin peers over IPv4/IPv6. Peers see your '
-               'public IP; your ISP may identify Bitcoin traffic.</td></tr><tr><td>Tor</td><td>Bitcoin P2P '
-               'uses the local Tor proxy. Direct daemon traffic is blocked. Other OS traffic, including '
-               'Debian updates, still uses the ordinary '
-               'network.</td></tr><tr><td>WireGuard</td><td>Whole-device full tunnel. The kill switch blocks '
-               'fallback and DNS/IPv6 leakage outside the tunnel, with exceptions for the configured VPN '
-               'endpoint and essential link setup. The VPN operator is a trust point.</td></tr></table>\n'
-               '<p>WireGuard import accepts a standard full-tunnel configuration with numeric endpoint and '
-               'explicit DNS. Configurations containing scripts or unsupported split routes are refused. '
-               'Private tunnel keys are stored only in root-owned configuration. Neither Tor nor a VPN '
-               'guarantees anonymity.</p>\n'
-               '<p>Profile switches stop a running Core, replace the guarded network policy and verify it '
-               'before restarting. If Core was stopped, it remains stopped. A failed switch leaves the node '
-               'stopped rather than falling back to a less private profile. I2P and Tor bridges are not '
-               'exposed in V1.</p>\n'
-               '<h3>Transaction broadcast privacy is separate</h3>\n'
-               "<p>The <b>private transaction broadcast</b> preference uses Core 32.1's privatebroadcast "
-               'behavior for sendrawtransaction. It is separate from the ordinary peer-network profile. '
-               'Private broadcast uses short-lived Tor/I2P connections and does not initially place the '
-               'submitted transaction into the local mempool. This product exposes the Tor '
-               'configuration.</p>\n'
-               '<p>Enabling Tor for private broadcasting also makes it available for ordinary peer '
-               'selection. An unavailable private route must not silently fall back to standard broadcast. A '
-               'returned transaction ID does not establish successful relay. Please check the exact '
-               "release's transport acceptance results.</p>\n"
-               '<h3>Bluetooth mouse and keyboard</h3>\n'
-               '<p>Open <b>Settings → Bluetooth Devices</b>, or press <b>Ctrl+Alt+B</b>. Turn on the '
-               'adapter, put your mouse or keyboard in pairing mode, select <b>Search</b>, then pair and '
-               'connect it. For a keyboard, enter the displayed code on that keyboard and press Enter when '
-               'prompted. Mark your device as trusted for future connections.</p>\n'
-               '<p>The installed system keeps pairing keys on disk. After restart, switch on or wake the '
-               'paired device to reconnect. Devices paired only in the live installer must be paired again '
-               'after installation. Use a built-in or USB keyboard/mouse for initial setup if needed; '
-               'Ctrl+Alt+B also opens pairing during installation.</p>\n'
-               '<p>The image includes Debian firmware for common adapters. If no adapter appears, check the '
-               "computer's Bluetooth/airplane-mode switch and BIOS settings. Some hardware needs additional "
-               'vendor firmware or a Debian-compatible USB Bluetooth adapter. Bluetooth network sharing and '
-               'file transfers are not enabled by the Node setup.</p>\n'
-               '<h3>Mouse &amp; Pointer speed</h3><p>After connecting a Bluetooth or USB mouse, open '
-               '<b>Settings → Mouse Speed</b>. Select the device, adjust the slider to Slower or Faster, and '
-               'press <b>Apply and Save</b>. The preference is saved per XInput mouse name and reapplied at '
-               'Bluetooth reconnect and new desktop sessions. These settings affect only cursor acceleration '
-               'and do not change Bitcoin Core, networking or keyboard pairing.</p>',
- 'Watch-only wallets': '<h2>Watch-only wallets</h2><h3>One wallet, two roles</h3>\n'
-                       '<p>The offline Vault holds signing keys. The online Node validates the blockchain, '
-                       'watches your public wallet and prepares transactions. Public wallet data reveal '
-                       'addresses and financial activity, but cannot authorize spending.</p>\n'
-                       '<h3>Transfer a native watch-only wallet</h3>\n'
-                       '<ol><li>On Vault, open Bitcoin Core 32.1, select your signing wallet and choose '
-                       '<b>File → Export watch-only wallet</b>. The signing wallet can remain locked.</li>\n'
-                       '<li>Save <b>watch-only.dat</b> in <b>Private Workspace</b>, then use Files to copy '
-                       'that public export to USB. Never copy the original signing wallet.dat to the '
-                       'Node.</li>\n'
-                       '<li>On Node, use <b>Files</b> to copy the public file from USB into <b>PSBT Transfer '
-                       "Folder</b> in your home folder. This folder is also visible in Core's file picker. "
-                       'If GPG-encrypted, use Decrypt Files and select the recovered database from Private '
-                       'Workspace in Core.</li>\n'
-                       '<li>Open Bitcoin Core and choose <b>File → Restore Wallet</b>. Select the file from '
-                       'PSBT Transfer Folder and give the restored wallet a new name.</li>\n'
-                       '<li>Wait for blockchain synchronization and the wallet rescan. Read any warnings '
-                       'from Core: if required historical blocks were pruned, recover the missing block '
-                       'history before relying on the balance.</li>\n'
-                       '<li>Compare receiving addresses and labels with Vault. The native export retains '
-                       'public descriptors, receiving/change address state, labels and wallet transaction '
-                       'history, without signing keys.</li></ol>\n'
-                       '<p>For the first public .dat file from Vault, Core performs the native restore. For '
-                       'a collection previously saved on Node, use Settings → Backup and Restore → '
-                       'Watch-only wallets → Restore. <b>Watch-Only Wallets</b> and the adjacent <b>PSBT '
-                       'Transfer Folder</b> launcher appear on Home after a loaded private-key-disabled '
-                       'descriptor wallet is detected. If a wallet is closed, open it through <b>Bitcoin '
-                       'Core → File → Open Wallet</b>.</p>\n'
-                       '<h3>Receive and prepare transactions</h3>\n'
-                       '<p>Use Core or Watch-Only Wallets to view balances, labels, addresses and history. '
-                       'Use Bitcoin Core itself to prepare, inspect and broadcast PSBT transactions. Until '
-                       'synchronization or the wallet scan finishes, balances are provisional. Please verify '
-                       'receiving addresses independently against Vault.</p>\n'
-                       '<p>An incomplete legacy import is shown as incomplete in the wallet manager. Restore '
-                       'a fresh native public export under a new name in Core.</p>\n',
- 'PSBT transactions': '<h2>PSBT transactions</h2><h3>Use Bitcoin Core directly</h3>\n'
-                      '<ol><li>On Node, select the watch-only wallet in Bitcoin Core. Use the Send tab to '
-                      'enter recipients, amounts and a fee, review the transaction and create an unsigned '
-                      'PSBT.</li><li>Save the PSBT in PSBT Transfer Folder or Private Workspace. Use Files '
-                      'to copy it to a USB drive before restarting: both PSBT Transfer Folder and Private '
-                      'Workspace are RAM-only.</li><li>On offline Vault, open Bitcoin Core and choose File → '
-                      'Load PSBT from file. Independently inspect recipients, amounts, fees and change '
-                      'before unlocking the signing wallet and signing. Save the signed PSBT to removable '
-                      'media.</li><li>On Node, copy the signed PSBT into PSBT Transfer Folder or Private '
-                      'Workspace. Choose Bitcoin Core → File → Load PSBT from file. Inspect the loaded '
-                      'transaction and confirm broadcast only when it matches the intended '
-                      'payment.</li><li>Check the transaction in Core. Submission is not proof of '
-                      'propagation or confirmation.</li></ol>\n'
-                      '<p>PSBT creation, parsing, signing and broadcast are handled by Bitcoin Core. Node '
-                      'has no separate Create Transaction or Import Signed PSBT application and creates no '
-                      'custom proposal records. Please keep any PSBT files you still need on USB or '
-                      'persistent storage.</p>\n'
-                      '<p>The offline signer must independently check the transaction: an online computer '
-                      'can propose an unwanted payment. A PSBT carries a transaction proposal and supporting '
-                      "public data, not the wallet's private keys.</p>",
- 'Backups & recovery': '<h2>Backups &amp; recovery</h2>\n'
-                       '<p><b>Settings → Backup and Restore</b> is the single starting point for four '
-                       'separate kinds of backup. Each row has its own <b>Backup</b> and <b>Restore</b> '
-                       'buttons. Choose the data you need, not a whole-disk clone.</p>\n'
-                       '<table border="1" cellpadding="10"><tr><th>Category</th><th>Purpose</th></tr>\n'
-                       '<tr><td><img src="icons/settings-chain-backup.png" width="32" height="32"> '
-                       '<b>Blockchain</b></td><td>Downloaded blocks, block index and chainstate. No wallets '
-                       'or network passwords.</td></tr>\n'
-                       '<tr><td><img src="bitcoin-ui.png" width="32" height="32"> <b>Watch-only '
-                       'wallets</b></td><td>Public descriptors, labels, address state and transaction '
-                       'records. Signing wallets are skipped.</td></tr>\n'
-                       '<tr><td><img src="icons/settings-software-updates.png" width="32" height="32"> '
-                       '<b>Bitcoin Core configuration</b></td><td>Supported Core and GUI preferences, '
-                       'without network credentials or wallet registrations.</td></tr>\n'
-                       '<tr><td><img src="icons/settings-network-connections.png" width="32" height="32"> '
-                       '<b>Node configuration</b></td><td>Saved Wi-Fi/Ethernet profiles, stored passwords, '
-                       'managed WireGuard/privacy, timezone and supported desktop preferences. Also includes '
-                       'portable Core preferences.</td></tr></table>\n'
-                       '<h3>Optional encryption</h3><p><b>Encrypt backup (optional)</b> starts unchecked for '
-                       'watch-only and configuration backups. Plain backups use <b>.json</b>; encrypted '
-                       'backups use <b>.gpg</b>. Select encryption to enter and repeat a nonempty '
-                       'passphrase; even one character is accepted, but a long random passphrase protects '
-                       'better. There is no automatic switch to plaintext if encryption fails.</p>\n'
-                       '<p><b>Privacy warning:</b> plain Node backups may contain Wi-Fi passwords and '
-                       'WireGuard private keys. Watch-only data can reveal addresses and balances. A '
-                       'checksum detects damaged files, not a malicious replacement. Keep backups private '
-                       'and restore only trusted files.</p>\n'
-                       '<h3>Keep working while data is copied</h3><p>Settings, this menu and progress '
-                       'windows are independent. Use the taskbar or <b>Back to Backup and Restore</b> while '
-                       'a job runs. Closing or minimizing a busy progress window does not cancel its job. '
-                       'Use <b>Cancel operation</b> explicitly when available. Node and Core configuration '
-                       'exports can run during blockchain copying. Watch-only transfer needs Core running, '
-                       'so it waits until chain copying finishes and you start Core manually.</p>\n'
-                       '<h3>Move to a different computer</h3><ol><li>Save Node configuration, supported '
-                       'watch-only wallets and, optionally, the blockchain to USB.</li><li>Install a '
-                       'compatible Node on the new computer. Installation erases its selected '
-                       'disk.</li><li>Restore Node configuration, review it and restart to apply '
-                       'it.</li><li>Restore the blockchain copy.</li><li>Start Bitcoin Core, restore '
-                       'watch-only wallets and check addresses, labels and scanning.</li></ol><p>Keep the '
-                       'old backups until the new setup has been checked. Your offline Vault and its '
-                       'signing-wallet backups remain separate.</p>',
- 'Blockchain backup': '<h2>Blockchain backup</h2>\n'
-                      '<p><img src="icons/settings-chain-backup.png" width="36" height="36"> <b>Settings → '
-                      'Backup and Restore → Blockchain</b></p>\n'
-                      '<h3>Copy the chain you already validated</h3><ol><li>Connect a USB drive with enough '
-                      'free space. Select <b>Backup</b> and <b>USB / External Drive…</b>, or choose a '
-                      'destination folder.</li><li>Select <b>I understand that Core will stop while the '
-                      'backup is created.</b> Click <b>Create backup</b>.</li><li>Core stops cleanly and '
-                      'flushes its data. The tool copies retained blocks, their index and XOR information, '
-                      'chainstate and any supported related chain data, then reads the copy back to check '
-                      'it.</li><li>Wait for the completed backup confirmation. A new complete snapshot is '
-                      'saved; a previous completed copy is kept. <b>Core remains stopped. Start it manually '
-                      'when ready.</b></li></ol>\n'
-                      '<p>Each backup is a complete copy of the retained chain data, not just an incremental '
-                      'change. Allow enough extra USB space for another copy. A pruned Node backs up only '
-                      'the history it still has. An unfinished copy is never published as a completed '
-                      'backup.</p>\n'
-                      '<h3>Import onto another Node</h3><ol><li>Use the same Core version and Bitcoin '
-                      'network. Open <b>Blockchain → Restore</b>.</li><li>Select the USB root and <b>Use '
-                      'latest backup</b>, or select a particular completed bitcoin-chain folder. Keep the '
-                      'complete folder and its manifest together.</li><li>Confirm that it is your trusted '
-                      'backup. Files are verified and the candidate databases opened by isolated Core '
-                      'without peers or wallets before activation.</li><li>Allow internal space for the '
-                      'imported copy alongside the existing chain until validation succeeds. Local wallets '
-                      'are not replaced.</li><li>Start Core if it is stopped. It continues from the saved '
-                      'state, downloads missing later blocks and validates them. The import workflow may '
-                      'restart Core if it was already running; backup itself never does.</li></ol>\n'
-                      '<h3>Keep the desktop usable</h3><p>Minimize progress or return through the taskbar to '
-                      'Settings and Backup and Restore. Node/Core configuration exports can run in parallel. '
-                      'Another chain operation or watch-only transfer must wait. Use <b>Cancel operation</b> '
-                      'explicitly; cancellation is briefly disabled during the final activation step.</p>\n'
-                      '<p>Do not unplug the USB during copying. A checksum checks copy integrity, not the '
-                      "honesty of someone else's blockchain. Use your own trusted source. This feature is "
-                      'not a wallet backup and does not import loose chainstate folders or arbitrary UTXO '
-                      'dump files.</p>',
- 'Watch-only backups': '<h2>Watch-only backups</h2>\n'
-                       '<p><img src="bitcoin-ui.png" width="36" height="36"> <b>Settings → Backup and '
-                       'Restore → Watch-only wallets</b></p>\n'
-                       '<h3>Create one portable public-wallet collection</h3><ol><li>Start Bitcoin Core and '
-                       'finish any conflicting chain-copy operation first.</li><li>Choose <b>Backup</b>, '
-                       'select the destination folder and optionally enable encryption.</li><li>Click '
-                       '<b>Create wallet backup</b>. The tool checks supported descriptor wallets, uses '
-                       "Core's native public-only export, and skips signing or unsupported "
-                       'wallets.</li><li>Review the result and the count of skipped wallets. Keep the saved '
-                       '<b>.json</b> or <b>.gpg</b> collection private.</li></ol>\n'
-                       '<p>An unloaded local wallet may be temporarily loaded for inspection and returned to '
-                       'its previous state. The public collection retains public descriptors, address state, '
-                       'labels/address book and transaction records. It contains no signing keys. It cannot '
-                       'replace the offline signing wallet.</p>\n'
-                       '<h3>Restore the collection</h3><ol><li>Use a compatible Node with the same Bitcoin '
-                       'Core version and Bitcoin network, and start Core.</li><li>Choose <b>Restore</b> in '
-                       'the Watch-only wallets row and select the collection. Encrypted collections require '
-                       'their passphrase.</li><li>Click <b>Review backup</b>, inspect the wallet names, '
-                       'approve the review and click <b>Restore wallets</b>.</li><li>Existing same-name '
-                       'wallets are not overwritten; new restored names are created. Repeating the same '
-                       'backup resumes completed imports rather than duplicating them.</li><li>Review the '
-                       'restored wallets in Core, compare addresses/labels and allow any required '
-                       'rescan.</li></ol>\n'
-                       '<p>Restoration is resumable per wallet, not an all-or-nothing transaction across a '
-                       'collection: completed wallets remain if a later one fails. Initial bounds are 32 '
-                       'wallets, 32 MiB per public export and 64 MiB combined, subject to available private '
-                       'RAM. A pruned chain cannot supply blocks already deleted, and public exports cannot '
-                       'derive uncached hardened keys. Keep the original Vault.</p>\n'
-                       '<p>For a single public <b>watch-only.dat</b> exported directly from Vault, use '
-                       '<b>Bitcoin Core → File → Restore Wallet</b> instead. The Node collection menu '
-                       'expects its own verified .json/.gpg format, not an arbitrary wallet file.</p>',
- 'Core configuration': '<h2>Core configuration</h2>\n'
-                       '<p><img src="icons/settings-software-updates.png" width="36" height="36"> '
-                       '<b>Settings → Backup and Restore → Bitcoin Core configuration</b></p>\n'
-                       '<p>This is the lightweight option when you only want Core preferences, not the '
-                       'operating-system network setup.</p>\n'
-                       '<h3>Included settings</h3><p>Supported numeric options include pruning, database '
-                       'cache, script-verification threads, mempool size/expiry, maximum connections and '
-                       'upload target. Supported native GUI preferences include Coin Control and PSBT '
-                       'controls. This is a validated subset, not an unchecked copy of every bitcoin.conf '
-                       'line.</p>\n'
-                       '<h3>Backup and restore</h3><ol><li>Choose <b>Backup</b>, select a USB folder and '
-                       'optionally enable encryption.</li><li>Click <b>Save backup</b>; wait for '
-                       'saved-and-verified confirmation.</li><li>On the target Node choose <b>Restore</b>, '
-                       'select the file and click <b>Review backup</b>.</li><li>Check the option names, '
-                       'approve the displayed settings and select <b>Restore on next '
-                       'restart</b>.</li><li>Restart and review the resulting Core settings.</li></ol>\n'
-                       '<p>Wallet registrations, wallets, blocks, Wi-Fi/VPN secrets, source-machine data '
-                       'paths, executable hooks and unsupported options are excluded. A complete Node '
-                       'configuration backup already contains this portable subset. Reducing the pruning '
-                       'target can later remove old blocks; restoring settings does not restore missing '
-                       'block history.</p>',
- 'Node configuration': '<h2>Node configuration</h2>\n'
-                       '<p><img src="icons/settings-network-connections.png" width="36" height="36"> '
-                       '<b>Settings → Backup and Restore → Node configuration</b></p>\n'
-                       '<h3>What this snapshot includes</h3><p>Saved Wi-Fi networks and stored passwords, '
-                       'Ethernet profiles, managed WireGuard and the Node privacy profile, timezone and '
-                       'automatic time, keyboard layout, display scale, matching mouse-name preferences and '
-                       'supported Bitcoin Core preferences. It does not save an old clock reading to replay '
-                       'later.</p>\n'
-                       '<h3>Create the backup</h3><ol><li>Finish applying the settings you want to keep. '
-                       'Plug in a USB drive.</li><li>Choose <b>Backup</b> on the Node configuration row, '
-                       'then <b>Choose folder…</b> and select the USB or a folder on it.</li><li>Leave '
-                       '<b>Encrypt backup (optional)</b> off for a plain file, or enable it and enter the '
-                       'same passphrase twice.</li><li>Click <b>Save backup</b> or <b>Save encrypted '
-                       'backup</b>. Wait for the saved-and-verified confirmation and note the '
-                       'filename.</li></ol>\n'
-                       '<p><b>The plain file can expose your Wi-Fi passwords and VPN private keys.</b> Keep '
-                       'it private. Encryption protects the saved backup, not the active operating system. '
-                       'Do not keep the only required passphrase inside the encrypted file itself.</p>\n'
-                       '<h3>Restore on the new Node</h3><ol><li>Open the same row and choose '
-                       '<b>Restore</b>.</li><li>Choose your <b>.json</b> or <b>.gpg</b> backup. Enter the '
-                       'passphrase only for an encrypted file.</li><li>Click <b>Review backup</b>. Check the '
-                       'timezone, saved-network counts, privacy profile and omissions.</li><li>Select <b>I '
-                       'trust this backup and approve the settings shown above</b>, then click <b>Restore on '
-                       'next restart</b>.</li><li>Restart normally. Validated settings are applied before '
-                       'networking starts. Use <b>Check pending restore</b> to inspect the result; <b>Cancel '
-                       'pending restore</b> cancels staged settings before restart.</li></ol>\n'
-                       '<h3>Portable preferences, not machine identity</h3><p>The restore preserves '
-                       'target-only network profiles and local wallets. It does not clone login '
-                       'passwords/accounts, disk encryption, disk identifiers, Bluetooth pairing keys, '
-                       'arbitrary scripts or external certificate/third-party VPN plug-ins. Pair Bluetooth '
-                       'devices again on a different adapter; mouse speed is reapplied only for matching '
-                       'device names. Unsupported values are reported rather than silently imported.</p>\n'
-                       '<p>If both computers remain online, the same static IP or WireGuard peer may '
-                       'conflict. Assign a suitable address or separate VPN peer to the new machine. Only '
-                       'passwords actually saved in supported profiles can be transferred; credentials held '
-                       'by unsupported agents are not invented.</p>\n'
-                       '<p><b>No blockchain or wallet databases are included.</b> Use their separate rows. A '
-                       'separate Core configuration backup is optional because Node configuration already '
-                       'includes the portable Core subset.</p>',
- 'Encrypt & Decrypt Files': '<h2>Encrypt &amp; Decrypt Files</h2><h3>Create a consistent file before '
-                            'encrypting it</h3>\n'
-                            '<ol><li>In Bitcoin Core, select the wallet and choose File → Backup Wallet. '
-                            "Save the consistent database into Private Workspace, visible in Core's file "
-                            'picker. Do not copy a database that is being modified by Core.</li><li>Open '
-                            'Encrypt Files on Home, select that saved database, choose a new .gpg filename '
-                            'on USB or disk and enter and confirm your passphrase. Extra independent GPG '
-                            'layers are optional; a single verified Bitcoin Core SQLite wallet.dat is '
-                            'encrypted directly (no TAR), while other files use TAR. Node uses AES-256 '
-                            'CFB+MDC for broad interoperability. Each layer and the complete recovery are '
-                            'verified before the encrypted file is published.</li><li>Keep independent '
-                            'encrypted copies and store their required passphrases separately. Original '
-                            'files remain unchanged.</li></ol>\n'
-                            '<h3>Decrypt and restore</h3>\n'
-                            '<p>Open Decrypt Files and select the encrypted file. Supply the required '
-                            'passphrases; layered Node/Vault files can be recovered with passphrases in any '
-                            'order. For a normal single-layer AES-256 GPG file made outside these tools, '
-                            'select Recover one ordinary GPG layer only. Authenticated output is published '
-                            'only in a new folder in Private Workspace. A failed or cancelled operation '
-                            'publishes no partial plaintext.</p>\n'
-                            '<p>After successful decryption and authentication, Files opens Private Workspace automatically, showing the new recovery folder. No extra success confirmation is required. Wrong passphrases, failed checks and cancellation do not open the folder. Recovered files remain in RAM until you deliberately copy or restore them elsewhere.</p>\n'
-                            '<p>Choose Bitcoin Core → File → Restore Wallet and select the recovered '
-                            'database. Restoring into Core creates a persistent wallet on the installed '
-                            'disk; it does not keep the active wallet in RAM. Compare addresses and labels, '
-                            'wait for synchronization and rescan, and resolve missing pruned history. Please '
-                            'perform a restore drill on another trusted machine at least once a year.</p>\n'
-                            '<p>For the Node/Vault arrangement, keep signing-wallet backups on offline Vault '
-                            'and public-wallet backups on Node. GPG is also available for files belonging to '
-                            'a wallet used directly on this online Node; it does not turn the Node into an '
-                            'offline signer or encrypt the installed system.</p><h3>USB media in both file '
-                            'pickers</h3><p>The input selectors for <b>Encrypt Files</b> and <b>Decrypt '
-                            'Files</b>, and the encrypted-file destination selector, show <b>Places</b> and '
-                            '<b>USB / External media</b> on the left. Attached supported filesystems appear '
-                            "automatically. Click an unmounted entry to mount it with the desktop's normal "
-                            'permissions; <b>Refresh USB</b> rescans without formatting '
-                            'anything.</p><p>Read-only USB drives may be used as input, not as an encryption '
-                            'destination. Encrypted disks that require unlocking should first be opened in '
-                            'Files, then refreshed. Decryption still publishes plaintext only into Private '
-                            'Workspace, never directly to the source USB. Selecting a USB input does not '
-                            'change that RAM-only recovery rule.</p><h3>Files sidebar</h3><p>Files opens the '
-                            'read-only Core view with <b>Core</b>, <b>Private Workspace</b> and <b>PSBT '
-                            'Transfer Folder</b> visible on the left. The default sidebar is wider so names '
-                            'are readable; a wider user-adjusted width is preserved.</p>',
- 'Persistent storage': '<h2>Persistent storage</h2><h3>What remains on disk</h3>\n'
-                       "<p>Bitcoin Core's blockchain, chainstate, loaded wallets and settings remain on the "
-                       'installed filesystem. PSBT Transfer Folder and Private Workspace are RAM-only and '
-                       'cleared on restart/shutdown. Save required files to removable storage. Ordinary '
-                       'files saved on disk remain persistent. The installer does not ask for a password. To '
-                       'require a password at login, use Settings → Login Password after installation.</p>\n'
-                       '<h3>Three immediately available Places in Files</h3>\n'
-                       '<p>Files opens <b>Core</b>, a read-only view of Bitcoin Core data, including '
-                       'wallets, blocks, chainstate and logs. The left sidebar lists Core, Private Workspace '
-                       'and PSBT Transfer Folder in that order, with attached USB media under Devices. Its '
-                       'default width keeps these names readable. Use Bitcoin Core to change wallet settings '
-                       'or create a consistent backup with File → Backup Wallet. Copying a live wallet '
-                       'database directly from Files is not a substitute for that backup.</p>\n'
-                       '<h3>Private Workspace is the exception</h3>\n'
-                       '<p>Private Workspace is a separate RAM filesystem, accessible from Home, Files and '
-                       "Core's file picker. Its files, recovery output and private temporary data disappear "
-                       'at restart or shutdown. An ordinary suspend keeps RAM powered and does not clear the '
-                       'workspace.</p>\n'
-                       '<p>Node disables swap and hibernation and verifies the dedicated RAM filesystem '
-                       'before file encryption and decryption. If verification fails, the operation stops; '
-                       'there is no fallback to a folder on disk. The workspace has a memory limit and uses '
-                       'RAM as files are added. Please keep working sets small while Core synchronizes.</p>\n'
-                       '<p>Saving or copying a file outside Private Workspace makes that copy persistent. '
-                       'Restoring a database into Core also makes a persistent copy. GPG protects the saved '
-                       'encrypted file, not any original or active wallet database.</p>\n'
-                       '<h3>Power and storage</h3>\n'
-                       '<p>If both Private Workspace and PSBT Transfer Folder are empty, Restart and Shut '
-                       'down show one ordinary confirmation. If either RAM folder contains anything, '
-                       'including hidden files or empty folders, two warnings are followed by a five-minute '
-                       'countdown. Cancel countdown, Esc or closing the window keeps the session open. '
-                       'Restart now or Shut down now skips the remaining wait. Core stops cleanly only after '
-                       'the countdown finishes or you choose the immediate action. Its saved blockchain and '
-                       'loaded wallets remain on disk.</p>\n'
-                       '<p>Please finish or cancel any open encryption tool before using those controls. A '
-                       'sudden power cut also loses RAM files. Save verified encrypted copies you need '
-                       'before leaving the session. Shutdown confirmations do not verify backups.</p>\n'
-                       '<p>The online operating system and applications can access files you open. RAM-only '
-                       'storage limits persistence; it does not protect against an already compromised '
-                       'running system or promise immediate physical RAM erasure.</p>\n'
-                       '<h3>KeePassXC</h3>\n'
-                       '<p>Open KeePassXC on Home to generate random passphrases. As on Vault, its native '
-                       'generator opens on Passphrase with six EFF words. Choose another length when needed '
-                       'and generate each secret independently. A password database is not required to use '
-                       'the generator.</p>\n'
-                       '<p>Its temporary profile and cache stay in RAM. Automatic clipboard clearing starts '
-                       'off, as on Vault; use Tools → Settings → Security to enable it if preferred. Your '
-                       'choices survive relaunch during this session. A fresh boot restores the defaults. '
-                       'Please save any database you need to keep to USB or persistent storage; a database '
-                       'saved only in Private Workspace disappears at shutdown.</p>\n'
-                       '<h3>Date and time</h3>\n'
-                       '<p>The date and 24-hour time remain visible above the network, restart and shutdown '
-                       'controls, even before Core starts. Click the clock, or open Settings → Date &amp; '
-                       'Time. Choose a time zone such as Europe/Zagreb and automatic network time, or switch '
-                       'automatic time off to enter the date and time manually. Apply and Save saves these '
-                       'operating-system settings across restart.</p>\n'
-                       '<p>Automatic time may wait until a time server is reachable. It uses ordinary OS '
-                       'networking in the Tor P2P profile and follows the VPN policy in WireGuard mode. '
-                       'Manual time is available without a network.</p>\n'
-                       '<h3>PSBT Transfer Folder is also temporary</h3><p>Core and the desktop share this '
-                       'separate RAM folder for public wallet exports and PSBT exchange. Files are lost '
-                       'after restart or shutdown, not after merely closing a window. Save needed copies on '
-                       'USB. The former disk-based Public Wallet Transfer folder is not automatically '
-                       'erased; files left there remain persistent.</p>',
- 'Updates': '<h2>Updates</h2><h3>Updates and maintenance</h3>\n'
-            '<p><b>Settings → Software Updates</b> checks the official Debian and signature-verified '
-            'KeePassXC packages, lists exact versions before installation, and displays live package-step '
-            'progress. Debian/KeePassXC updates do not deliberately stop or restart the Bitcoin Core '
-            'service. Debian package scripts may still briefly restart other operating-system services. An '
-            'on-screen warning shows when the updated kernel/system requires or may require restarting. '
-            'Bitcoin Core version upgrades remain a separate review-and-confirm process.</p>\n'
-            '<p><b>Debian updates</b> requires your explicit approval but does not ask for the login password again '
-            'in the active local Node desktop. It retains the selected network policy. In Tor P2P mode, updates use '
-            'clearnet; in WireGuard mode, the VPN policy remains enforced.</p>\n'
-            '<p><b>Settings → Software Updates</b> displays the active verified Core version and can check '
-            "Bitcoin Core's official stable-release record. These checks and downloads use the "
-            'operating-system network: clearnet in the Tor P2P profile, or the enforced tunnel in WireGuard '
-            'mode. Nothing is downloaded or replaced automatically.</p>\n'
-            '<p>To maintain Core, choose a supported Core 32 release and select <b>Download and verify Core '
-            'release</b>. The archive must match the official signed checksums, with at least two distinct, '
-            'currently valid signers from the bundled, pinned release-key set. Expired signers do not count. '
-            'Please review the version, hashes and signer fingerprints before explicitly approving '
-            'installation. The active local Node desktop does not re-enter the login password. Downgrades and '
-            'new major versions are refused; a new major version requires a reviewed Node system '
-            'update.</p>\n'
-            '<p>Activation stops Core and checks for clean service shutdown, copies wallet databases and '
-            'settings into a protected local snapshot, and activates the verified release in a separate '
-            'directory. A stopped Core remains stopped after activation; open Bitcoin Core when ready. Old '
-            'binaries remain available. Startup continues to verify the exact selected Bitcoin Core GUI hash '
-            'from the signed release. A health-check failure leaves Core stopped. Because database formats '
-            'can change, the system never automatically rolls wallet data backward. Please keep an '
-            'independent public recovery backup and use deliberate recovery if maintenance fails.</p>\n'
-            '<p><b>Restart computer</b> requires confirmation without a desktop-password prompt. Save other '
-            'work first. Core receives a graceful service stop before restart. A local snapshot protects '
-            'maintenance consistency; it is not a replacement for a backup stored on a separate device.</p>\n'
-            '<p>Use graceful shutdown and keep sufficient disk space. If Core reports database corruption, '
-            'stop and preserve data before investigating. There is no automatic wallet deletion, repair or '
-            'network-profile downgrade.</p>\n'
-            '<h3>A connected node can still encounter an unavailable update server</h3><p>KeePassXC release '
-            'discovery first uses its official GitHub release API. If that endpoint is unavailable or '
-            'rate-limited, Node can read the stable x86-64 AppImage and matching signature links from the '
-            'official KeePassXC download page. The source used is displayed. Installation still requires the '
-            'pinned release signature; neither TLS nor signature verification is disabled.</p><p>HTTP 503 '
-            'means a server or gateway returned an unavailable response. DNS, timeout, TLS certificate and '
-            'local file-write failures are reported separately. A timezone choice only changes the clock '
-            'display; an incorrect absolute date/time can matter for TLS, but it is not assumed to be the '
-            'cause of every failed check.</p><p>If both official sources fail, the check remains incomplete. '
-            'Successful Debian findings remain visible, but installation is disabled until a fresh complete '
-            'check succeeds. An older release record does not cause a downgrade or a false up-to-date '
-            'claim.</p>',
- 'Troubleshooting': '<h2>Troubleshooting</h2><h3>Troubleshooting</h3>\n'
-                    '<table border="1" cellpadding="12"><tr><th>Observation</th><th>Next '
-                    'step</th></tr><tr><td>Core is stopped after boot</td><td>Please check installation, the '
-                    'selected data SSD and local service status. Open <b>Bitcoin Core</b> to begin. It stays '
-                    'stopped until you open it.</td></tr><tr><td>Public import refuses old '
-                    'history</td><td>Please use an archive node or restore the required blocks. Do not '
-                    'override the warning with a newer timestamp.</td></tr><tr><td>Balance is '
-                    'provisional</td><td>Please wait for blockchain validation and wallet scanning, or '
-                    'resume an incomplete import.</td></tr><tr><td>PSBT cannot be opened</td><td>Please '
-                    'check the file in Bitcoin Core. Review recipients, amounts, fees and change before '
-                    'signing or broadcasting.</td></tr><tr><td>Private broadcast is not '
-                    'observed</td><td>Please check Tor and transaction status. The application must not '
-                    'silently use a standard route.</td></tr><tr><td>Export filename already '
-                    'exists</td><td>Please choose a new filename. Existing exports are '
-                    'preserved.</td></tr></table>\n'
-                    '<p>Advanced diagnostics are available in Terminal using ordinary systemd and Bitcoin '
-                    'Core commands. Please avoid sharing logs or screenshots containing public wallet '
-                    'metadata without reviewing them first.</p>\n'
-                    '<p><b>Powered by Debian GNU/Linux · Official Bitcoin Core · No signing keys required on '
-                    'Node</b></p>\n'
-                    '\n'
-                    '\n'
-                    '\n'
-                    '<h3>Backup and file-transfer checks</h3><table border="1" '
-                    'cellpadding="10"><tr><th>Observation</th><th>What to check</th></tr><tr><td>Save seems '
-                    'inactive</td><td>Please select a destination. When encryption is selected, enter and '
-                    'repeat the passphrase. Read the visible feedback.</td></tr><tr><td>Core stopped after '
-                    'chain backup</td><td>This is intentional. Please open Bitcoin Core manually after the '
-                    'operation finishes.</td></tr><tr><td>Watch-only backup blocked during chain '
-                    'copying</td><td>Wallet transfer needs running Core. Please finish the chain operation, '
-                    'start Core, then retry.</td></tr><tr><td>PSBT missing after restart</td><td>The '
-                    'transfer folder is RAM-only. Please recover the independent USB copy; restarting does '
-                    'not preserve it.</td></tr><tr><td>USB not listed</td><td>Please reconnect it, use '
-                    'Refresh USB and check Files. Unlock encrypted media there '
-                    'first.</td></tr><tr><td>Settings staged, not applied</td><td>Please restart normally or '
-                    'use Check pending restore to inspect the result.</td></tr><tr><td>KeePassXC HTTP '
-                    '503</td><td>The source server/gateway is unavailable. Node tries the official download '
-                    'page and reports the source; no clock reset is required just because of HTTP '
-                    '503.</td></tr></table>'}
+from guide_content import SECTIONS
 
-SECTION_ICONS = {'Bitcoin Core': 'bitcoin-ui.png',
+SECTION_ICONS = {'Start here: Node & Vault': 'bitcoin-ui.png',
+ 'Device privacy & login': 'icons/settings-login.png',
+ 'Storage & pruning': 'icons/settings-chain-backup.png',
+ 'Receiving bitcoin': 'bitcoin-ui.png',
+ 'Bitcoin Core': 'bitcoin-ui.png',
  'Synchronization': 'bitcoin-ui.png',
  'Status & diagnostics': 'bitcoin-ui.png',
  'Networking': 'icons/settings-network-connections.png',
@@ -641,47 +68,6 @@ SECTION_ICONS = {'Bitcoin Core': 'bitcoin-ui.png',
  'Updates': 'icons/settings-software-updates.png',
  'Troubleshooting': 'icons/settings-chain-backup.png'}
 
-SECTIONS['Backups & recovery'] += '<h3>Choose a backup from USB</h3><p>In all four <b>Settings → Backup and Restore</b> categories, the chooser shows <b>USB / External media</b> on the left. Plug in the drive while the chooser is open, or use <b>Refresh USB</b>. Select the drive; if needed, click to mount it. Configuration and watch-only restores select a <b>.json</b> or <b>.gpg</b> file. Blockchain restore selects the USB root for the latest completed copy, or a specific completed backup folder. Read-only media can be used for restore. Choosing a file or folder does not start restoration: review and confirmation still follow.</p>'
-
-
-SECTIONS['Persistent storage'] += """
-<h3>USB access from every included file picker</h3>
-<p>Node Backup and Restore, Encrypt/Decrypt, WireGuard import, Bitcoin Core,
-KeePassXC, Editor and Files show removable media in their Places/sidebar.
-The default sidebars are widened. Qt applications show mounted USB filesystems;
-if a drive is connected while an upstream dialog is already open, close and
-reopen that dialog, or open its <b>USB Media</b> entry. Node's own pickers have
-live device discovery and <b>Refresh USB</b>.</p>
-<p>Core can now read and write files through its verified USB view: restore or
-export a wallet, load or save a PSBT, and save backups directly on writable
-media. This does not permit writing to the rest of the operating system.
-The Files <b>Core</b> view remains read-only. Existing USB files keep their
-ownership and permissions; newly created Core exports belong to the desktop
-user on filesystems that support ownership.</p>
-<p><b>Safe removal:</b> finish saving and close files using that drive. While
-Bitcoin Core is open, its USB view keeps the drive in use. Please stop Core
-normally, then use <b>Files → Eject/Unmount</b>. Never pull out a drive while
-copying or saving. If another application still uses it, close that file and
-retry. Reconnecting creates a freshly verified view rather than reusing a
-stale disk path.</p>
-<p>A hardware-write-protected or read-only filesystem stays read-only. Unlock
-an encrypted drive in Files before using it elsewhere. USB access does not
-change the decryption policy: Decrypt Files still recovers plaintext into
-Private Workspace RAM. Use Files to copy recovered output to USB when needed.</p>
-"""
-
-SECTIONS['Backups & recovery'] += """
-<h3>Backup and Restore on Home</h3>
-<p>On a new installation, the shortcut stays in <b>Settings → Backup and Restore</b>.
-After a saved setup change — such as connecting Wi-Fi, changing time zone or mouse
-settings, starting Bitcoin Core or importing a wallet — a second <b>Backup and
-Restore</b> card appears on Home, immediately after <b>Private Workspace</b> and
-before <b>Encrypt Files</b>. Both open the same four-category menu, not a second
-backup operation.</p><p>The Home shortcut stays after restart and after Core stops.
-It does not claim a backup is current, and it does not automatically create one.
-A changed setting is not necessarily portable: the existing category summaries
-still state what is included and excluded.</p>
-"""
 
 class Guide(QDialog):
     def __init__(self, parent=None):
@@ -699,7 +85,7 @@ class Guide(QDialog):
         title = QLabel('Node Guide')
         title.setObjectName('Title')
         outer.addWidget(title)
-        sub = QLabel('Online validation, watch-only wallets and persistent Node storage.')
+        sub = QLabel('Import Vault’s public wallet, receive, prepare PSBTs and keep this Node recoverable.')
         sub.setObjectName('Subtitle')
         sub.setFont(UI_FONT)
         sub.setWordWrap(True)
@@ -714,7 +100,9 @@ class Guide(QDialog):
         body.setSpacing(16)
         self.nav = QListWidget()
         self.nav.setFont(UI_FONT)
-        self.nav.setFixedWidth(260)
+        self.nav.setFixedWidth(320)
+        self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.nav.setTextElideMode(Qt.ElideNone)
         self.nav.setWordWrap(True)
         self.nav.setAccessibleName('Guide chapters')
         self.nav.addItems(list(SECTIONS))
@@ -725,6 +113,7 @@ class Guide(QDialog):
         self.viewer = QTextBrowser()
         self.viewer.setAccessibleName('Guide chapter and illustration description')
         self.viewer.viewport().installEventFilter(self)
+        self.nav.viewport().installEventFilter(self)
         self.viewer.setSearchPaths([str(branding_file("GUIDE.html").parent)])
         self.viewer.setOpenExternalLinks(False)
         self.viewer.setOpenLinks(False)
@@ -763,18 +152,30 @@ class Guide(QDialog):
     def eventFilter(self, watched, event):
         # A vertical scrollbar changes the reader width after setHtml(), even
         # when the dialog itself has not resized. Reflow the figure at that width.
-        if watched is self.viewer.viewport() and event.type() == QEvent.Type.Resize:
+        if watched in (self.viewer.viewport(), self.nav.viewport()) and event.type() == QEvent.Type.Resize:
             self._render_timer.start(40)
         return super().eventFilter(watched, event)
 
+    def fit_chapter_labels(self):
+        width = self.nav.viewport().width()
+        metrics = QFontMetrics(self.nav.font())
+        text_width = max(80, width - self.nav.iconSize().width() - 40)
+        for row in range(self.nav.count()):
+            item = self.nav.item(row)
+            bounds = metrics.boundingRect(QRect(0, 0, text_width, 1000), Qt.TextWordWrap, item.text())
+            size = QSize(width, max(self.nav.iconSize().height(), bounds.height()) + 20)
+            if item.sizeHint() != size:
+                item.setSizeHint(size)
+
     def render_section(self):
+        self.fit_chapter_labels()
         row = self.nav.currentRow()
         if row < 0:
             return
         section = list(SECTIONS)[row]
         # Vector commands are rendered at display size and device scale;
         # labels reflow instead of shrinking when the window gets narrower.
-        available = int(self.viewer.viewport().width() - 2 * self.viewer.document().documentMargin() - 4)
+        available = int(self.viewer.viewport().width() - 2 * self.viewer.document().documentMargin() - 48)
         width = min(960, max(490, available))
         key = (section, width, self.devicePixelRatioF())
         if key == self.render_key:

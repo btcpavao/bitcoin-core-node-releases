@@ -155,10 +155,10 @@ class Drawing:
 def pairing(d, _):
     y = d.pair(1,
         ('Offline Vault', 'Private keys stay here.\nReview and sign transactions.', 'amber'),
-        ('Online Node', 'Public descriptors only.\nWatch and prepare transactions.', 'blue'))
+        ('Online Node', 'Public wallet information only.\nWatch addresses and prepare payments.', 'blue'))
     y = d.box(1, y + 24, d.width - 2, 'Compare independently',
-        'Receiving addresses + change addresses + next index + network', 'green') + y + 24
-    return d.footer(y + 12, 'Public descriptors reveal activity, but cannot authorize spending.', 'muted')
+        'Check the receiving/change addresses, wallet labels and Bitcoin network.', 'green') + y + 24
+    return d.footer(y + 12, 'Public wallet information can reveal activity, but cannot approve spending.', 'muted')
 
 def psbt(d, _):
     gap = 52
@@ -176,7 +176,7 @@ def psbt(d, _):
     y += h + 18
     y += d.text(0, y, 'PSBT files cross by removable media', width, 18, 'muted') + 20
     d.arrow(d.width - width / 2, end_review + 7, d.width - width / 2, y - 7)
-    left = ('4  Broadcast', 'Publish the signed transaction from the online coordinator.')
+    left = ('4  Broadcast', 'Send the checked, signed transaction from your online Node.')
     right = ('3  Sign', 'Sign in Core, then export the signed PSBT.')
     h = max(d.box_height(width, *left), d.box_height(width, *right))
     d.box(1, y, width - 2, *left, tone='blue', height=h)
@@ -187,12 +187,12 @@ def psbt(d, _):
 # Node-specific explanations use the same measured boxes, color roles and arrows.
 PANELS = {
     'Bitcoin Core': ('Your node checks Bitcoin independently',
-        ('Bitcoin peers', 'Supply blocks and transactions. Their claims are not trusted.', 'blue'),
+        ('Other Bitcoin computers', 'Send blocks and transactions. Your Node checks them for itself.', 'blue'),
         ('Your Bitcoin Core', 'Checks the rules and keeps the validated chain on disk.', 'green'),
         'Open Bitcoin Core to start. Exiting Core stops it; saved progress remains.'),
     'Synchronization': ('Two different kinds of progress',
         ('Blockchain validation', 'Core verifies blocks and transactions against Bitcoin rules.', 'blue'),
-        ('Wallet scanning', 'Core finds transactions belonging to your public descriptors.', 'amber'),
+        ('Wallet scanning', 'Core finds the transactions related to your wallet addresses.', 'amber'),
         'Both must finish before preparing a payment. Pruning removes old blocks, not validation rules.'),
     'Networking': ('Connection and privacy have different controls',
         ('Network Status', 'Choose Wi-Fi, enter its password and connect. Advanced settings remain available.', 'blue'),
@@ -203,7 +203,7 @@ PANELS = {
         ('Node + Core settings', 'Node configuration includes network and desktop preferences plus the portable Core subset.', 'green'),
         'Encryption is optional for wallet/settings exports. Keep the offline signing-wallet backup separately.'),
     'Persistent storage': ('Two places, different lifetimes',
-        ('Both transfer folders · RAM', 'PSBT files and decrypted output and decrypted output disappear at restart or shutdown.', 'amber'),
+        ('Two temporary RAM folders', 'Payment-transfer files and recovered files disappear at restart or shutdown.', 'amber'),
         ('Disk and USB', 'Core wallets, blockchain and files saved outside the workspace remain.', 'blue'),
         'Save encrypted copies before shutdown. Restoring a wallet into Core creates a persistent copy.'),
     'Updates': ('Verify before activating',
@@ -218,6 +218,22 @@ PANELS = {
 
 
 FLOWS = {
+ 'Start here: Node & Vault': ('Your online side of the offline-signing workflow', [
+  ('1  Pair the public wallet', 'Restore the watch-only .dat from Vault. Keep signing keys and Vault secrets offline.', 'blue'),
+  ('2  Receive and prepare', 'Generate receiving addresses in Core. Build an unsigned PSBT when spending.', 'green'),
+  ('3  Sign offline, broadcast online', 'Move the PSBT to Vault for review/signature. Open the returned file in Node and broadcast.', 'amber')], 'Back up public wallets and Node settings separately from the offline signing-wallet recovery plan.'),
+ 'Device privacy & login': ('Public wallet data still deserves privacy', [
+  ('Persistent watch-only data', 'Addresses, balance, labels and history stay on Node after restart.', 'blue'),
+  ('Optional login password', 'Settings → Login Password. A barrier at sign-in, not disk encryption or a lock on the current session.', 'amber'),
+  ('Control device access', 'Protect the computer and exports. Review payments independently in Vault.', 'green')], 'No signing keys does not mean no sensitive information.'),
+ 'Storage & pruning': ('Budget retained blocks, databases and free space', [
+  ('1  Read actual capacity', 'Blockchain files already used + free space currently available to Core. Not the whole disk size.', 'blue'),
+  ('2  Leave room beyond the block target', 'Chainstate, indexes, future growth and maintenance require space too.', 'amber'),
+  ('3  Choose retention in Core', 'Settings → Options: prune block storage. Keep watch-only wallets loaded and resolve missing-history scans.', 'green')], 'Pruning removes old block files after validation; it is not a limit on every Core file.'),
+ 'Receiving bitcoin': ('Create an address with the public wallet', [
+  ('1  Select the wallet', 'Core → Receive → Create new receiving address. Add a useful label.', 'blue'),
+  ('2  Confirm independently', 'Compare the intended address with the matching offline wallet/address index before significant deposits.', 'amber'),
+  ('3  Share and follow confirmations', 'Share that address or QR code, not the complete watch-only export.', 'green')], 'Vault need not be on to receive. Signing keys remain offline.'),
  'Node configuration': ('Your setup travels; machine identity stays local', [
   ('1  Backup', 'Settings → Backup and Restore → Node configuration. Choose USB and optional encryption.', 'blue'),
   ('2  Review', 'On the new Node, choose the file. Check networks, time zone, privacy and omissions.', 'amber'),
@@ -226,22 +242,22 @@ FLOWS = {
   ('1  Save preferences', 'Backup supported Core options and GUI choices; encryption is optional.', 'blue'),
   ('2  Review and stage', 'Inspect the option names on the target, then approve restoration.', 'amber'),
   ('3  Restart', 'Apply the portable subset. Wallets and blockchain are separate.', 'green')], 'Full Node configuration already includes these portable Core preferences.'),
- 'Watch-only backups': ('Public-wallet collection, never signing authority', [
+ 'Watch-only backups': ('Your public wallets, without the keys that spend', [
   ('1  Core running', 'Export supported watch-only wallets. Signing wallets are skipped.', 'blue'),
   ('2  Save to USB', 'One .json collection or an optionally encrypted .gpg backup.', 'amber'),
   ('3  Restore and check', 'Review names, restore with Core, compare addresses and finish rescanning.', 'green')], 'Existing wallets are never overwritten. Keep your offline Vault and its separate backups.'),
  'Blockchain backup': ('Reuse validated chain data', [
-  ('1  Stop and copy', 'Core stops cleanly. Copy retained blocks and chainstate to USB.', 'blue'),
-  ('2  Verify', 'Read back the copy. Core stays stopped until you start it manually.', 'amber'),
+  ('1  Stop and copy', 'Core finishes saving and stops. Copy its downloaded chain and current bookkeeping to USB.', 'blue'),
+  ('2  Finish writes', 'Save the completed copy without a read-back pass. Start Core manually afterwards.', 'amber'),
   ('3  Restore elsewhere', 'Select the latest completed backup. Validate before replacing the target chain.', 'green')], 'Not a wallet backup. Pruned copies cannot supply history already deleted.'),
  'Status & diagnostics': ('Compact dashboard; independent details window', [
-  ('1  Live dashboard', 'Version, blocks, headers, peers, validation and storage from local Core.', 'blue'),
-  ('2  Show technical details', 'A separate window: grouped fields, search, expand/collapse and optional raw JSON.', 'purple'),
+  ('1  Live dashboard', 'See download progress, peer connections and storage from your own Core.', 'blue'),
+  ('2  Show technical details', 'A separate window with grouped readings and search. Advanced text is on its own tab.', 'purple'),
   ('3  Refresh when ready', 'Inspect a stable snapshot without the data jumping as you read.', 'green')], 'Copy is explicit. Review private wallet names before sharing diagnostics.'),
  'Encrypt & Decrypt Files': ('USB input, verified files, RAM-only recovery', [
   ('1  Choose input', 'Places and USB / External media appear on the left. Click to mount or Refresh USB.', 'blue'),
   ('2  Encrypt or decrypt', 'Encryption saves a verified .gpg file. Decryption checks every required layer.', 'amber'),
-  ('3  Save what you need', 'Recovered plaintext stays in Private Workspace. Copy required output before shutdown.', 'green')], 'Choosing a USB source does not change the RAM-only decryption destination.')
+  ('3  Save what you need', 'Recovered files stay in Private Workspace RAM. Copy what you need before shutdown.', 'green')], 'Choosing a USB source does not change the RAM-only decryption destination.')
 }
 
 def flow(d, panels):

@@ -14,7 +14,7 @@ def resources(action):
     read_config=action in ('settings-backup','core-settings-backup','settings-preview','core-settings-preview','settings-status','core-settings-status')
     result=[]
     if not read_config:result.append(('bitcoin-core-node-admin.lock',fcntl.LOCK_EX))
-    if read_config or action in ('chain-import','configure','time-settings','debian-updates','software-install','core-update','reboot','poweroff','settings-import','core-settings-import','settings-cancel','core-settings-cancel'):
+    if read_config or action in ('chain-import','configure','time-settings','keyboard-settings','debian-updates','software-install','core-update','reboot','poweroff','settings-import','core-settings-import','settings-cancel','core-settings-cancel'):
         result.append(('core-node-configuration.lock',fcntl.LOCK_SH if read_config else fcntl.LOCK_EX))
     return result
 

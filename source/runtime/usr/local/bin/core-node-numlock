@@ -50,20 +50,20 @@ class Keyboard:
         self.x.XCloseDisplay(self.display)
 
 
-def enable():
+def enable(enabled=True):
     keyboard = Keyboard()
     try:
         mask = keyboard.x.XkbKeysymToModifiers(keyboard.display, NUM_LOCK)
         if not mask:
             raise RuntimeError('The keyboard has no Num Lock modifier mapping.')
-        if not keyboard.x.XkbLockModifiers(keyboard.display, XKB_CORE_KEYBOARD, mask, mask):
+        if not keyboard.x.XkbLockModifiers(keyboard.display, XKB_CORE_KEYBOARD, mask, mask if enabled else 0):
             raise RuntimeError('The Num Lock request was unavailable.')
         keyboard.x.XSync(keyboard.display, 0)
-        if keyboard.state().locked_mods & mask != mask:
-            raise RuntimeError('Num Lock could not be enabled.')
+        if bool(keyboard.state().locked_mods & mask) != enabled:
+            raise RuntimeError('Num Lock could not be changed.')
     finally:
         keyboard.close()
-    print('Num Lock enabled for this X11 session.')
+    print('Num Lock '+('enabled' if enabled else 'disabled')+' for this X11 session.')
 
 
 if __name__ == '__main__':
@@ -71,7 +71,8 @@ if __name__ == '__main__':
     signal.signal(signal.SIGALRM, signal.SIG_DFL)
     signal.alarm(3)
     try:
-        enable()
+        if sys.argv[1:] not in ([],['on'],['off']):raise RuntimeError('Use on or off.')
+        enable(sys.argv[1:] != ['off'])
     except (OSError, AttributeError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)

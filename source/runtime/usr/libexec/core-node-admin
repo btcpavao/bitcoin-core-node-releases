@@ -103,7 +103,7 @@ def configure(request):
         run(['/usr/bin/systemctl','start','bitcoin-core-node.service'])
 
 def main():
-    if os.geteuid()!=0 or len(sys.argv)!=2 or sys.argv[1] not in ('configure','start','stop','restart','debian-updates','software-check','software-install','core-update','time-settings','chain-backup','chain-import','wallet-delete','reboot','poweroff','settings-backup','core-settings-backup','settings-preview','core-settings-preview','settings-import','core-settings-import','settings-status','core-settings-status','settings-cancel','core-settings-cancel','watch-backup','watch-preview','watch-import'):
+    if os.geteuid()!=0 or len(sys.argv)!=2 or sys.argv[1] not in ('configure','start','stop','restart','debian-updates','software-check','software-install','core-update','time-settings','chain-backup','chain-import','wallet-delete','reboot','poweroff','settings-backup','core-settings-backup','settings-preview','core-settings-preview','settings-import','core-settings-import','settings-status','core-settings-status','settings-cancel','core-settings-cancel','watch-backup','watch-preview','watch-import','keyboard-settings'):
         raise RuntimeError('Unsupported administration operation.')
     if not (CONFIG/'installed').is_file():
         raise RuntimeError('Please install Bitcoin Core Node before starting persistent operation.')
@@ -160,10 +160,13 @@ def main():
             if len(raw)>8192 or not raw.endswith(b'\n'):raise RuntimeError('Invalid chain copy request.')
             result=perform(action,json.loads(raw),int(os.environ.get('PKEXEC_UID','0')),Events(sys.stdin.buffer))
             result={'event':'result',**result}
-        elif action in ('configure','core-update','time-settings'):
+        elif action in ('configure','core-update','time-settings','keyboard-settings'):
             raw=sys.stdin.buffer.read(32769)
             if len(raw)>32768:raise RuntimeError('Configuration is too large.')
             if action=='configure':configure(json.loads(raw))
+            elif action=='keyboard-settings':
+                from desktop_input import apply_system_layout
+                result=apply_system_layout(json.loads(raw))
             elif action=='time-settings':
                 from system_time import apply_settings
                 result=apply_settings(json.loads(raw))
@@ -181,6 +184,7 @@ def main():
     print(json.dumps(result))
 
 if __name__=='__main__':
+    from desktop_input import InputError
     from wallets import WalletError
     from system_time import TimeError
     from chain_backup import ChainError
@@ -191,7 +195,7 @@ if __name__=='__main__':
     from keepass_updates import UpdateError
     from wallet_delete import WalletDeleteError
     try:main()
-    except (WalletError,TimeError,ChainError,UpdateError,WalletDeleteError,SettingsError,GPGError,CoreError,OperationBusy) as exc:
+    except (InputError,WalletError,TimeError,ChainError,UpdateError,WalletDeleteError,SettingsError,GPGError,CoreError,OperationBusy) as exc:
         print(str(exc),file=sys.stderr)
         sys.exit(1)
     except Exception:

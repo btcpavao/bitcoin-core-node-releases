@@ -82,11 +82,11 @@ class LoginOnlyPolicy(unittest.TestCase):
     def test_no_generic_sudo_change_and_current_guide_consistent(self):
         self.assertFalse((ROOT/'runtime/etc/sudoers').exists())
         self.assertFalse((ROOT/'runtime/etc/sudoers.d').exists())
-        for relative in ('app/guide_ui.py','runtime/usr/share/bitcoin-core-node/GUIDE.html',
+        for relative in ('app/guide_content.py','runtime/usr/share/bitcoin-core-node/GUIDE.html',
                          'runtime/usr/share/bitcoin-core-node/GUIDE.txt'):
             s=(ROOT/relative).read_text()
-            self.assertIn('not to authorize each Node action',s)
-            self.assertIn('wallet encryption remain separate',s)
+            self.assertIn('not for each routine operation',s)
+            self.assertIn('Core signing-wallet passphrase belongs on offline Vault',s)
             self.assertNotIn('Changing or removing an existing password asks for the current password',s)
         ui=(ROOT/'app/login_ui.py').read_text()
         self.assertNotIn('please enter the current login password',ui)

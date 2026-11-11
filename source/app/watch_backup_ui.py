@@ -50,7 +50,7 @@ class WatchBackupDialog(SettingsSnapshotDialog):
                 self.preview=result
                 self.feedback.setText('Public-only wallets verified by Bitcoin Core. Review the names, then approve restoration.')
             elif self.action=='watch-backup':
-                self.feedback.setText(('Encrypted' if result.get('encrypted',result['file'].endswith('.gpg')) else 'Unencrypted')+' watch-only collection saved and verified.\n'+result['file'])
+                self.feedback.setText(('Encrypted' if result.get('encrypted',result['file'].endswith('.gpg')) else 'Unencrypted')+' watch-only collection saved.\n'+result['file'])
                 self.password.clear();self.repeat.clear()
             else:
                 self.feedback.setText('Watch-only wallets restored:\n'+', '.join(result['names'])+'\nExisting wallets were not replaced. Check Bitcoin Core for scanning progress.')

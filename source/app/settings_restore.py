@@ -22,6 +22,7 @@ FIXED = {
  'etc/bitcoin-core-node/firewall.nft','etc/bitcoin-core-node/restored-time.json',
  'etc/wireguard/core-node.conf','etc/default/keyboard','etc/core-display-scale.conf',
  'etc/timezone','etc/localtime','home/node/.config/bitcoin-core-node/pointer.json',
+ 'home/node/.config/bitcoin-core-node/input.json','etc/X11/xorg.conf.d/90-core-node-keyboard.conf',
  'var/lib/bitcoin-core-node/data/settings.json','var/lib/bitcoin-core-node/data/bitcoin.conf',
  'var/lib/bitcoin-core-node/gui/.config/Bitcoin/Bitcoin-Qt.conf',
  'var/lib/bitcoin-core-node/gui/.config/Bitcoin/Bitcoin-Qt-regtest.conf',
@@ -179,6 +180,14 @@ def build_plan(data,root=Path('/')):
         'etc/localtime':dict(kind='symlink',target='../usr/share/zoneinfo/'+data['clock']['timezone'],uid=0,gid=0,mode=0o777),
         'home/node/.config/bitcoin-core-node/pointer.json':file_record(ss.canonical(dict(schema=1,devices=data['pointer'])),node.pw_uid,node.pw_gid),
     }
+    from desktop_input import xorg_text
+    kb=data['keyboard']
+    # Old multi-layout profiles still restore through Debian's existing path.
+    if ',' not in kb['XKBLAYOUT']:
+        plan['etc/X11/xorg.conf.d/90-core-node-keyboard.conf']=file_record(xorg_text(dict(model=kb['XKBMODEL'],layout=kb['XKBLAYOUT'],variant=kb['XKBVARIANT'],options=kb['XKBOPTIONS'])).encode(),mode=0o644)
+    else:plan['etc/X11/xorg.conf.d/90-core-node-keyboard.conf']=None
+    if data['version']==2:
+        plan['home/node/.config/bitcoin-core-node/input.json']=file_record(ss.canonical(data['input']),node.pw_uid,node.pw_gid)
     plan.update(core_plan(data,root,setup))
     existing={}
     parent=root/NM_PREFIX

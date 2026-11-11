@@ -5,7 +5,7 @@ import subprocess
 import fcntl
 import os
 import shutil
-from PySide6.QtCore import Qt, QSize, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import Qt, QSize, QThread, QTimer, Signal, Slot, QEvent
 from PySide6.QtGui import QColor, QIcon, QPalette, QPixmap
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
     QFileDialog, QFormLayout, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -102,7 +102,7 @@ def admin(action,request=None):
     response = json.loads(result.stdout)
     if response.get('ok') and action in ('configure', 'start', 'restart', 'time-settings',
             'core-update', 'software-install', 'debian-updates', 'settings-import',
-            'core-settings-import', 'watch-import', 'wallet-delete'):
+            'core-settings-import', 'watch-import', 'wallet-delete', 'keyboard-settings'):
         from home_backup import remember_local_use
         remember_local_use()
     return response
@@ -271,11 +271,21 @@ class Home(DesktopSurface):
         activity_layout.addWidget(self.blockchain_storage,alignment=Qt.AlignHCenter)
         # Keep the whole activity stack between the application cards and footer.
         index=self.body_layout.indexOf(self.grid_wrap)+1
-        self.body_layout.insertSpacing(index,24)
-        self.body_layout.insertWidget(index+1,self.activity_row)
+        self.activity_slot=QWidget()
+        self.activity_slot.setStyleSheet('background:transparent;')
+        self.activity_slot.setFixedHeight(145)
+        self.body_layout.insertWidget(index,self.activity_slot)
+        self.activity_row.setParent(self)
+        self.activity_row.setFixedWidth(620)
+        # Position status independently of the card-layout cache. Its visible
+        # height and the footer can change without a new card/text layout key.
+        self.activity_position_timer=QTimer(self)
+        self.activity_position_timer.setSingleShot(True)
+        self.activity_position_timer.timeout.connect(self.position_activity)
+        self.geometry_timer.timeout.connect(self.queue_activity_position)
         self.status=StatusLabel('');self.status.setWordWrap(True);self.status.setTextFormat(Qt.PlainText)
         self.status.setAlignment(Qt.AlignCenter);self.status.setContentsMargins(12,0,12,16)
-        self.body_layout.insertWidget(self.body_layout.indexOf(self.activity_row)+1,self.status)
+        self.body_layout.insertWidget(self.body_layout.indexOf(self.activity_slot)+1,self.status)
         from time_ui import ClockButton
         self.clock=ClockButton(self)
         self.activity_job=None
@@ -345,6 +355,7 @@ class Home(DesktopSurface):
             if self.activity.width()!=width:self.activity.setFixedWidth(width)
             if self.blockchain_storage.width()!=width:self.blockchain_storage.setFixedWidth(width)
         super().layout_cards()
+        self.queue_activity_position()
 
     def backup_restore(self):
         from backup_restore_ui import BackupRestoreDialog
@@ -472,11 +483,58 @@ class Home(DesktopSurface):
                                               ('syncing','synchronized','starting') else None)
         self.activity_text.setText(text)
         self.activity_row.setVisible(self.activity_seen)
+        self.activity_row.layout().invalidate()
+        self.schedule_layout()
+        self.queue_activity_position()
+
+    def queue_activity_position(self):
+        timer=getattr(self,'activity_position_timer',None)
+        if timer is not None and not timer.isActive():timer.start(0)
+
+    def eventFilter(self,watched,event):
+        # The taskbar/work area and footer can settle after the grid's geometry
+        # pass. React to their final bounds, including when the message itself
+        # has not changed. Coalesce events; never keep polling the UI geometry.
+        boundaries=('body','grid_wrap','footer','credit_box','debian_logo')
+        content=('activity_row','activity_text','activity','blockchain_storage')
+        kind=event.type()
+        if ((kind in (QEvent.Move,QEvent.Resize,QEvent.Show,QEvent.Hide,QEvent.LayoutRequest)
+                and any(watched is getattr(self,name,None) for name in boundaries))
+            or (kind in (QEvent.LayoutRequest,QEvent.Show,QEvent.Hide,QEvent.FontChange,QEvent.StyleChange)
+                and any(watched is getattr(self,name,None) for name in content))):
+            self.queue_activity_position()
+        return super().eventFilter(watched,event)
+
+    def position_activity(self):
+        """Center the visible text/meters between the last launcher and Debian."""
+        if not hasattr(self,'activity_slot') or not hasattr(self,'debian_logo'):return
+        from PySide6.QtCore import QPoint
+        self.body_layout.activate()
+        self.grid.activate()
+        self.footer.layout().activate()
+        self.credit_box.layout().activate()
+        width=min(620,max(300,self.width()-60))
+        self.activity_row.setFixedWidth(width)
+        layout=self.activity_row.layout()
+        height=layout.totalHeightForWidth(width)
+        height=max(layout.minimumSize().height(),height if height>=0 else layout.sizeHint().height())
+        # Shrink immediately when bars disappear; do not retain the former
+        # multi-bar height when displaying stopped/error/starting text alone.
+        self.activity_row.setFixedHeight(height)
+        bottoms=[card.mapTo(self,QPoint(0,card.height())).y()
+                 for card in self.cards if not card.isHidden()]
+        if not bottoms:return
+        top=max(bottoms)
+        bottom=self.debian_logo.mapTo(self,QPoint(0,0)).y()
+        y=round((top+bottom-height)/2)
+        self.activity_row.setGeometry((self.width()-width)//2,y,width,height)
+        layout.activate()
+        self.activity_row.raise_()
 
     def mouse_settings(self):
         self.hide_card_help()
-        from pointer_ui import PointerDialog
-        dialog=PointerDialog(self)
+        from input_ui import KeyboardMouseDialog
+        dialog=KeyboardMouseDialog(self)
         try:dialog.exec()
         finally:dialog.deleteLater()
 

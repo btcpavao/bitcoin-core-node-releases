@@ -94,7 +94,7 @@ class NodeSettingsDialog(QDialog):
             ('Date & Time','System clock and time zone',bundled('settings-date-time.png'),QStyle.SP_FileDialogDetailedView,parent.date_time),
             ('Backup and Restore','Blockchain, wallets and configuration',bundled('settings-chain-backup.png'),QStyle.SP_DialogSaveButton,parent.backup_restore),
             ('Bluetooth Devices','Pair mice and keyboards',bundled('settings-bluetooth.png'),QStyle.SP_ComputerIcon,lambda:parent.bluetooth_devices(from_settings=True)),
-            ('Mouse Speed','Bluetooth and USB pointer speed',bundled('settings-mouse.png'),QStyle.SP_ComputerIcon,parent.mouse_settings),
+            ('Keyboard and Mouse','Typing, buttons, scrolling and speed',bundled('settings-mouse.png'),QStyle.SP_ComputerIcon,parent.mouse_settings),
             ('Login Password','Choose password or automatic login',bundled('settings-login.png'),QStyle.SP_DialogApplyButton,parent.login_settings),
             ('Software Updates','Debian, apps and KeePassXC',bundled('settings-software-updates.png'),QStyle.SP_BrowserReload,parent.updates)
         ]

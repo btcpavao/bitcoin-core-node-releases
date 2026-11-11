@@ -55,7 +55,7 @@ export XDG_CACHE_HOME=/run/core-node-private/user/cache
 # PSBT Transfer Folder shortcuts are prepared for both accounts on verified RAM.
 # Reapply mouse speed after Bluetooth reconnect or X11 restart without
 # changing networking, Core, or the Debian mouse defaults for unconfigured mice.
-/usr/bin/python3 /usr/lib/bitcoin-core-node/pointer_control.py --watch \
+/usr/bin/python3 /usr/lib/bitcoin-core-node/desktop_input.py --watch \
     >"$XDG_RUNTIME_DIR/core-node-pointer.log" 2>&1 &
 POINTER_PID=$!
 /usr/local/bin/core-node-file-places --apply \

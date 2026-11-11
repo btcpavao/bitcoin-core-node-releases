@@ -68,6 +68,8 @@ def preferences(root: Path = Path('/'), home: Path = Path('/home/node')) -> dict
     # An automatically created empty mouse-preferences file is not customization.
     devices = json.loads(raw).get('devices', {}) if raw else {}
     result['pointer-devices'] = hashlib.sha256(json.dumps(devices, sort_keys=True).encode()).hexdigest()
+    raw = regular_bytes(home / '.config/bitcoin-core-node/input.json')
+    result['desktop-input'] = hashlib.sha256(raw).hexdigest() if raw is not None else None
     return result
 
 

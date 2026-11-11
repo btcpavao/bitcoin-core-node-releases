@@ -44,29 +44,20 @@ class ProgressAndStorage(unittest.TestCase):
         self.assertEqual(widget.grab().toImage().pixelColor(499,6).rgb(),orange)
         widget.close()
 
-    def test_storage_reads_verified_filesystem_not_blockchain_file_count(self):
-        fs=type('Stat',(),dict(f_blocks=1000,f_bavail=300,f_frsize=1024**2))()
-        with patch('state.load_setup',return_value={'data_uuid':None}),\
-             patch('state.verify_data_mount',return_value={'target':'/var/lib/bitcoin-core-node/data'}),\
-             patch.object(activity_ui.os,'statvfs',return_value=fs):
+    def test_storage_shows_blockchain_full_percentage_not_whole_disk(self):
+        from chain_storage import reading
+        expected=reading(30*1024**3,60*1024**3)
+        with patch('chain_storage.storage_usage',return_value=expected):
             result=storage_usage()
-        self.assertEqual(result['free_percent'],30)
-        self.assertEqual(result['used_percent'],70)
-        self.assertEqual(result['free'],300*1024**2)
-        application()
-        bar=StorageBar()
-        bar.update_space(result)
-        self.assertTrue(bar.isVisible() or not bar.isHidden())
-        self.assertIn('30% free',bar.caption.text())
-        self.assertEqual(bar.bar.value(),70)
+        self.assertEqual(result['total'],90*1024**3)
+        self.assertEqual(result['used_percent'],33.3)
+        application();bar=StorageBar();bar.update_space(result)
+        self.assertIn('33.3% full',bar.caption.text())
+        self.assertEqual(bar.bar.value(),333);bar.close()
 
-    def test_missing_unmounted_or_unsafe_external_drive_never_shows_root_space(self):
-        from state import SetupError
-        with patch('state.load_setup',return_value={'data_uuid':'disk-id'}),\
-             patch('state.verify_data_mount',side_effect=SetupError('SSD missing')),\
-             patch.object(activity_ui.os,'statvfs') as inspect:
+    def test_unavailable_storage_hides_instead_of_showing_root_space(self):
+        with patch('chain_storage.storage_usage',return_value=None):
             self.assertIsNone(storage_usage())
-            inspect.assert_not_called()
 
     def test_node_activity_keeps_real_verificationprogress(self):
         fake_chain=dict(initialblockdownload=True,blocks=520000,headers=600000,

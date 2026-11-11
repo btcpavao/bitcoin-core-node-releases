@@ -477,6 +477,7 @@ class DesktopSurface(QWidget):
             (40, 26, 13, 34, 14, 11, 6, 3, 12),
             (28, 22, 12, 28, 12, 10, 4, 2, 8),
             (24, 20, 11, 24, 12, 10, 2, 1, 6),
+            (20, 18, 10, 20, 11, 9, 1, 1, 4),
         )[level]
         logo = self.header.layout().itemAt(0).widget()
         if not hasattr(self, '_home_logo'):
@@ -487,7 +488,7 @@ class DesktopSurface(QWidget):
         for name, size in (('MainTitle', title_size), ('MainSubtitle', subtitle_size)):
             label = self.header.findChild(QLabel, name)
             label.setStyleSheet('font-size: %dpx;' % size)
-        self.header.layout().setSpacing(8 if level == 0 else 2 if level == 3 else 4)
+        self.header.layout().setSpacing(8 if level == 0 else 2 if level >= 3 else 4)
         header_index = self.body_layout.indexOf(self.header)
         self.body_layout.itemAt(header_index + 1).spacerItem().changeSize(0, gap)
         for card in getattr(self, 'all_home_cards', self.cards):
@@ -507,12 +508,22 @@ class DesktopSurface(QWidget):
             card.icon_label.setPixmap(pixmap)
             card.icon_label.setFixedHeight(icon_size + (2 if level == 0 else 0))
         if hasattr(self, 'activity_row'):
-            activity_index = self.body_layout.indexOf(self.activity_row)
-            self.body_layout.itemAt(activity_index - 1).spacerItem().changeSize(
-                0, 24 if level == 0 else 4 if level == 3 else 8)
-            self.activity_row.layout().setSpacing(8 if level == 0 else 2 if level == 3 else 4)
+            if not hasattr(self,'activity_slot'):
+                activity_index = self.body_layout.indexOf(self.activity_row)
+                self.body_layout.itemAt(activity_index - 1).spacerItem().changeSize(
+                    0, 24 if level == 0 else 4 if level >= 3 else 8)
+            self.activity_row.layout().setSpacing(8 if level == 0 else 2 if level >= 3 else 4)
             self.activity_text.setStyleSheet(
                 'font-style:italic; font-size:%dpx;' % (14 if level == 0 else 12))
+            if hasattr(self,'activity_slot'):
+                w=min(620,max(300,self.width()-60))
+                self.activity_row.setFixedWidth(w)
+                self.activity_row.layout().invalidate()
+                h=self.activity_row.heightForWidth(w)
+                h=max(self.activity_row.minimumSizeHint().height(),h if h>=0 else self.activity_row.sizeHint().height())
+                # Leave enough space that the centered meters never meet the
+                # right-hand status/clock controls on a 600px-high screen.
+                self.activity_slot.setFixedHeight(h+62)
         self.body_layout.invalidate()
 
     def layout_cards(self):
@@ -528,10 +539,10 @@ class DesktopSurface(QWidget):
             return
         self._layout_key = key
         self.hide_card_help()
-        for level in range(4):
+        for level in range(5):
             self.apply_home_density(level)
             vertical_margin = 8 if level == 0 and viewport.height() >= 500 else 2
-            vertical_gap = (14, 10, 8, 6)[level]
+            vertical_gap = (14, 10, 8, 6, 4)[level]
             self.body_layout.setContentsMargins(0, vertical_margin, 0, vertical_margin)
             self.grid.setVerticalSpacing(vertical_gap)
             self.header.layout().invalidate()
@@ -581,7 +592,6 @@ class DesktopSurface(QWidget):
             row = index // columns
             row_count = min(columns, len(self.cards) - row * columns)
             offset = columns - row_count
-            if columns==5 and row_count in (2,3) and self.cards[-1].tool['title']=='Node Guide':offset=2*(3-row_count)
             self.grid.addWidget(card, row, 2 * (index % columns) + offset, 1, 2)
         self.grid_wrap.setFixedSize(columns * card_width + (columns - 1) * 14,
                                     rows * card_height + (rows - 1) * vertical_gap)

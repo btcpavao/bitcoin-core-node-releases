@@ -43,7 +43,7 @@ class SnapshotV2(unittest.TestCase):
         self.assertFalse((path/'wallets').exists())
         self.assertEqual(self.select()[0],path)
 
-    def test_hint_is_explicit_and_all_files_are_readback_checked(self):
+    def test_hint_is_explicit_and_streamed_checksums_match_saved_files(self):
         r=self.backup({'blocks':100,'bestblockhash':'a'*64,'pruned':False})
         p,m=self.select();self.assertEqual(m['height'],100);self.assertTrue(r['tip_is_hint'])
         for entry in m['files']:

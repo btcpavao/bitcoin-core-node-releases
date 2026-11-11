@@ -29,7 +29,7 @@ class SettingsAllChildrenBack(unittest.TestCase):
             ('Bitcoin Core Network & Privacy','Network & Privacy','Back to Settings'),
             ('Backup and Restore','Backup and Restore','Back to Settings'),
             ('Bluetooth Devices','Bluetooth Devices','Back to Settings'),
-            ('Mouse Speed','Mouse & Pointer','Back to Settings'),
+            ('Keyboard and Mouse','Keyboard and Mouse','Back to Settings'),
             ('Login Password','Login Password','Back to Settings'),
             ('Software Updates','Software Updates','Back to Settings')
         ]

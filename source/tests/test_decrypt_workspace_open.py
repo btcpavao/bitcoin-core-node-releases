@@ -143,7 +143,7 @@ class RecoveryHandoff(unittest.TestCase):
             f.launch.assert_not_called()
 
     def test_guide_copies_explain_automatic_open_and_ram_lifetime(self):
-        for relative in ('app/guide_ui.py', 'runtime/usr/share/bitcoin-core-node/GUIDE.html',
+        for relative in ('app/guide_content.py', 'runtime/usr/share/bitcoin-core-node/GUIDE.html',
                          'runtime/usr/share/bitcoin-core-node/GUIDE.txt'):
             text = (ROOT / relative).read_text()
             self.assertIn('Files opens Private Workspace automatically', text)

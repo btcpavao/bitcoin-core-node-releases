@@ -34,7 +34,7 @@ def stop_home(home):
 TITLES=(
     'Network Connections','Bitcoin Core Network & Privacy','Bitcoin Core Status',
     'Date & Time','Backup and Restore',
-    'Bluetooth Devices','Mouse Speed','Login Password','Software Updates'
+    'Bluetooth Devices','Keyboard and Mouse','Login Password','Software Updates'
 )
 
 class SettingsCards(unittest.TestCase):
@@ -119,7 +119,7 @@ class SettingsCards(unittest.TestCase):
                     'Date & Time':'settings-date-time.png',
                     'Backup and Restore':'settings-chain-backup.png',
                     'Bluetooth Devices':'settings-bluetooth.png',
-                    'Mouse Speed':'settings-mouse.png',
+                    'Keyboard and Mouse':'settings-mouse.png',
                     'Login Password':'settings-login.png',
                     'Software Updates':'settings-software-updates.png',
                 }
@@ -146,7 +146,7 @@ class SettingsCards(unittest.TestCase):
                   'Backup and Restore':('backup_restore',{}),
                   'Network Connections':('network_status',{'from_settings':True}),
                   'Bluetooth Devices':('bluetooth_devices',{'from_settings':True}),
-                  'Mouse Speed':('mouse_settings',{})
+                  'Keyboard and Mouse':('mouse_settings',{})
                 }
                 for title,(method,kwargs) in actions.items():
                     with patch.object(home,method) as action:

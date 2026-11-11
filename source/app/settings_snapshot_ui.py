@@ -164,6 +164,12 @@ class SettingsSnapshotDialog(QDialog):
                f"Saved Wi-Fi: {value['wifi']} · Ethernet: {value['ethernet']}",
                f"Node privacy: {value['privacy']} · WireGuard saved: {'yes' if value['wireguard'] else 'no'}",f"Keyboard: {value['keyboard']}",
                '', 'Not included:',*value['not_included']]
+        prefs=value.get('desktop_input')
+        if prefs:
+            k=prefs['keyboard']
+            lines[5:5]=[f"Keyboard repeat: {'on' if k['repeat'] else 'off'} · {k['delay_ms']} ms delay · {k['rate_hz']} keys/second",
+                        f"Num Lock at desktop startup: {'on' if k['numlock'] else 'off'}",
+                        'Mouse/touchpad profiles: '+(', '.join(prefs['devices']) or 'none')]
         self.details.setPlainText('\n'.join(lines))
 
     def completed(self,code,_):
@@ -176,7 +182,7 @@ class SettingsSnapshotDialog(QDialog):
             if self.action.removeprefix('core-')=='settings-preview':
                 self.preview=result;self.show_summary(result['summary']);self.feedback.setText('Backup verified. Review the contents, then confirm restoration on the next restart.')
             elif self.action.removeprefix('core-')=='settings-backup':
-                self.show_summary(result['summary']);self.feedback.setText(('Encrypted' if result.get('encrypted',result['file'].endswith('.gpg')) else 'Unencrypted')+' settings backup saved and verified.\n'+result['file']);self.password.clear();self.repeat.clear()
+                self.show_summary(result['summary']);self.feedback.setText(('Encrypted' if result.get('encrypted',result['file'].endswith('.gpg')) else 'Unencrypted')+' settings backup saved.\n'+result['file']);self.password.clear();self.repeat.clear()
             elif self.action.removeprefix('core-')=='settings-import':
                 self.feedback.setText('Settings are staged. Restart normally to apply them before networking starts. Login password, wallets and blockchain remain local.');self.password.clear();self.repeat.clear();self.cancel_pending.show()
             else:

@@ -117,7 +117,7 @@ def collect(rpc,events):
             temporary=False
             try:
                 if name not in loaded:
-                    events.cancel_allowed=False;events.update('Opening a local wallet for type verification',force=True)
+                    events.cancel_allowed=False;events.update('Opening a local watch-only wallet',force=True)
                     rpc('loadwallet',name);temporary=True
                 info=rpc('getwalletinfo',wallet=name)
                 if not is_watch(info):skipped+=1;continue
@@ -179,9 +179,9 @@ def _perform(action,request,caller,events):
     ss.require(chain['chain']==load_setup()['network'],'Running Core uses a different network.')
     if action=='watch-backup':
         fd,_,_=ss.external(request['path'],caller,writing=True);os.close(fd)
-        data=collect(rpc,events);check_copies(data,events)
+        data=collect(rpc,events)
         filename=crypt.publish(ss.canonical(data),request['path'],request['passphrase'],caller,events,prefix='watch-only-wallets',limit=MAX_PLAIN)
-        return dict(ok=True,file=filename,encrypted=bool(request['passphrase']),summary=summary(data))
+        return dict(ok=True,file=filename,encrypted=bool(request['passphrase']),readback_verified=False,summary=summary(data))
     raw,fingerprint=crypt.read(request['path'],request['passphrase'],caller,events,limit=MAX_PLAIN)
     data=parse(raw)
     ss.require(data['network']==chain['chain'],'Watch-only backup is for a different Bitcoin network.')

@@ -28,7 +28,7 @@ class ChainDialog(QDialog):
         layout=QVBoxLayout(self);layout.setContentsMargins(24,20,24,20);layout.setSpacing(12)
         heading=QLabel(title);heading.setObjectName('Title');layout.addWidget(heading)
         text=('Save the downloaded blocks, block index and chainstate to a folder on USB or disk. '
-              'Core stops while files are copied and verified. Start it manually after the backup. Each completed snapshot is kept separately.'
+              'Core stops while files are copied. There is no read-back verification pass. Start it manually after the backup. Each completed snapshot is kept separately.'
               if mode=='backup' else
               'Select the USB drive or a completed backup folder from a Node with the same Bitcoin Core version. The latest completed copy is detected automatically. '
               'The copy is verified before replacing this computer’s blockchain data. Core stops during import.')
@@ -152,7 +152,7 @@ class ChainDialog(QDialog):
         if code==0 and self.result and self.result.get('ok') is True:
             self.progress.setValue(1000);height=self.result['height']
             if self.mode=='backup':
-                message='Blockchain files copied and verified.\n'+self.result['directory']
+                message='Blockchain backup saved.\n'+self.result['directory']
                 if height is not None:
                     label='Last reported block before shutdown' if self.result.get('tip_is_hint') else 'Verified block'
                     message+=f'\n{label}: {height:,}.'

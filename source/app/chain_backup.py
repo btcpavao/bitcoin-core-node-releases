@@ -2,7 +2,8 @@
 
 The authenticated admin entry serializes operations. External paths are opened
 as the desktop user; all traversal uses no-follow directory descriptors. A
-checksummed manifest is published only after a clean stop and read-back check.
+checksummed manifest is published after a clean stop, streaming copy and flush.
+Backup export has no destination read-back pass; restore still checks its copy.
 Imports are staged, checked by an isolated Core, and journaled before activation.
 """
 from contextlib import contextmanager
@@ -314,7 +315,7 @@ def make_dirs(fd, dirs, uid=None, owner=None):
             finally: os.close(child)
 
 
-def copy_files(src, dst, files, events, *, src_uid=None, dst_uid=None, owner=None):
+def copy_files(src, dst, files, events, *, src_uid=None, dst_uid=None, owner=None, verify_destination=True):
     total = sum(f['size'] for f in files); done = 0
     for entry in files:
         events.check(); parts = relative(entry['path'])
@@ -332,7 +333,9 @@ def copy_files(src, dst, files, events, *, src_uid=None, dst_uid=None, owner=Non
                         events.check()
                         block = os.read(incoming, min(4 * 1024 * 1024, remaining))
                         if not block: raise ChainError('A source file is incomplete.')
-                        target.write(block); digest.update(block)
+                        if target.write(block) != len(block):
+                            raise ChainError('The destination did not accept the complete write.')
+                        digest.update(block)
                         remaining -= len(block); done += len(block)
                         events.update('Copying blockchain data', done, total)
                     if os.read(incoming, 1): raise ChainError('A source file grew during copying.')
@@ -346,7 +349,8 @@ def copy_files(src, dst, files, events, *, src_uid=None, dst_uid=None, owner=Non
                     target.flush(); os.fsync(target.fileno())
                 os.fsync(d)
             finally: os.close(incoming)
-    verify_files(dst, files, events, uid=dst_uid)
+    if verify_destination:
+        verify_files(dst, files, events, uid=dst_uid)
 
 
 def verify_files(fd, files, events, uid=None):
@@ -693,7 +697,7 @@ def backup(destination, caller, setup, release, events, *, tip_hint=None):
                     os.mkdir(temporary, 0o700, dir_fd=dest)
                     output = os.open(temporary, DIR_FLAGS, dir_fd=dest)
                 make_dirs(output, dirs, caller)
-                copy_files(src, output, files, events, dst_uid=caller)
+                copy_files(src, output, files, events, dst_uid=caller, verify_destination=False)
                 raw, settings = settings_read(DATA)
                 try: target = int(settings.get('prune', setup['prune_mib']))
                 except (ValueError, TypeError): target = setup['prune_mib']
@@ -716,14 +720,14 @@ def backup(destination, caller, setup, release, events, *, tip_hint=None):
                          directories=dirs, files=files, total_bytes=total)
                 json_at(output, MANIFEST, m, caller)
                 events.check(); events.cancel_allowed = False
-                events.update('Finishing verified backup', total, total, force=True)
+                events.update('Finishing backup writes', total, total, force=True)
                 name = 'bitcoin-chain-' + setup['network'] + '-' + time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + '-' + uuid.uuid4().hex[:12]
                 with identity(caller):
                     os.rename(temporary, name, src_dir_fd=dest, dst_dir_fd=dest)
                     os.fsync(dest)
                 publish_latest(dest, name, setup['network'], caller)
                 return dict(ok=True, directory=str(resolved / name), height=details.get('blocks'),
-                            tip_is_hint=True, bytes=total)
+                            tip_is_hint=True, bytes=total, readback_verified=False)
             finally: os.close(src)
     finally:
         if output is not None: os.close(output)
