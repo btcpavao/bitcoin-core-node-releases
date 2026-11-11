@@ -19,6 +19,15 @@ fi
 # Restore the ownership Debian expects for privilege-separated downloads.
 chroot "$target" chown _apt:root /var/cache/apt/archives/partial
 chmod 0700 "$target/var/cache/apt/archives/partial"
+# systemd-resolved's package saves the builder resolver as a .bak and
+# may stage its temporary stub in /run. At boot /run is a fresh tmpfs and
+# the Node resolver service wires /etc/resolv.conf after resolved starts.
+rm -f "$target/etc/.resolv.conf.systemd-resolved.bak" \
+      "$target/run/systemd/resolve/stub-resolv.conf"
+test -s "$target/etc/systemd/system/bitcoin-core-node-resolver.service"
+grep -Fxq 'After=systemd-resolved.service' "$target/etc/systemd/system/bitcoin-core-node-resolver.service"
+grep -Fxq 'ExecStart=/usr/bin/ln -sfn /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf' \
+    "$target/etc/systemd/system/bitcoin-core-node-resolver.service"
 rm -f "$target/var/cache/apt/pkgcache.bin" "$target/var/cache/apt/srcpkgcache.bin"
 rm -f "$target/var/cache/ldconfig/aux-cache" "$target/var/lib/systemd/random-seed"
 find "$target/var/log" -type f -exec truncate -s 0 {} +
