@@ -1,5 +1,7 @@
 # Build and compare a Bitcoin Core Node ISO
 
+[Upute na hrvatskom](REBUILD.hr.md)
+
 This recipe builds a **new candidate** from the public source of v0.1.0-rc.2. The old RC2 image was made from an earlier image and records its hash in BUILD-INFO.json. Its original build did not lock every input. The signed RC2 checksum authenticates that historical download. The comparison below uses two candidates built from the same revision of this recipe.
 
 ## 1. Set up a build computer
@@ -55,7 +57,7 @@ For a quick check that the guide and transfer-folder settings refer to the inten
 PYTHONDONTWRITEBYTECODE=1 python3 ../node-source/tests/check_core_release.py
 ```
 
-Example prompt for an LLM: “Explain this build patch one file at a time. List every downloaded file, how its identity is checked, which commands run as root, which settings reach the installed Node, and how the final ISO is compared. Quote the relevant filenames and lines. Point out anything you cannot verify from the files.” Give it public source or build logs only. An LLM explanation helps read the code. The actual commands establish the result.
+You can give an LLM the public patch and ask it the following. “Explain this build patch one file at a time. List every downloaded file, how its identity is checked, which commands run as root, which settings reach the installed Node, and how the final ISO is compared. Quote the relevant filenames and lines. Point out anything you cannot verify from the files.” Give it public source or build logs only. An LLM explanation helps read the code. The actual commands establish the result.
 
 ## 3. Build the candidate
 
@@ -72,7 +74,7 @@ The result includes the complete `bitcoin-core-node-candidate-amd64.iso`, its SH
 
 ## 4. Compare on a second machine
 
-A second person can build the recorded commit in a clean VM under their own control. Both builders can exchange only the two SHA-256 values initially. If both ISO files are available on the same machine, compare every byte. Copy the second builder's result to a new directory named `../node-result-two`, then run:
+A second person can build the recorded commit in a clean VM under their own control. Both builders can exchange only the two SHA-256 values initially. If both ISO files are available on the same machine, compare every byte. Copy the second builder's result to a new directory named `../node-result-two`, then run the comparison.
 
 ```bash
 sudo bash rebuild/node compare \
