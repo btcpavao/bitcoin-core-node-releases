@@ -1,0 +1,116 @@
+name: Publish verified Node rebuild candidate
+on:
+  push:
+    branches: [publish-node-e6519d7e5e95]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: e6519d7e5e956aa62512294389a9db2cd0a60a96
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Confirm the completed comparison and the unchanged assembly inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/"$GITHUB_REPOSITORY"/actions/runs/43015398147 > "$RUNNER_TEMP/run.json"
+          jq -e '.conclusion=="success" and .head_sha=="e6519d7e5e956aa62512294389a9db2cd0a60a96" and .path==".github/workflows/node-rebuild.yml"' "$RUNNER_TEMP/run.json"
+          gh api repos/"$GITHUB_REPOSITORY"/actions/runs/43014184996 > "$RUNNER_TEMP/earlier-run.json"
+          jq -e '.conclusion=="success" and .head_sha=="294cccd7f1d69ab216bb34d116dd0fac15517906" and .path==".github/workflows/node-rebuild.yml"' "$RUNNER_TEMP/earlier-run.json"
+          gh api repos/"$GITHUB_REPOSITORY"/actions/runs/43014184996/jobs > "$RUNNER_TEMP/earlier-jobs.json"
+          jq -e '[.jobs[]|select(.conclusion=="success")|.name]|sort==["build (one)","build (two)","compare"]' "$RUNNER_TEMP/earlier-jobs.json"
+          git diff --name-only 294cccd7f1d69ab216bb34d116dd0fac15517906 e6519d7e5e956aa62512294389a9db2cd0a60a96 > "$RUNNER_TEMP/recipe-diff.txt"
+          while IFS= read -r file; do
+            [[ $file =~ ^docs/REBUILD(\.[a-z]{2})?\.md$ ]] || { echo "Assembly input differs: $file" >&2; exit 1; }
+          done < "$RUNNER_TEMP/recipe-diff.txt"
+          git diff --exit-code 294cccd7f1d69ab216bb34d116dd0fac15517906 e6519d7e5e956aa62512294389a9db2cd0a60a96 -- rebuild .github/workflows btcpavao-pgp.asc
+          test "$(git rev-parse 294cccd7f1d69ab216bb34d116dd0fac15517906:rebuild)" = "$(git rev-parse e6519d7e5e956aa62512294389a9db2cd0a60a96:rebuild)"
+          gh api repos/"$GITHUB_REPOSITORY"/actions/runs/43015398147/jobs > "$RUNNER_TEMP/jobs.json"
+          jq -e '[.jobs[]|select(.conclusion=="success")|.name]|sort==["build (one)","build (two)","compare"]' "$RUNNER_TEMP/jobs.json"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 43015398147
+          pattern: node-*
+          path: ${{ runner.temp }}/images
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 43014184996
+          name: node-one
+          path: ${{ runner.temp }}/earlier
+      - name: Compare again, package the source and create a uniquely named prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_RECIPE: 'e6519d7e5e956aa62512294389a9db2cd0a60a96'
+          PUBLISH_TAG: 'rebuild-e6519d7e5e95'
+          EXPECTED_ISO_SHA256: '8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6'
+          COMPARED_RECIPE: 'e6519d7e5e956aa62512294389a9db2cd0a60a96'
+          EARLIER_RUN: '43014184996'
+          EARLIER_RECIPE: '294cccd7f1d69ab216bb34d116dd0fac15517906'
+          COMPARED_RUN: '43015398147'
+        run: |
+          set -euo pipefail
+          first="$RUNNER_TEMP/images/node-one"
+          second="$RUNNER_TEMP/images/node-two"
+          candidate=bitcoin-core-node-candidate-amd64.iso
+          name="bitcoin-core-node-$PUBLISH_TAG"
+          out="$RUNNER_TEMP/release"
+          bundle="$RUNNER_TEMP/$name"
+          mkdir -m 755 "$out" "$bundle" "$bundle/recipe"
+          bash rebuild/node compare "$first/$candidate" "$second/$candidate"
+          bash rebuild/node compare "$first/$candidate" "$RUNNER_TEMP/earlier/$candidate"
+          echo "$EXPECTED_ISO_SHA256  $first/$candidate" | sha256sum --strict --check
+          one_sha=$(sha256sum "$first/$candidate" | cut -d' ' -f1)
+          two_sha=$(sha256sum "$second/$candidate" | cut -d' ' -f1)
+          mv "$first/$candidate" "$out/$name-core32.1-amd64.iso"
+          git archive "$GITHUB_RECIPE" | tar -xf - -C "$bundle/recipe"
+          bash rebuild/node source "$bundle/source"
+          printf '%s\n' "$GITHUB_RECIPE" > "$bundle/SOURCE-COMMIT.txt"
+          cp docs/REBUILD.md "$bundle/BUILD.md"
+          printf '%s\n' "Public build recipe commit $GITHUB_RECIPE." 'source/ contains the assembled candidate project source.'  'recipe/ contains the exact public build recipe, including the signed baseline key and instructions.' 'To repeat the build in a disposable VM, enter recipe/ and follow docs/REBUILD.md.' > "$bundle/README.txt"
+          source rebuild/inputs.env
+          (cd "$RUNNER_TEMP" && tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$SOURCE_DATE_EPOCH" --format=gnu -cf - "$name") | gzip -n > "$out/$name-source.tar.gz"
+          printf '%s\n' "$GITHUB_RECIPE" > "$out/SOURCE-COMMIT.txt"
+          cp btcpavao-pgp.asc "$out/"
+          cp "$first"/{filesystem.packages,builder.packages,root-files.sha256.gz,iso-files.sha256} "$out/"
+          iso_size=$(stat -c %s "$out/$name-core32.1-amd64.iso")
+          rebuild_tree=$(git rev-parse "$GITHUB_RECIPE:rebuild")
+          jq --arg commit "$GITHUB_RECIPE" --arg tested "$COMPARED_RECIPE" --arg build_tree "$rebuild_tree" --arg base "$SOURCE_COMMIT" --arg base_sha256 "$SOURCE_DIGEST" \
+             --arg earlier_recipe "$EARLIER_RECIPE" --arg earlier_run "$EARLIER_RUN" --slurpfile earlier "$RUNNER_TEMP/earlier-jobs.json" \
+             --arg builder "$BUILDER_IMAGE" --arg debian "$DEBIAN_SNAPSHOT" --arg security "$SECURITY_SNAPSHOT" \
+             --arg hash "$EXPECTED_ISO_SHA256" --arg iso "$name-core32.1-amd64.iso" --arg run "$COMPARED_RUN" \
+             --arg one_sha "$one_sha" --arg two_sha "$two_sha" --argjson size "$iso_size" --argjson epoch "$SOURCE_DATE_EPOCH" \
+             '{recipe_commit:$commit,assembly_tested_commit:$tested,rebuild_git_tree:$build_tree,
+               additional_pair:{commit:$earlier_recipe,run_id:$earlier_run,sha256:$hash,
+                 comparison:"A second successful pair of fresh runners and a cross-run full-ISO cmp; only documentation changed between pairs.",
+                 jobs:[$earlier[0].jobs[]|{name:.name,url:.html_url,result:.conclusion}]},
+               base_source_commit:$base,base_source_archive_sha256:$base_sha256,
+               builder_image:$builder,debian_snapshot:$debian,security_snapshot:$security,source_date_epoch:$epoch,
+               iso:$iso,bytes:$size,sha256:$hash,per_builder_sha256:{one:$one_sha,two:$two_sha},workflow_run_id:$run,
+               comparison:"cmp on both complete ISO files on two fresh GitHub-hosted runners",
+               jobs:[.jobs[]|{name:.name,url:.html_url,result:.conclusion}]}' \
+             "$RUNNER_TEMP/jobs.json" > "$out/BUILD-INFO.json"
+          (cd "$out" && sha256sum -- * > "$RUNNER_TEMP/candidate-sums" && mv "$RUNNER_TEMP/candidate-sums" SHA256SUMS && sha256sum --strict -c SHA256SUMS)
+          {
+            echo "Independent BTC Pavao project. This prerelease is a public rebuild candidate for testing. The previous signed Node RC2 download remains available."
+            echo
+            echo "Both full ISOs matched byte for byte in the [two-builder comparison](https://github.com/$GITHUB_REPOSITORY/actions/runs/$COMPARED_RUN)."
+            echo
+            echo "A [second pair](https://github.com/$GITHUB_REPOSITORY/actions/runs/$EARLIER_RUN) made the same ISO from the same assembly inputs. A further full-file comparison linked the two pairs."
+            echo
+            echo "Recipe commit: \`$GITHUB_RECIPE\`"
+            echo "Compared assembly commit: \`$COMPARED_RECIPE\`"
+            echo "Full ISO SHA-256: \`$EXPECTED_ISO_SHA256\`"
+            echo
+            echo "The source archive combines the matching prepared project files, pinned build recipe and beginner instructions. BUILD-INFO.json records the original source archive, Debian inputs and the two jobs. The build uses Debian packages and pinned upstream binaries. Two hosted builds share the GitHub infrastructure. Independent third-party rebuild attestations can be added separately."
+            echo
+            echo "A checksum manifest is supplied for the publisher to sign. Authenticate an OpenPGP signature if SHA256SUMS.asc has been added. Installation and hardware acceptance are separate from this byte comparison."
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$PUBLISH_TAG" "$out"/* --target "$GITHUB_RECIPE" --prerelease --latest=false --title "Bitcoin Core Node rebuild candidate $PUBLISH_TAG" --notes-file "$RUNNER_TEMP/notes.md"
