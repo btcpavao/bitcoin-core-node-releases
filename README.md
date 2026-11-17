@@ -1,10 +1,10 @@
 # Bitcoin Core Node — Debian image releases
 
-**Unsigned rebuild candidate `rebuild-e6519d7e5e95`.** [Download the candidate ISO and complete source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [Build it yourself (English)](docs/REBUILD.md) · [Recorded ISO hash and both build jobs](docs/proofs/rebuild-e6519d7e5e95.json).
+**Current website download: reproducible test ISO `rebuild-e6519d7e5e95`.** [Download this ISO and its matching source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [Build it yourself (English)](docs/REBUILD.md) · [Recorded ISO hash and both build jobs](docs/proofs/rebuild-e6519d7e5e95.json).
 
 An independently developed online Bitcoin Core Node environment for ordinary amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
-**Current test release candidate: v0.1.0-rc.2.** [Release assets, ISO, checksums and source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2). This is not an official Bitcoin Core or Debian release, nor an independently audited or independently reproducible ISO. Evaluate it on noncritical hardware with disposable wallets.
+The website’s Download Node ISO button serves the same file reproduced by the project’s builders. Its checksum manifest is unsigned. Use a spare disk and a disposable wallet to evaluate this test image. The earlier [signed RC2 release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2) supplies the base project source for the reproducible recipe.
 
 ## Screenshots
 
@@ -44,7 +44,7 @@ echo '8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6  bitcoin-
 
 An `OK` result matches the recorded ISO hash. This candidate has an unsigned checksum manifest. For a check on your own machine, [rebuild the ISO from source and compare both complete files](docs/REBUILD.md).
 
-### Signed test release `v0.1.0-rc.2`
+### Historical signed test release `v0.1.0-rc.2`
 
 Download the ISO, `SHA256SUMS`, `SHA256SUMS.asc` and `btcpavao-pgp.asc` from the [RC2 release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2) into one directory. Confirm the full primary fingerprint with the publisher through an independently trusted channel.
 
@@ -84,6 +84,6 @@ Backup categories include blockchain/chainstate, public watch-only wallets, port
 - A Node/watch-only backup does not contain signing keys. An unencrypted network-settings backup may reveal saved credentials.
 - Full mainnet sync, hardware compatibility and every external disk adapter have not been tested in this exact public release.
 
-The release includes scoped test evidence, package inventory, build/source commit and a curated matching source archive. See [release notes](docs/RELEASE-v0.1.0-rc.2.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Project-local code does not yet have a specified blanket license; upstream packages retain their licenses.
+The release includes scoped test evidence, package inventory, build/source commit and a curated matching source archive. See [the current release and its build record](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95), [the historical RC2 notes](docs/RELEASE-v0.1.0-rc.2.md) and [third-party notices](THIRD_PARTY_NOTICES.md). Project-local code does not yet have a specified blanket license; upstream packages retain their licenses.
 
 Website download guide: https://btcpavao.com/en/bitcoin-core/debian-images/
