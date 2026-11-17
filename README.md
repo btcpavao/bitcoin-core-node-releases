@@ -1,10 +1,10 @@
 # Bitcoin Core Node — Debian image releases
 
-**Current website download: reproducible test ISO `rebuild-e6519d7e5e95`.** [Download this ISO and its matching source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [Build it yourself (English)](docs/REBUILD.md) · [Recorded ISO hash and both build jobs](docs/proofs/rebuild-e6519d7e5e95.json).
+**Current website download: signed, reproducible test ISO `rebuild-e6519d7e5e95`.** [Download this ISO and its matching source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [Build it yourself (English)](docs/REBUILD.md) · [Recorded ISO hash and both build jobs](docs/proofs/rebuild-e6519d7e5e95.json).
 
 An independently developed online Bitcoin Core Node environment for ordinary amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
-The website’s Download Node ISO button serves the same file reproduced by the project’s builders. Its checksum manifest is unsigned. Use a spare disk and a disposable wallet to evaluate this test image. The earlier [signed RC2 release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2) supplies the base project source for the reproducible recipe.
+The website’s Download Node ISO button serves the same file reproduced by the project’s builders. Pavao’s detached OpenPGP signature authenticates the checksum list for this exact build. Use a spare disk and a disposable wallet to evaluate this test image. The earlier [signed RC2 release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2) supplies the base project source for the reproducible recipe.
 
 ## Screenshots
 
@@ -36,13 +36,28 @@ Built-in guidance for validation, watch-only wallets and PSBT workflows.
 
 ### Rebuild candidate `rebuild-e6519d7e5e95`
 
-Download the ISO from the [candidate release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95). In the directory containing the download, run the following command.
+Download the ISO, `SHA256SUMS`, `SHA256SUMS.asc` and `btcpavao-pgp.asc` from [this exact release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95). Keep all four files in one directory. Confirm Pavao’s full signing-key fingerprint through a channel you already trust.
+
+`787A 2AAF B0D1 19CA 0522 B2A5 B9C9 9AF8 5788 96D0`
+
+On Debian 13, open a terminal in that directory and run the block. It verifies the signature against the confirmed fingerprint, then checks the downloaded ISO against its entry in the signed list.
 
 ```sh
-echo '8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6  bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso' | sha256sum -c -
+(
+  set -e
+  iso=bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso
+  fingerprint=787A2AAFB0D119CA0522B2A5B9C99AF8578896D0
+  work=$(mktemp -d)
+  trap 'rm -rf -- "$work"' EXIT
+  gpg --homedir "$work" --batch --dearmor --output "$work/publisher.gpg" btcpavao-pgp.asc
+  gpg --homedir "$work" --batch --no-default-keyring --keyring "$work/publisher.gpg" \
+    --assert-signer "$fingerprint" --verify SHA256SUMS.asc SHA256SUMS
+  awk -v name="$iso" '$2 == name {print; count++} END {if (count != 1) exit 1}' SHA256SUMS > "$work/iso-checksum"
+  sha256sum --check --strict "$work/iso-checksum"
+)
 ```
 
-An `OK` result matches the recorded ISO hash. This candidate has an unsigned checksum manifest. For a check on your own machine, [rebuild the ISO from source and compare both complete files](docs/REBUILD.md).
+Look for GnuPG’s good signature from `btcpavao` and `OK` beside the ISO filename. The signed ISO SHA-256 is `8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6`. To check the build on your own machine, [rebuild the ISO from source and compare both complete files](docs/REBUILD.md).
 
 ### Historical signed test release `v0.1.0-rc.2`
 
