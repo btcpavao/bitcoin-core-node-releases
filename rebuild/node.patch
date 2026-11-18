@@ -2085,10 +2085,20 @@ index 076fdd08cdf1c4e00da64bae66880a429c09683d..396c137698a13e6a0cd6de58c12b2651
      print('Blockchain maintenance is active or recovery needs attention. Bitcoin Core remains stopped.',file=sys.stderr)
      sys.exit(1)
 diff --git a/runtime/usr/libexec/core-node-install-target b/runtime/usr/libexec/core-node-install-target
-index d372f53aaac06a5f34bb4a94222519c59838a8a1..0941dd7f272e0fb238e26b98c45003410a41000f 100755
+index d372f53aaac06a5f34bb4a94222519c59838a8a1..ecc08c683836a27b37367099d1d3b6c19f029ab9 100755
 --- a/runtime/usr/libexec/core-node-install-target
 +++ b/runtime/usr/libexec/core-node-install-target
-@@ -42,7 +42,7 @@ def main():
+@@ -26,7 +26,8 @@ def main():
+     if any(line.startswith('node-live:') for line in target('etc/passwd').read_text().splitlines()):
+         call('/usr/sbin/userdel', '--force', 'node-live')
+     for name in ['etc/sudoers.d/live', 'etc/sudoers.d/zz-live',
+-                 'etc/lightdm/lightdm.conf.d/22-live-autologin.conf']:
++                 'etc/lightdm/lightdm.conf.d/22-live-autologin.conf',
++                 'etc/systemd/system/lightdm.service.d/core-node-live-config.conf']:
+         target(name).unlink(missing_ok=True)
+     main_lightdm = target('etc/lightdm/lightdm.conf')
+     if main_lightdm.exists():
+@@ -42,7 +43,7 @@ def main():
      # password-free login path; no generic passwordless sudo is installed.
      call('/usr/sbin/useradd', '--create-home', '--shell', '/bin/bash',
           '--comment', 'Bitcoin Core Node',
@@ -3350,10 +3360,10 @@ index 34f586210bc2043d8e87b11a1b0976990ad0df95..bb006e29e1cec868bdddae959dd59809
  if __name__=='__main__':unittest.main()
 diff --git a/tests/test_live_installer_access.py b/tests/test_live_installer_access.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..c632c3b394cf590a59417539abcefd64541ec5c5
+index 0000000000000000000000000000000000000000..0d3e5554da01c0096e9264da85248832fd9be42e
 --- /dev/null
 +++ b/tests/test_live_installer_access.py
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,60 @@
 +"""Check the separation between live installer access and the installed Node."""
 +import configparser
 +from pathlib import Path
@@ -3393,6 +3403,8 @@ index 0000000000000000000000000000000000000000..c632c3b394cf590a59417539abcefd64
 +        display.read(RUNTIME / 'etc/systemd/system/lightdm.service.d/core-node-live-config.conf')
 +        self.assertIn('live-config.service', display['Unit']['Requires'].split())
 +        self.assertIn('live-config.service', display['Unit']['After'].split())
++        target = (RUNTIME / 'usr/libexec/core-node-install-target').read_text()
++        self.assertIn("'etc/systemd/system/lightdm.service.d/core-node-live-config.conf'", target)
 +
 +    def test_live_installer_entry_points_and_arguments(self):
 +        launcher = RUNTIME / 'usr/share/applications/install-core-node.desktop'
