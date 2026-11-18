@@ -1140,7 +1140,7 @@ index 48969bb53211cdd52350223026d7e2371469f3f2..49c9562be896539de4eb9773ad798dbf
                  'utxos': self.rpc('listunspent', 0, wallet=wallet),
                  'transactions': self.rpc('listtransactions', '*', 100, 0, True, wallet=wallet)}
 diff --git a/app/watch_backup.py b/app/watch_backup.py
-index 7cc8da8afdcc49fc11b8470e817d8a2ce65e4ff0..1ecad6b2c202d78cd60b0c14a36c3533805389dd 100644
+index 7cc8da8afdcc49fc11b8470e817d8a2ce65e4ff0..474682bc70b8eb78aa108d7dba1ad567f25f12d4 100644
 --- a/app/watch_backup.py
 +++ b/app/watch_backup.py
 @@ -8,10 +8,11 @@ from pathlib import Path
@@ -1291,7 +1291,7 @@ index 7cc8da8afdcc49fc11b8470e817d8a2ce65e4ff0..1ecad6b2c202d78cd60b0c14a36c3533
  
  def import_wallets(data,fingerprint,rpc,events):
      ss.require(not STATE.is_symlink());STATE.mkdir(mode=0o700,exist_ok=True)
-@@ -156,8 +182,11 @@ def import_wallets(data,fingerprint,rpc,events):
+@@ -156,8 +182,14 @@ def import_wallets(data,fingerprint,rpc,events):
              target=row['name']
              if target in existing:target='Restored '+str(index+1)+' '+uuid.uuid4().hex[:10];renamed+=1
              ss.require(wallet_name(target) and target not in existing)
@@ -1301,11 +1301,14 @@ index 7cc8da8afdcc49fc11b8470e817d8a2ce65e4ff0..1ecad6b2c202d78cd60b0c14a36c3533
 +            with path.open('xb') as wallet:
 +                wallet.write(base64.b64decode(row['public_export']))
 +                os.fchown(wallet.fileno(),0,pwd.getpwnam('bitcoinnode').pw_gid)
-+                os.fchmod(wallet.fileno(),0o440)
++                # Core copies these mode bits onto its own wallet.dat. Its
++                # SQLite copy needs owner write; the staged file belongs to
++                # root, so the Core group still has only read permission here.
++                os.fchmod(wallet.fileno(),0o640)
              events.cancel_allowed=False;events.update('Restoring verified watch-only wallet with Bitcoin Core',force=True)
              try:
                  rpc('restorewallet',target,str(path),True)
-@@ -179,17 +208,19 @@ def _perform(action,request,caller,events):
+@@ -179,17 +211,19 @@ def _perform(action,request,caller,events):
      ss.require(chain['chain']==load_setup()['network'],'Running Core uses a different network.')
      if action=='watch-backup':
          fd,_,_=ss.external(request['path'],caller,writing=True);os.close(fd)
@@ -2432,12 +2435,31 @@ index f79979d43cf2152605028e59e7c9a97c5d215ca1..96f4cf12d9930a5c4d646c8d06c045de
          assert not reaches('192.0.2.2',53)
          assert reaches('192.0.2.2',as_uid=0)
 diff --git a/tests/installed_onboarding_probe.py b/tests/installed_onboarding_probe.py
-index d57ea45eed343c13585240a90bda1d7c45f413fe..3d91df468af4176368b1ab18633e0b5d2b30c4a7 100644
+index d57ea45eed343c13585240a90bda1d7c45f413fe..33ce641f96743c8ab4e2503bd97703a6eb39f215 100644
 --- a/tests/installed_onboarding_probe.py
 +++ b/tests/installed_onboarding_probe.py
-@@ -22,7 +22,10 @@ def run(args,**kw):return subprocess.run(args,check=True,capture_output=True,tex
+@@ -1,6 +1,6 @@
+ #!/usr/bin/python3
+ """Exercise actual local-session authorization on disposable installed QEMU only."""
+-import argparse,base64,hashlib,json,os,pwd,subprocess,sys,time
++import argparse,hashlib,json,os,pwd,subprocess,sys,time
+ from pathlib import Path
+ p=argparse.ArgumentParser();p.add_argument('phase',choices=['before','password','reboot','autologin','default-reboot']);p.add_argument('--media',type=Path,required=True);a=p.parse_args()
+ assert os.environ.get('NODE_VM_ACCEPTANCE')=='1' and os.getuid()==pwd.getpwnam('node').pw_uid
+@@ -21,8 +21,21 @@ def passed(s):report['covered'].append(s);print('PASS '+s,flush=True)
+ def run(args,**kw):return subprocess.run(args,check=True,capture_output=True,text=True,timeout=180,**kw)
  def helper(path,action,request=None):
   return json.loads(run(['pkexec','/usr/libexec/'+path,action],input='' if request is None else json.dumps(request)).stdout)
++def watch_transfer(action, request):
++ # The broker treats closed input as cancellation. Keep the control pipe
++ # open while it verifies exports with an isolated Core and emits progress.
++ reader,writer=os.pipe()
++ with os.fdopen(reader,'rb') as source, os.fdopen(writer,'wb') as control:
++  control.write((json.dumps(request)+'\n').encode());control.flush()
++  output=run(['pkexec','/usr/libexec/core-node-admin',action],stdin=source).stdout
++ result=json.loads(output.splitlines()[-1])
++ assert result['event']=='result' and result['ok'] is True
++ return result
  def permission(action):
 - return subprocess.run(['pkcheck','--action-id',action,'--process',str(os.getpid())],capture_output=True).returncode
 + kind=action.split('.')[-1].removesuffix('-initialize')
@@ -2447,7 +2469,7 @@ index d57ea45eed343c13585240a90bda1d7c45f413fe..3d91df468af4176368b1ab18633e0b5d
  def ready(chain):
   for _ in range(300):
    try:
-@@ -43,7 +46,8 @@ try:
+@@ -43,7 +56,8 @@ try:
   if a.phase=='before':
    assert load_setup()==default_setup();ready('main')
    assert passwordless()
@@ -2457,8 +2479,26 @@ index d57ea45eed343c13585240a90bda1d7c45f413fe..3d91df468af4176368b1ab18633e0b5d
    assert subprocess.run(['sudo','-k','-n','true'],capture_output=True).returncode!=0
    assert os.environ.get('DISPLAY') and os.environ.get('XDG_SESSION_ID')
    passed('automatic local desktop login and running mainnet Core without a setup prompt; no generic passwordless sudo')
-@@ -59,10 +63,10 @@ try:
-   passed('bounded production administration works in the active automatic-login session, including public-wallet snapshot')
+@@ -52,17 +66,24 @@ try:
+   address=service.receive('onboarding','Onboarding persistence','bech32')
+   tip=rpc('generatetoaddress',101,address)[-1];rpc('syncwithvalidationinterfacequeue')
+   assert service.snapshot('onboarding')['utxos']
+-  backup=helper('core-node-admin','wallet-snapshot',{'wallet':'onboarding'})
+-  data=base64.b64decode(backup['data']);assert data.startswith(b'SQLite format 3\0')
+-  assert hashlib.sha256(data).hexdigest()==backup['sha256']
++  transfer={'passphrase':'disposable QEMU fixture only'}
++  backup=watch_transfer('watch-backup',{**transfer,'path':str(a.media)})
++  request={**transfer,'path':backup['file']}
++  preview=watch_transfer('watch-preview',request)
++  assert backup['encrypted'] and preview['fingerprint']==backup['fingerprint']
++  restored=watch_transfer('watch-import',{**request,'fingerprint':preview['fingerprint'],'confirmed':True})
++  names=restored['names'];assert len(names)==1 and names[0]!='onboarding'
++  assert rpc('getwalletinfo',wallet=names[0])['private_keys_enabled'] is False
++  assert rpc('getaddressinfo',address,wallet=names[0])['labels']==['Onboarding persistence']
++  assert rpc('getnewaddress','Restored',wallet=names[0])
+   report.update(tip=tip,address=address)
+-  passed('bounded production administration works in the active automatic-login session, including public-wallet snapshot')
++  passed('encrypted watch-only export, isolated preview and native restoration yield a writable watch-only wallet with the original label')
   elif a.phase=='password':
    assert not passwordless();retained()
 -  assert all(permission(x)!=0 for x in ['org.bitcoin-core-node.admin','org.bitcoin-core-node.login'])
@@ -2559,12 +2599,13 @@ index fe3764224be8f50a3ee454c38beee538cd7815ce..fa46e8b8ec747f82d163f121022d4622
                  self.assertEqual(run.call_args.args[1]['passphrase'],'1')
 diff --git a/tests/test_broker_permissions.py b/tests/test_broker_permissions.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..e3c5169b182c8b594fd7bd5649e78131da7c99a5
+index 0000000000000000000000000000000000000000..ab7f719d9a3fe05e26170bd167bbf5e5a5bcd614
 --- /dev/null
 +++ b/tests/test_broker_permissions.py
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,108 @@
 +"""Credential and maintenance boundaries, using disposable local files only."""
-+from contextlib import ExitStack
++from contextlib import ExitStack, nullcontext
++import base64
 +import os
 +from pathlib import Path
 +import stat
@@ -2577,6 +2618,7 @@ index 0000000000000000000000000000000000000000..e3c5169b182c8b594fd7bd5649e78131
 +sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
 +import chain_backup as chain
 +import login
++import watch_backup
 +from rpc import CoreRPC
 +from wallets import WalletError
 +
@@ -2628,6 +2670,31 @@ index 0000000000000000000000000000000000000000..e3c5169b182c8b594fd7bd5649e78131
 +
 +@unittest.skipUnless(os.geteuid() == 0, 'requires root or a disposable user namespace')
 +class Maintenance(unittest.TestCase):
++    def test_watch_restore_stages_a_root_owned_database_with_owner_write(self):
++        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
++            base = Path(directory)
++            stage = base/'work'
++            stage.mkdir(mode=0o700)
++            stack.enter_context(patch.object(watch_backup, 'STATE', base/'receipts'))
++            stack.enter_context(patch.object(watch_backup, 'core_ram', return_value=nullcontext(stage)))
++            account = SimpleNamespace(pw_gid=os.getgid())
++            stack.enter_context(patch.object(watch_backup.pwd, 'getpwnam', return_value=account))
++            raw = b'public test fixture'
++            data = {'wallets': [{'name': 'watch', 'public_export': base64.b64encode(raw).decode()}]}
++            staged = []
++            def rpc(method, *args, **kwargs):
++                if method == 'listwalletdir': return {'wallets': []}
++                if method == 'getwalletinfo': return {'private_keys_enabled': False, 'descriptors': True}
++                self.assertEqual(method, 'restorewallet')
++                name, path, load_on_start = args
++                path = Path(path)
++                self.assertEqual((name, path.parent, load_on_start), ('watch', stage, True))
++                info = path.stat()
++                staged.append((info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode), path.read_bytes()))
++            result = watch_backup.import_wallets(data, 'a'*64, rpc, chain.Events(emit=lambda row: None))
++            self.assertEqual(result['names'], ['watch'])
++            self.assertEqual(staged, [(0, account.pw_gid, 0o640, raw)])
++
 +    def test_existing_lock_and_data_permissions_survive_an_interruption(self):
 +        with tempfile.TemporaryDirectory() as directory:
 +            data = Path(directory)
