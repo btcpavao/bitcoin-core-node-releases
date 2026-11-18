@@ -1,5 +1,18 @@
 # Build and compare a Bitcoin Core Node ISO
 
+## Build this review candidate
+
+The signed download below is the historical comparison target. This branch includes updated runtime code and forces both processor vendors' microcode into the initrd. To build the candidate, stay on this branch and run these commands from the repository root in the disposable amd64 Docker build VM. Use new output directories.
+
+```bash
+git rev-parse HEAD
+bash rebuild/node source ../reviewed-node-source
+bash rebuild/node build ../reviewed-node-build
+```
+
+Record the commit and the candidate ISO's SHA-256. Compare two independent builds of that same commit with `bash rebuild/node compare FIRST_ISO SECOND_ISO`. The historical digest below identifies the earlier release. An independent Intel builder found that the earlier recipe omitted the AMD archive on Intel hosts.
+
+
 This recipe builds a **new candidate** from the public source of v0.1.0-rc.2. The old RC2 image was made from an earlier image and records its hash in BUILD-INFO.json. Its original build did not lock every input. The signed RC2 checksum authenticates that historical download. The comparison below uses two candidates built from the same revision of this recipe.
 
 [Download the comparison ISO and complete project source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [View both build jobs and their byte comparison](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147)

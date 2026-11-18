@@ -29,6 +29,8 @@ jobs:
             sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           fi
           df -h /
+      - name: Record builder CPU
+        run: LC_ALL=C lscpu | grep -E '^(Architecture|Vendor ID|Model name):'
       - run: bash rebuild/node build "$RUNNER_TEMP/result"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
