@@ -33,18 +33,8 @@ Components: main non-free-firmware
 Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
 Check-Valid-Until: no
 APT
+bash /recipe/apt-pin-config.sh > /etc/apt/apt.conf.d/99node-snapshot.conf
 apt-get update
-# Check signed metadata bytes APT actually selected before installing anything.
-cd /var/lib/apt/lists
-for spec in \
- '0584fba32e13e0ab8285fb16c27adea1ec03a73669c18702821094fd6ca86675 trixie' \
- '877205fdc4edad023f4441f11f8de0e3e85af9f52ac5de92022669ace8a455c6 trixie-updates' \
- '3b638178819e5b4a01a9d9ed333410a3a1b2cda026aaee9cd05741981f1f4f6f trixie-security'; do
-    read -r digest suite <<< "$spec"
-    files=( *_dists_"${suite}"_InRelease )
-    [[ ${#files[@]} == 1 && -f ${files[0]} ]]
-    echo "$digest  ${files[0]}" | sha256sum --check --strict
-done
 apt-get install -y --no-install-recommends ca-certificates python3 gnupg patch
 mkdir -p /build/node
 cp -a /inputs/. /build/node/

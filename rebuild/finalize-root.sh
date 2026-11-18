@@ -8,6 +8,8 @@ mv "$sources/core-node.sources.runtime" "$sources/core-node.sources"
 # The installed Node already has both ordinary and security mirrors in its
 # managed deb822 source. Discard live-build's temporary duplicate and snapshot.
 rm -f "$target/etc/apt/sources.list" "$sources/debian.sources"
+rm "$target/etc/apt/apt.conf.d/99node-snapshot.conf"
+cmp -- /inputs/runtime/etc/apt/sources.list.d/core-node.sources "$sources/core-node.sources"
 if grep -rE 'snapshot\.debian\.org|Check-Valid-Until' "$target/etc/apt" --exclude-dir=trusted.gpg.d; then
     echo 'A build-only APT setting would escape into the installed Node.' >&2
     exit 1
