@@ -722,6 +722,18 @@ index 13ea0a91bfe884d450d447548d6f13064682760b..c47d9f09d9f72c93c54a26af818871be
      def go_back(self):
          owner=self.navigation_owner;self.reject()
          if owner and self.from_settings:owner.settings()
+diff --git a/app/desktop_input.py b/app/desktop_input.py
+index f0a0169098ea90a24c1ec797d49ac5fe112a4b92..c7f4ac66d2a8ab401d71a139616f59512b312587 100644
+--- a/app/desktop_input.py
++++ b/app/desktop_input.py
+@@ -238,4 +238,6 @@ def watch():
+ if __name__=='__main__':
+     import sys
+     if sys.argv[1:]==['--watch']:watch()
+-    else:raise SystemExit('Use --watch.')
++    elif sys.argv[1:]==['--startup-numlock']:
++        sys.exit(0 if load()['keyboard']['numlock'] else 10)
++    else:raise SystemExit('Use --watch or --startup-numlock.')
 diff --git a/app/encrypted_transfer.py b/app/encrypted_transfer.py
 index cb07aa2c173b96b61496898d707abefd2b143551..6d455a99605c4a2d400921e96561e487f15ebf3d 100644
 --- a/app/encrypted_transfer.py
@@ -1851,7 +1863,7 @@ index 0000000000000000000000000000000000000000..18e503ee348f0fa5d37a43a40135a161
 +            result.message += " " + " ".join(notes)
 +    return result
 diff --git a/app/guide_content.py b/app/guide_content.py
-index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..4ee3f0786e0c3871a3fe1b2a4c75c36f0617a88d 100644
+index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..10725a0f87d22c04781c67f77531e4f607e2c989 100644
 --- a/app/guide_content.py
 +++ b/app/guide_content.py
 @@ -2,23 +2,23 @@
@@ -1873,7 +1885,7 @@ index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..4ee3f0786e0c3871a3fe1b2a4c75c36f
 -'Backups & recovery': '<h2>Backups &amp; recovery</h2>\n<p>Start at <b>Settings → Backup and Restore</b>. A backup is a separate saved copy; a restore uses that copy to recover something. The four rows keep different kinds of information separate. This is not a copy of the entire disk.</p>\n<table border="1" cellpadding="10"><tr><th>Choose this row</th><th>To keep this information</th></tr>\n<tr><td><img src="icons/settings-chain-backup.png" width="30" height="30"> Blockchain</td><td>Your existing blockchain data, so another Node can continue without downloading the same history again. No wallets or network passwords.</td></tr>\n<tr><td><img src="bitcoin-ui.png" width="30" height="30"> Watch-only wallets</td><td>Your public wallet information, names, labels and transaction records. No signing keys.</td></tr>\n<tr><td><img src="icons/settings-software-updates.png" width="30" height="30"> Bitcoin Core configuration</td><td>Supported Core preferences, such as storage/cache and selected interface choices.</td></tr>\n<tr><td><img src="icons/settings-network-connections.png" width="30" height="30"> Node configuration</td><td>Supported saved networks and passwords, managed VPN, time and desktop settings. This already includes the portable Core preferences.</td></tr></table>\n<h3>Export finishes after copying and saving</h3>\n<p><b>All four Backup and Restore categories now finish after the backup is prepared, written and flushed to the destination.</b> There is no second pass that reads the saved USB data back, decrypts a newly encrypted export to test it, or opens the outgoing watch-only collection in another Core process. A successful message means the copy/write operation completed, not that a recovery test was performed.</p>\n<p>Core still stops cleanly for a consistent blockchain copy. The tools still refuse unsafe paths, incomplete reads, failed writes, insufficient space and unsupported input. Checksums are calculated as data are already being copied or packaged, without another USB read pass. File formats remain compatible with existing backups. <b>Restore checks remain enabled</b> before existing data or settings are changed; GPG authentication is not disabled.</p>\n<p>Keep at least two separate copies of important backups and periodically test recovery on another installation. A latent media fault may first be noticed on restore without export read-back testing. Wait for the saved confirmation and eject/unmount properly; flushing pending writes can still take time on a slow drive and is not a verification pass.</p>\n<h3>Choose whether to encrypt the backup</h3>\n<p><b>Encrypt backup (optional)</b> starts unchecked for wallet collections and configuration backups. An unencrypted file ends in <b>.json</b>; a GPG-encrypted one ends in <b>.gpg</b>. JSON is structured text data, not encryption. With encryption selected, enter the same nonempty passphrase twice. The tool accepts even one character, but that is not a sensible way to protect valuable private information. A random passphrase from KeePassXC is much harder to guess. An encryption error never quietly saves plaintext instead.</p>\n<p><b>Privacy matters:</b> a plain Node configuration may contain Wi-Fi passwords and VPN private keys. A public wallet can reveal addresses and balances. Keep these backups private and restore only a copy you trust. A <b>checksum</b> is a file fingerprint used to detect damage or a bad copy; by itself it cannot prove who created the file or that a stranger\'s replacement is trustworthy.</p>\n<h3>Find your USB</h3>\n<p>The file chooser lists <b>USB / External media</b> on the left. Connect the drive, or use <b>Refresh USB</b>. Click it to open it; if needed, the tool first mounts it, which means making its files available. Configuration and wallet collections use a .json/.gpg file. Blockchain restore uses a whole completed backup folder or the USB root with <b>Use latest backup</b>. A read-only drive can supply a restore but cannot receive a new backup. Choosing a file does not immediately apply it: review and confirmation still follow.</p>\n<h3>Continue using Settings while copying</h3>\n<p>Settings, the backup menu and the progress windows are independent. Minimize a window or switch with the bottom taskbar. Closing or minimizing a busy progress window does not cancel its work. Use <b>Cancel operation</b> when offered. You can export Node and Core settings while blockchain data is being copied. A watch-only transfer needs running Core, so finish the blockchain copy and start Core manually first.</p>\n<h3>Move to a new computer</h3>\n<ol><li>Back up Node configuration and supported watch-only wallets to USB. Add a blockchain backup if you want to reuse the downloaded history.</li><li>Install a compatible Node on the other computer. Installation erases its selected disk.</li><li>Restore Node configuration, review it and restart to apply it.</li><li>Restore the blockchain copy, if you made one.</li><li>Start Core, restore the watch-only collection, compare addresses and labels, and let any necessary scan finish.</li></ol>\n<p>Keep the old copies until the new setup works. Offline Vault and its signing-wallet backups remain a separate responsibility. Showing a balance on Node does not prove that you can restore the signing wallet.</p>\n<h3>Backup and Restore on Home</h3>\n<p>After the first saved customization or use—such as connecting Wi-Fi, changing time zone/mouse settings, starting Core or importing a wallet—a second <b>Backup and Restore</b> shortcut appears on Home, after <b>Private Workspace</b> and before <b>Encrypt Files</b>. Settings keeps its entry. Both open the same menu and existing work. The Home shortcut stays after restart or after Core stops; it does not make a backup automatically or certify that an old backup is current.</p>',
 -'Blockchain backup': "<h2>Blockchain backup</h2>\n<p>Use <b>Settings → Backup and Restore → Blockchain</b> to reuse downloaded and validated chain data on another Node, or to avoid repeating that work after a disk replacement. <b>Chainstate</b> is the current unspent-output database; this feature also copies the related retained blocks, block index, undo/XOR information and supported indexes. It is not just a loose copy of the chainstate folder.</p>\n<h3>Create a backup</h3>\n<ol><li>Connect an external drive with enough free space for the retained data. Choose <b>Blockchain → Backup</b> and the destination through <b>USB / External Drive…</b> or the folder selector.</li><li>Check <b>I understand that Core will stop while the backup is created.</b> and choose <b>Create backup</b>.</li><li>Core stops cleanly and finishes writing its databases. The tool copies the files once, calculating their restore checksums as those bytes pass through the copy.</li><li>Wait for <b>Blockchain backup saved</b>. There is no separate read-back verification stage. <b>Core remains stopped:</b> open Bitcoin Core manually when ready.</li><li>Finish other writes, eject/unmount the drive and keep the completed folder intact, including its manifest. Make another copy on different media as needed.</li></ol>\n<p>Each run creates a new <b>complete snapshot</b> of the retained data, not an incremental update. Earlier completed folders remain, so the drive needs space for another full copy. Cancelling or a failed write does not publish a partial folder as the latest completed backup. FAT32 cannot hold an individual file of 4 GiB or more; use a suitable filesystem such as exFAT, ext4 or NTFS when necessary.</p>\n<h3>What it does not contain</h3>\n<p>No wallet databases, private keys, Wi-Fi passwords or full system configuration are included. Use the separate backup rows for public wallets and settings. Pruned blocks that have already been deleted cannot appear in the snapshot. A blockchain backup does not recover signing keys and is not a guarantee that an old wallet can rescan all its history.</p>\n<h3>Restore a trusted copy</h3>\n<ol><li>Use a compatible Node with the <b>same Core version and Bitcoin network</b>. Keep the source drive connected.</li><li>Open <b>Blockchain → Restore</b>. Select the USB root and <b>Use latest backup</b>, or choose the specific completed bitcoin-chain folder.</li><li>Review and confirm. Core stops during import. The restore copies into a separate candidate area, checks the file checksums and opens the candidate databases with an isolated Core process.</li><li>Allow room for the incoming copy beside the current chain. Existing chain data is not replaced until those checks succeed; wallet data is not part of that replacement.</li><li>Start Core if necessary. It continues from the saved tip and validates newer blocks. Restore restarts a Core that had been running before import; backup export never starts it automatically.</li></ol>\n<p>Import can therefore still have verification stages. The change is to <b>backup export</b>, not to safeguards for applying data from removable media. A checksum detects damage but does not prove that a stranger's chain snapshot is trustworthy; use your own trusted source. Arbitrary UTXO dump files are not accepted by this workflow.</p>\n<p>You can minimize the copy window and continue using Settings, including exporting Node/Core configuration. Watch-only backup needs running Core and must wait. Avoid forcing shutdown, unplugging media or trying to start Core while its blockchain files are being copied.</p>",
 -'Watch-only backups': "<h2>Watch-only backups</h2>\n<p><b>Settings → Backup and Restore → Watch-only wallets</b> saves a collection of supported public wallets from this Node. It is useful for moving addresses, labels and history to another Node. It deliberately excludes signing wallets and private keys.</p>\n<h3>Make a collection</h3>\n<ol><li>Start Core and finish any blockchain-copy operation.</li><li>Choose <b>Backup</b> and a destination folder. Turn on optional encryption if you need it.</li><li>Choose <b>Create wallet backup</b>. The tool identifies supported watch-only wallets and asks Core to make a consistent native public-only export.</li><li>Read the result, including any skipped-wallet count, and keep the saved .json or .gpg file private.</li></ol>\n<p>A wallet that was closed may be loaded briefly for inspection and then put back in its previous state. The collection keeps public descriptors, receiving/change-address state, labels, address-book entries and transaction records. Descriptors are the wallet's address instructions. The collection cannot authorize spending and cannot replace your original offline signing wallet.</p>\n<p>The export is packaged, optionally encrypted, written and flushed to the destination. It is not reopened in a second Core process and is not read back from USB before the saved confirmation. This avoids the extra export verification step; Core's native public-only export is still used rather than copying an active wallet database.</p>\n<h3>Restore it</h3>\n<ol><li>Use the same Core version and Bitcoin network, and start Core on the target Node.</li><li>Choose <b>Restore</b> in the Watch-only wallets row. Select the collection file; supply its passphrase only if it is encrypted.</li><li>Choose <b>Review backup</b>, check the wallet names, approve the review, then choose <b>Restore wallets</b>.</li><li>If a name already exists, a new restored name is used rather than overwriting the existing wallet. Repeating this backup's restore does not duplicate wallets already restored successfully.</li><li>Compare addresses and labels in Core and let any needed scan finish.</li></ol>\n<p>A multi-wallet restore can succeed partly: wallets already completed remain if a later one fails. Repeating the restore can continue the work. Limits are 32 wallets, 32 MiB for one public export and 64 MiB combined, also limited by free private RAM. MiB is a storage-size unit; those limits keep the temporary in-memory work bounded.</p>\n<p>A pruned chain cannot provide old blocks it no longer has. Public exports also cannot recreate missing <b>hardened</b> address derivations that require private-key information: please keep the original Vault and review any address/scan warning.</p>\n<p>A single <b>watch-only.dat</b> exported straight from Vault is different from this collection. Open that file with <b>Bitcoin Core → File → Restore Wallet</b>. This menu expects Node's .json/.gpg collection format.</p>",
-+'Watch-only wallets': "<h2>Watch-only wallets</h2>\n<p>A native watch-only export contains public descriptors, receiving/change-address state, labels, address-book entries and recorded transactions, without private keys. <b>Descriptors</b> are the instructions Core uses to recognize and derive the wallet's addresses. This lets Node follow the same wallet while Vault retains signing authority.</p>\n<h3>Import the file exported by Vault</h3>\n<ol><li>On Vault, choose <b>Bitcoin Core → File → Export watch-only wallet</b> from the intended signing wallet. Save the public watch-only.dat to the transfer USB. If Vault displays the wallet metadata warning, approve only if you intend to include those labels and records.</li><li>On Node, open Core and select <b>File → Restore Wallet</b>. Use the USB sidebar or a public copy in PSBT Transfer Folder. Give the wallet a new name.</li><li>For a GPG-encrypted public export, use Decrypt Files first and restore the recovered .dat from Private Workspace. Do not decrypt a signing backup on Node.</li><li>Wait for Core's scan and resolve pruning warnings. Compare public address information with the corresponding Vault wallet and confirm the Bitcoin network.</li></ol>\n<p>Core's restore copies the public database into persistent wallet storage. Removing the transfer USB or clearing Private Workspace does not remove that active wallet.</p>\n<h3>Use the correct import path</h3>\n<p>A single <b>watch-only.dat</b> from Vault belongs in <b>Core → File → Restore Wallet</b>. A <b>.json/.gpg collection</b> created by Node's watch-only backup belongs in <b>Backup and Restore → Watch-only wallets → Restore</b>. The formats are intentionally different; no manual descriptor JSON editing is needed for the native .dat flow.</p>\n<p>The Wallets launcher is always on Home. The PSBT Transfer Folder shortcut appears when Node detects a supported watch-only wallet. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.</p>\n<p>Public information can reveal balances and transaction history. Use the optional login password and physical access precautions described in Device privacy &amp; login. Protect public exports and backups too; watch-only does not make them nonsensitive.</p>\n<p>Technical source: Bitcoin Core's offline-signing-tutorial.md and release-notes-32.0.md under github.com/bitcoin/bitcoin/doc describe exportwatchonlywallet and restorewallet. This Guide uses the corresponding GUI actions in the bundled Core.</p>",
++'Watch-only wallets': "<h2>Watch-only wallets</h2>\n<p>A native watch-only export contains public descriptors, receiving/change-address state, labels, address-book entries and recorded transactions, without private keys. <b>Descriptors</b> are the instructions Core uses to recognize and derive the wallet's addresses. This lets Node follow the same wallet while Vault retains signing authority.</p>\n<h3>Import the file exported by Vault</h3>\n<ol><li>On Vault, choose <b>Bitcoin Core → File → Export watch-only wallet</b> from the intended signing wallet. Save the public watch-only.dat to the transfer USB. If Vault displays the wallet metadata warning, approve only if you intend to include those labels and records.</li><li>On Node, open Core and select <b>File → Restore Wallet</b>. Use the USB sidebar or a public copy in PSBT Transfer Folder. Give the wallet a new name.</li><li>For a GPG-encrypted public export, use Decrypt Files first and restore the recovered .dat from Private Workspace. Do not decrypt a signing backup on Node.</li><li>Wait for Core's scan and resolve pruning warnings. Compare public address information with the corresponding Vault wallet and confirm the Bitcoin network.</li></ol>\n<p>Core's restore copies the public database into persistent wallet storage. Removing the transfer USB or clearing Private Workspace does not remove that active wallet.</p>\n<h3>Use the correct import path</h3>\n<p>A single <b>watch-only.dat</b> from Vault belongs in <b>Core → File → Restore Wallet</b>. A <b>.json/.gpg collection</b> created by Node's watch-only backup belongs in <b>Backup and Restore → Watch-only wallets → Restore</b>. The formats are intentionally different; no manual descriptor JSON editing is needed for the native .dat flow.</p>\n<p>Wallets and Watch-Only Wallets are always on Home. Open Watch-Only Wallets for balances and receiving addresses. Its list refreshes when you return from Bitcoin Core or choose Refresh wallets. The PSBT Transfer Folder shortcut appears when Node detects a supported watch-only wallet. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.</p>\n<p>Public information can reveal balances and transaction history. Use the optional login password and physical access precautions described in Device privacy &amp; login. Protect public exports and backups too; watch-only does not make them nonsensitive.</p>\n<p>Technical source: Bitcoin Core's offline-signing-tutorial.md and release-notes-32.0.md under github.com/bitcoin/bitcoin/doc describe exportwatchonlywallet and restorewallet. This Guide uses the corresponding GUI actions in the bundled Core.</p>",
 +'Receiving bitcoin': "<h2>Receiving bitcoin</h2>\n<p>Once the correct watch-only wallet is restored, Node can generate receiving addresses without asking Vault to sign anything. The private keys remain offline. Vault does not need to be running to receive a payment.</p>\n<h3>Open a Mac text clipping</h3>\n<p>In Files, double-click a Finder <b>.textClipping</b> on your USB drive. Select <b>Copy Text</b> and paste it where you need it. When using a receiving address, compare it with the address shown by the recipient. For an older clipping on removable media, copy it using Finder so its associated data travels with it.</p>\n<ol><li>Open Bitcoin Core on Node and select the intended watch-only wallet.</li><li>Open <b>Receive</b>. Add a label that will help identify the payment later. An optional requested amount is information for the payer, not a restriction on what that address can receive.</li><li>Choose <b>Create new receiving address</b>. Copy the displayed address or show the QR code.</li><li>Before a significant deposit, independently confirm the address belongs to your corresponding Vault wallet and the correct Bitcoin network. Checking only two displays on the online computer is not an independent check.</li><li>Share the address with the sender. Use a fresh receiving address for a new payment when practical to reduce simple address reuse.</li><li>Wait for the payment to appear and for confirmations. Keep Core synchronized and the wallet scan complete when checking status.</li></ol>\n<h3>Compare the same address, not different requests</h3>\n<p>Both wallet copies can generate a sequence of addresses. Creating more requests on one side advances its next-address index, so the next request on Vault is not necessarily the same as the latest request on Node. For the initial pairing, compare corresponding addresses at the same index before making extra requests. For an address not already visible in Vault's address information, resolve that match using Core's wallet/address tools rather than accepting a visually similar address or a familiar wallet name.</p>\n<p>A receiving address is public but can link payments to you. Do not publish a whole watch-only export merely to request payment; share only the address needed. Labels/history are local useful records, so keep a watch-only backup after important changes. Backing up Node never substitutes for recovering the offline signing wallet.</p>",
 +'PSBT transactions': "<h2>PSBT transactions</h2>\n<p><b>Node prepares → Vault reviews and signs → Node broadcasts.</b> A PSBT is a Partially Signed Bitcoin Transaction: it carries transaction details and supporting public data so the offline wallet can sign without connecting to the network. An unsigned PSBT has no authority to spend. A fully signed payment may be broadcast by anyone holding it, so handle the returned file deliberately.</p>\n<h3>1. Prepare on the online Node</h3>\n<ol><li>Wait for blockchain synchronization and wallet scanning. Select the correct watch-only wallet in Core.</li><li>In <b>Send</b>, enter the recipient's address and amount. Review the fee; Coin Control is available when you want to choose specific outputs.</li><li>Use <b>Create Unsigned</b> rather than expecting Node to sign. Save the .psbt to PSBT Transfer Folder or directly to writable USB. A filename such as payment-unsigned.psbt helps distinguish it from the returned file.</li><li>If the file is in a RAM working folder, use Files to copy it to the transfer USB. Finish writing and eject/unmount safely.</li></ol>\n<h3>2. Review and sign on offline Vault</h3>\n<ol><li>Copy the unsigned PSBT to Vault's Private Workspace. Open the corresponding signing wallet and choose <b>File → Load PSBT from file</b>.</li><li>The Node desktop and Core share the online display and transfer folder. Any unsigned file there or on the USB could have been replaced. On offline Vault, compare every recipient address and amount with the original payment instructions from a separate trusted source. Check the fee and identify every change output as returning to your own wallet. Stop if any output is unexpected.</li><li>When satisfied, unlock the wallet with its Core passphrase if required and choose <b>Sign Tx</b>.</li><li>Save the signed .psbt directly to the transfer USB, or copy it from Private Workspace using Files. Keep the signing wallet and its secrets offline.</li></ol>\n<h3>3. Return to Node and broadcast</h3>\n<ol><li>Connect the USB to Node. Choose <b>File → Load PSBT from file</b> in Bitcoin Core and select the signed file. A RAM copy is optional.</li><li>Recheck that the intended transaction is complete and matches the payment approved in Vault. An incomplete PSBT cannot be broadcast as a complete transaction.</li><li>Choose <b>Broadcast Tx</b>. Node sends the signed transaction to its peers using the configured route.</li><li>Inspect the transaction in Core afterwards. Broadcast does not guarantee inclusion in a block; confirmations arrive after miners include it. A fee estimate is not a guarantee of confirmation time.</li></ol>\n<p>There is no extra custom Node transaction app or proprietary proposal file in this flow. Core handles the PSBT and transaction. Do not select an original signing wallet backup when asked for a PSBT.</p>\n<p>Keep unfinished payment files you still need outside RAM before shutdown. A PSBT is not your wallet recovery backup. If private broadcast is enabled and fails, inspect that route rather than silently switching to a different privacy setting.</p>\n<p>Technical source: Bitcoin Core doc/psbt.md and doc/offline-signing-tutorial.md (github.com/bitcoin/bitcoin). The standard separates transaction creation, signing and broadcast; the GUI combines the intermediate PSBT processing steps.</p>",
 +'Backups & recovery': '<h2>Backups &amp; recovery</h2>\n<p>Start at <b>Settings → Backup and Restore</b>. A backup is a separate saved copy; a restore uses that copy to recover something. The four rows keep different kinds of information separate. This is not a copy of the entire disk.</p>\n<table border="1" cellpadding="10"><tr><th>Choose this row</th><th>To keep this information</th></tr>\n<tr><td><img src="icons/settings-chain-backup.png" width="30" height="30"> Blockchain</td><td>Your existing blockchain data, so another Node can continue without downloading the same history again. No wallets or network passwords.</td></tr>\n<tr><td><img src="bitcoin-ui.png" width="30" height="30"> Watch-only wallets</td><td>Your public wallet information, names, labels and transaction records. No signing keys.</td></tr>\n<tr><td><img src="icons/settings-software-updates.png" width="30" height="30"> Bitcoin Core configuration</td><td>Supported Core preferences, such as storage/cache and selected interface choices.</td></tr>\n<tr><td><img src="icons/settings-network-connections.png" width="30" height="30"> Node configuration</td><td>Supported saved networks and passwords, managed VPN, time and desktop settings. This already includes the portable Core preferences.</td></tr></table>\n<h3>Export finishes after copying and saving</h3>\n<p><b>All four Backup and Restore categories now finish after the backup is prepared, written and flushed to the destination.</b> There is no second pass that reads the saved USB data back, decrypts a newly encrypted export to test it, or opens the outgoing watch-only collection in another Core process. A successful message means the copy/write operation completed, not that a recovery test was performed.</p>\n<p>Core still stops cleanly for a consistent blockchain copy. The tools still refuse unsafe paths, incomplete reads, failed writes, insufficient space and unsupported input. Checksums are calculated as data are already being copied or packaged, without another USB read pass. File formats remain compatible with existing backups. <b>Restore checks remain enabled</b> before existing data or settings are changed; GPG authentication is not disabled.</p>\n<p>Keep at least two separate copies of important backups and periodically test recovery on another installation. A latent media fault may first be noticed on restore without export read-back testing. Wait for the saved confirmation and eject/unmount properly; flushing pending writes can still take time on a slow drive and is not a verification pass.</p>\n<h3>Choose whether to encrypt the backup</h3>\n<p><b>Encrypt backup (optional)</b> is selected by default for watch-only wallets and full Node configuration. The separate Core configuration backup starts with it unchecked. An unencrypted file ends in <b>.json</b>; a GPG-encrypted one ends in <b>.gpg</b>. JSON is structured text data, not encryption. With encryption selected, enter the same nonempty passphrase twice. The tool accepts even one character, but that is not a sensible way to protect valuable private information. A random passphrase from KeePassXC is much harder to guess. An encryption error never quietly saves plaintext instead.</p>\n<p><b>Privacy matters:</b> a plain Node configuration may contain Wi-Fi passwords and VPN private keys. A public wallet can reveal addresses and balances. Keep these backups private and restore only a copy you trust. A <b>checksum</b> is a file fingerprint used to detect damage or a bad copy; by itself it cannot prove who created the file or that a stranger\'s replacement is trustworthy.</p>\n<h3>Find your USB</h3>\n<p>The file chooser lists <b>USB / External media</b> on the left. Connect the drive, or use <b>Refresh USB</b>. Click it to open it; if needed, the tool first mounts it, which means making its files available. Configuration and wallet collections use a .json/.gpg file. Blockchain restore uses a whole completed backup folder or the USB root with <b>Use latest backup</b>. A read-only drive can supply a restore but cannot receive a new backup. Choosing a file does not immediately apply it: review and confirmation still follow.</p>\n<h3>Continue using Settings while copying</h3>\n<p>Settings, the backup menu and the progress windows are independent. Minimize a window or switch with the bottom taskbar. Closing or minimizing a busy progress window does not cancel its work. Use <b>Cancel operation</b> when offered. You can export Node and Core settings while blockchain data is being copied. A watch-only transfer needs running Core, so finish the blockchain copy and start Core manually first.</p>\n<h3>Move to a new computer</h3>\n<ol><li>Back up Node configuration and supported watch-only wallets to USB. Add a blockchain backup if you want to reuse the downloaded history.</li><li>Install a compatible Node on the other computer. Installation erases its selected disk.</li><li>Restore Node configuration, review it and restart to apply it.</li><li>Restore the blockchain copy, if you made one.</li><li>Start Core, restore the watch-only collection, compare addresses and labels, and let any necessary scan finish.</li></ol>\n<p>Keep the old copies until the new setup works. Offline Vault and its signing-wallet backups remain a separate responsibility. Showing a balance on Node does not prove that you can restore the signing wallet.</p>\n<h3>Backup and Restore on Home</h3>\n<p>After the first saved customization or use—such as connecting Wi-Fi, changing time zone/mouse settings, starting Core or importing a wallet—a second <b>Backup and Restore</b> shortcut appears on Home, after <b>Private Workspace</b> and before <b>Encrypt Files</b>. Settings keeps its entry. Both open the same menu and existing work. The Home shortcut stays after restart or after Core stops; it does not make a backup automatically or certify that an old backup is current.</p>',
@@ -1883,7 +1895,7 @@ index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..4ee3f0786e0c3871a3fe1b2a4c75c36f
 -'Node configuration': "<h2>Node configuration</h2>\n<p>This backup is a shortcut for setting up another Node the way you like it. Open <b>Settings → Backup and Restore → Node configuration</b>. A <b>snapshot</b> here means a saved selection of your current settings, not a complete copy of the computer's disk.</p>\n<h3>What it keeps</h3>\n<p>It can keep supported saved Wi-Fi networks and their stored passwords, Ethernet profiles, the managed WireGuard VPN and privacy choice, time zone and automatic-time choice, keyboard layout, display scale, mouse speed for matching device names and supported Core preferences. New backups also keep Keyboard and Mouse repeat/Num Lock choices and supported mouse/touchpad options. Restore these newer backups on a Node with this feature; older Node versions may reject the new format. This Node still reads earlier configuration backups.</p>\n<p>A network profile is the saved information needed to connect. Display scale controls how large interface elements look. The backup does not save an old clock reading to set the computer back to that time later.</p>\n<h3>Create the copy</h3>\n<ol><li>Finish applying the settings you want to keep and connect a USB drive.</li><li>Choose <b>Backup → Choose folder…</b> and select the drive or a folder on it.</li><li>Leave <b>Encrypt backup (optional)</b> off for a plain .json file, or turn it on and enter the same passphrase twice.</li><li>Choose <b>Save backup</b> or <b>Save encrypted backup</b>. Wait for the saved confirmation and note the filename. There is no read-back verification pass.</li></ol>\n<p><b>A plain Node backup can expose saved Wi-Fi passwords and VPN private keys.</b> Keep it private. Encryption protects the saved file, not the running computer. Please do not store the only copy of the passphrase inside the file that needs that passphrase to open.</p>\n<h3>Apply it to another Node</h3>\n<ol><li>Open the same category and choose <b>Restore</b>.</li><li>Select the .json or .gpg file. Only an encrypted file needs its backup passphrase.</li><li>Choose <b>Review backup</b>. Check the time zone, network counts, privacy profile and any omissions.</li><li>Tick <b>I trust this backup and approve the settings shown above</b>, then choose <b>Restore on next restart</b>.</li><li>Restart normally. The checked settings are applied before networking starts. <b>Check pending restore</b> shows the staged request or its result; <b>Cancel pending restore</b> cancels an unapplied request before restart.</li></ol>\n<h3>What does not move</h3>\n<p>The restore keeps local wallets and network profiles found only on the target computer. It does not clone login passwords/accounts, disk encryption, disk identifiers, Bluetooth pairing keys, arbitrary scripts, external certificates or unsupported VPN plug-ins. Pair Bluetooth devices again on a different adapter. Mouse settings apply only when the device name matches, and only to capabilities that device offers.</p>\n<p>Only passwords actually stored in supported profiles can be transferred. Some workplace authentication tools store credentials elsewhere; missing passwords are not invented. Unsupported values and omissions are reported for you to review.</p>\n<p>If the old and new computers will be online together, they may need different manually assigned IP addresses and different WireGuard peers. Reusing the same address or tunnel identity can cause a conflict.</p>\n<p><b>This contains no blockchain or wallet database.</b> Use those separate backup rows. You do not normally need a separate Core configuration backup because Node configuration already includes the supported Core settings.</p>",
 -'Networking': '<h2>Networking</h2>\n<h3>Connect to Wi-Fi or a cable</h3>\n<p>Click the <b>Network Status</b> icon just to the left of Restart. Choose your Wi-Fi network, enter its password and click <b>Connect</b>. Saved networks can reconnect automatically. Ethernet is a wired connection: connect the cable and the system normally sets it up automatically.</p>\n<p><b>Advanced settings</b> is for hidden Wi-Fi names, workplace networks and manually assigned IP addresses. An IP address is the network address used to reach a computer. You usually do not need to set one manually on a home router. A connection to the router is not proof that the Internet is reachable.</p>\n<p>If you open Core without a connection, Node offers network setup first. <b>Use Core offline</b> still lets you inspect local data. Changing Wi-Fi does not remove your chosen network protection rules.</p>\n<h3>Choose a privacy connection deliberately</h3>\n<p>Open <b>Settings → Bitcoin Core Network &amp; Privacy</b>. These choices affect how information leaves the computer; they do not make an unsafe computer safe.</p>\n<table border="1" cellpadding="10"><tr><th>Choice</th><th>What it does</th></tr>\n<tr><td>Clearnet</td><td>Core connects directly to Bitcoin peers. They see your public IP address; your Internet provider may recognize Bitcoin traffic.</td></tr>\n<tr><td>Tor</td><td>Core\'s peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system\'s other traffic, including software updates, still uses its ordinary connection.</td></tr>\n<tr><td>WireGuard VPN</td><td>The computer routes traffic through the configured encrypted VPN tunnel. Its protection rules block ordinary fallback outside that tunnel, apart from reaching the VPN server and essential connection setup. The VPN provider becomes someone you must trust.</td></tr></table>\n<p>A <b>firewall</b> is a set of rules allowing or blocking network traffic. The VPN\'s <b>kill switch</b> means these rules block fallback if the tunnel stops. <b>DNS</b> is the service that translates website names into network addresses. This Node\'s managed WireGuard setup protects against unintended traffic outside its tunnel, including ordinary DNS and IPv6 traffic. Neither Tor nor a VPN guarantees anonymity.</p>\n<p>Import a supported full-tunnel WireGuard configuration from your provider or own server. It must have a numeric server address and explicit DNS settings. Configurations containing scripts or unsupported split routes are refused. Tunnel private keys are stored in protected system files. A split route sends only some traffic through the VPN; this tool is designed for the supported whole-device configuration instead.</p>\n<p>Changing the privacy profile first stops a running Core, checks and replaces the network policy, then restarts it. If it was already stopped, it stays stopped. If the change fails, Core remains stopped rather than silently using a less-private route. I2P setup and Tor bridges are not exposed in this interface.</p>\n<h3>Sending a transaction privately is a separate option</h3>\n<p><b>Private transaction broadcast</b> concerns the initial sending of a transaction, not every connection Core makes. It uses Core 32.1\'s private-broadcast route. The underlying feature can use short-lived Tor/I2P connections; this Node exposes the Tor configuration. The submitted transaction is not initially added to the local mempool by this route.</p>\n<p>Turning on Tor for this purpose also makes Tor available for ordinary peer selection. A failed private route must not silently fall back to standard sending. A returned transaction ID is a reference number, not proof that peers received the transaction or that a block confirmed it. Please check transaction status afterward.</p>\n<h3>Connect a Bluetooth keyboard or mouse</h3>\n<p>Open <b>Settings → Bluetooth Devices</b> or press <b>Ctrl+Alt+B</b>. Switch on the adapter, put the device into pairing mode, then choose <b>Search</b>, pair and connect. For a keyboard, type the displayed pairing code on that keyboard and press Enter when asked. Mark a device you own as trusted to help it reconnect.</p>\n<p>Pairing means the two devices remember each other. The installed Node saves those pairing details. After restart, wake or switch on the device. Pairing done only in the installation session must be repeated after installation. A wired or built-in keyboard and mouse are useful during setup; Ctrl+Alt+B also works in the installer. Bluetooth file transfer and network sharing are not enabled by this Node setup.</p>\n<p>If no Bluetooth adapter appears, please check any airplane-mode switch and the computer\'s firmware settings. Common adapter firmware is included, but some devices need different firmware or a compatible USB adapter.</p>\n<h3>Keyboard and Mouse</h3>\n<p>Open <b>Settings → Keyboard and Mouse</b>. On the <b>Keyboard</b> tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after <b>Apply and Save</b>; please do not type passwords there.</p>\n<p>The chosen layout applies to your current desktop and to the login screen after restart. Repeat and Num Lock preferences are applied when the desktop starts. They do not replace an older encrypted installation\'s disk-unlock keyboard configuration.</p>\n<p>On <b>Mouse and Touchpad</b>, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.</p>',
 +'Node configuration': "<h2>Node configuration</h2>\n<p>This backup is a shortcut for setting up another Node the way you like it. Open <b>Settings → Backup and Restore → Node configuration</b>. A <b>snapshot</b> here means a saved selection of your current settings, not a complete copy of the computer's disk.</p>\n<h3>What it keeps</h3>\n<p>It can keep supported saved Wi-Fi networks and their stored passwords, Ethernet profiles, the managed WireGuard VPN and privacy choice, time zone and automatic-time choice, keyboard layout, display scale, mouse speed for matching device names and supported Core preferences. New backups also keep Keyboard and Mouse repeat/Num Lock choices and supported mouse/touchpad options. Restore these newer backups on a Node with this feature; older Node versions may reject the new format. This Node still reads earlier configuration backups.</p>\n<p>A network profile is the saved information needed to connect. Display scale controls how large interface elements look. The backup does not save an old clock reading to set the computer back to that time later.</p>\n<h3>Create the copy</h3>\n<ol><li>Finish applying the settings you want to keep and connect a USB drive.</li><li>Choose <b>Backup → Choose folder…</b> and select the drive or a folder on it.</li><li>Leave <b>Encrypt backup (optional)</b> selected and enter the same passphrase twice. To deliberately save a plain .json file, clear the checkbox.</li><li>Choose <b>Save backup</b> or <b>Save encrypted backup</b>. Wait for the saved confirmation and note the filename. There is no read-back verification pass.</li></ol>\n<p><b>A plain Node backup can expose saved Wi-Fi passwords and VPN private keys.</b> Keep it private. Encryption protects the saved file, not the running computer. Please do not store the only copy of the passphrase inside the file that needs that passphrase to open.</p>\n<h3>Apply it to another Node</h3>\n<ol><li>Open the same category and choose <b>Restore</b>.</li><li>Select the .json or .gpg file. Only an encrypted file needs its backup passphrase.</li><li>Choose <b>Review backup</b>. Check the time zone, networks, privacy profile and omissions. If the backup includes a managed VPN, compare the WireGuard peer public key, endpoint and DNS addresses with your trusted configuration before approving.</li><li>Tick <b>I trust this backup and approve the settings shown above</b>, then choose <b>Restore on next restart</b>.</li><li>Restart normally. The checked settings are applied before networking starts. <b>Check pending restore</b> shows the staged request or its result; <b>Cancel pending restore</b> cancels an unapplied request before restart.</li></ol>\n<h3>What does not move</h3>\n<p>The restore keeps local wallets and network profiles found only on the target computer. It does not clone login passwords/accounts, disk encryption, disk identifiers, Bluetooth pairing keys, arbitrary scripts, external certificates or unsupported VPN plug-ins. Pair Bluetooth devices again on a different adapter. Mouse settings apply only when the device name matches, and only to capabilities that device offers.</p>\n<p>Only passwords actually stored in supported profiles can be transferred. Some workplace authentication tools store credentials elsewhere; missing passwords are not invented. Unsupported values and omissions are reported for you to review.</p>\n<p>If the old and new computers will be online together, they may need different manually assigned IP addresses and different WireGuard peers. Reusing the same address or tunnel identity can cause a conflict.</p>\n<p><b>This contains no blockchain or wallet database.</b> Use those separate backup rows. You do not normally need a separate Core configuration backup because Node configuration already includes the supported Core settings.</p>",
-+'Networking': '<h2>Networking</h2>\n<h3>Connect to Wi-Fi or a cable</h3>\n<p>Click the <b>Network Status</b> icon just to the left of Restart. Choose your Wi-Fi network, enter its password and click <b>Connect</b>. Saved networks can reconnect automatically. Ethernet is a wired connection: connect the cable and the system normally sets it up automatically.</p>\n<p><b>Advanced settings</b> is for hidden Wi-Fi names, workplace networks and manually assigned IP addresses. An IP address is the network address used to reach a computer. You usually do not need to set one manually on a home router. A connection to the router is not proof that the Internet is reachable.</p>\n<p>If you open Core without a connection, Node offers network setup first. <b>Use Core offline</b> still lets you inspect local data. Changing Wi-Fi does not remove your chosen network protection rules.</p>\n<h3>Choose a privacy connection deliberately</h3>\n<p>Open <b>Settings → Bitcoin Core Network &amp; Privacy</b>. These choices affect how information leaves the computer; they do not make an unsafe computer safe.</p>\n<table border="1" cellpadding="10"><tr><th>Choice</th><th>What it does</th></tr>\n<tr><td>Clearnet</td><td>Core connects directly to Bitcoin peers. Node runs the Tor service only when the Tor peer profile or private transaction broadcast needs it. Peers see your public IP address; your Internet provider may recognize Bitcoin traffic.</td></tr>\n<tr><td>Tor</td><td>Core\'s peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system\'s other traffic, including software updates, still uses its ordinary connection.</td></tr>\n<tr><td>WireGuard VPN</td><td>The computer routes traffic through the configured encrypted VPN tunnel. Its protection rules block ordinary fallback outside that tunnel, apart from reaching the VPN server and essential connection setup. The VPN provider becomes someone you must trust.</td></tr></table>\n<p>A <b>firewall</b> is a set of rules allowing or blocking network traffic. The VPN\'s <b>kill switch</b> means these rules block fallback if the tunnel stops. <b>DNS</b> is the service that translates website names into network addresses. This Node\'s managed WireGuard setup protects against unintended traffic outside its tunnel, including ordinary DNS and IPv6 traffic. Neither Tor nor a VPN guarantees anonymity.</p>\n<p>Import a supported full-tunnel WireGuard configuration from your provider or own server. It must have a numeric server address and explicit DNS settings. Configurations containing scripts or unsupported split routes are refused. Tunnel private keys are stored in protected system files. A split route sends only some traffic through the VPN; this tool is designed for the supported whole-device configuration instead.</p>\n<p>Changing the privacy profile first stops a running Core, checks and replaces the network policy, then restarts it. If it was already stopped, it stays stopped. If the change fails, Core remains stopped rather than silently using a less-private route. I2P setup and Tor bridges are not exposed in this interface.</p>\n<h3>Sending a transaction privately is a separate option</h3>\n<p><b>Private transaction broadcast</b> concerns the initial sending of a transaction, not every connection Core makes. It uses Core 32.1\'s private-broadcast route. The underlying feature can use short-lived Tor/I2P connections; this Node exposes the Tor configuration. The submitted transaction is not initially added to the local mempool by this route.</p>\n<p>Turning on Tor for this purpose also makes Tor available for ordinary peer selection. A failed private route must not silently fall back to standard sending. A returned transaction ID is a reference number, not proof that peers received the transaction or that a block confirmed it. Please check transaction status afterward.</p>\n<h3>Connect a Bluetooth keyboard or mouse</h3>\n<p>Open <b>Settings → Bluetooth Devices</b> or press <b>Ctrl+Alt+B</b>. Switch on the adapter, put the device into pairing mode, then choose <b>Search</b>, pair and connect. For a keyboard, type the displayed pairing code on that keyboard and press Enter when asked. Mark a device you own as trusted to help it reconnect.</p>\n<p>Pairing means the two devices remember each other. The installed Node saves those pairing details. After restart, wake or switch on the device. Pairing done only in the installation session must be repeated after installation. A wired or built-in keyboard and mouse are useful during setup; Ctrl+Alt+B also works in the installer. Bluetooth file transfer and network sharing are not enabled by this Node setup.</p>\n<p>If no Bluetooth adapter appears, please check any airplane-mode switch and the computer\'s firmware settings. Common adapter firmware is included, but some devices need different firmware or a compatible USB adapter.</p>\n<h3>Keyboard and Mouse</h3>\n<p>Open <b>Settings → Keyboard and Mouse</b>. On the <b>Keyboard</b> tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after <b>Apply and Save</b>; please do not type passwords there.</p>\n<p>The chosen layout applies to your current desktop and to the login screen after restart. Repeat and Num Lock preferences are applied when the desktop starts. They do not replace an older encrypted installation\'s disk-unlock keyboard configuration.</p>\n<p>On <b>Mouse and Touchpad</b>, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.</p>',
++'Networking': '<h2>Networking</h2>\n<h3>Connect to Wi-Fi or a cable</h3>\n<p>Click the <b>Network Status</b> icon just to the left of Restart. Choose your Wi-Fi network, enter its password and click <b>Connect</b>. Saved networks can reconnect automatically. Ethernet is a wired connection: connect the cable and the system normally sets it up automatically.</p>\n<p><b>Advanced settings</b> is for hidden Wi-Fi names, workplace networks and manually assigned IP addresses. An IP address is the network address used to reach a computer. You usually do not need to set one manually on a home router. A connection to the router is not proof that the Internet is reachable.</p>\n<p>If you open Core without a connection, Node offers network setup first. <b>Use Core offline</b> still lets you inspect local data. Changing Wi-Fi does not remove your chosen network protection rules.</p>\n<h3>Choose a privacy connection deliberately</h3>\n<p>Open <b>Settings → Bitcoin Core Network &amp; Privacy</b>. These choices affect how information leaves the computer; they do not make an unsafe computer safe.</p>\n<table border="1" cellpadding="10"><tr><th>Choice</th><th>What it does</th></tr>\n<tr><td>Clearnet</td><td>Core connects directly to Bitcoin peers. Node runs the Tor service only when the Tor peer profile or private transaction broadcast needs it. Peers see your public IP address; your Internet provider may recognize Bitcoin traffic.</td></tr>\n<tr><td>Tor</td><td>Core\'s peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system\'s other traffic, including software updates, still uses its ordinary connection.</td></tr>\n<tr><td>WireGuard VPN</td><td>The computer routes traffic through the configured encrypted VPN tunnel. Its protection rules block ordinary fallback outside that tunnel, apart from reaching the VPN server and essential connection setup. The VPN provider becomes someone you must trust.</td></tr></table>\n<p>A <b>firewall</b> is a set of rules allowing or blocking network traffic. The VPN\'s <b>kill switch</b> means these rules block fallback if the tunnel stops. <b>DNS</b> is the service that translates website names into network addresses. This Node\'s managed WireGuard setup protects against unintended traffic outside its tunnel, including ordinary DNS and IPv6 traffic. Neither Tor nor a VPN guarantees anonymity.</p>\n<p>Import a supported full-tunnel WireGuard configuration from your provider or own server. It must have a numeric server address and explicit DNS settings. Configurations containing scripts or unsupported split routes are refused. Tunnel private keys are stored in protected system files. A split route sends only some traffic through the VPN; this tool is designed for the supported whole-device configuration instead.</p>\n<p>Changing the privacy profile first stops a running Core, checks and replaces the network policy, then restarts it. If it was already stopped, it stays stopped. If the change fails, Core remains stopped rather than silently using a less-private route. I2P setup and Tor bridges are not exposed in this interface.</p>\n<h3>Sending a transaction privately is a separate option</h3>\n<p><b>Private transaction broadcast</b> concerns the initial sending of a transaction, not every connection Core makes. It uses Core 32.1\'s private-broadcast route. The underlying feature can use short-lived Tor/I2P connections; this Node exposes the Tor configuration. The submitted transaction is not initially added to the local mempool by this route.</p>\n<p>Turning on Tor for this purpose also makes Tor available for ordinary peer selection. A failed private route must not silently fall back to standard sending. A returned transaction ID is a reference number, not proof that peers received the transaction or that a block confirmed it. Please check transaction status afterward.</p>\n<h3>Connect a Bluetooth keyboard or mouse</h3>\n<p>Open <b>Settings → Bluetooth Devices</b> or press <b>Ctrl+Alt+B</b>. Switch on the adapter, put the device into pairing mode, then choose <b>Search</b>, pair and connect. For a keyboard, type the displayed pairing code on that keyboard and press Enter when asked. Mark a device you own as trusted to help it reconnect.</p>\n<p>Pairing means the two devices remember each other. The installed Node saves those pairing details. After restart, wake or switch on the device. Pairing done only in the installation session must be repeated after installation. A wired or built-in keyboard and mouse are useful during setup; Ctrl+Alt+B also works in the installer. Bluetooth file transfer and network sharing are not enabled by this Node setup.</p>\n<p>If no Bluetooth adapter appears, please check any airplane-mode switch and the computer\'s firmware settings. Common adapter firmware is included, but some devices need different firmware or a compatible USB adapter.</p>\n<h3>Keyboard and Mouse</h3>\n<p>Open <b>Settings → Keyboard and Mouse</b>. On the <b>Keyboard</b> tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after <b>Apply and Save</b>; please do not type passwords there.</p>\n<p>The chosen layout applies to your current desktop and to the login screen after restart. Num Lock follows your saved choice on the login screen and when the desktop starts. It starts on by default. Key repeat applies on the desktop. They do not replace an older encrypted installation\'s disk-unlock keyboard configuration.</p>\n<p>On <b>Mouse and Touchpad</b>, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.</p>',
  'Status & diagnostics': "<h2>Status &amp; diagnostics</h2>\n<p>Open <b>Settings → Bitcoin Core Status</b> for a live overview of this computer's Core. It reads information locally; it does not ask a public website to tell you what your node is doing.</p>\n<h3>What the cards mean</h3>\n<p><b>Version</b> identifies the Core program you are running. <b>Blocks</b> are the blocks Core has checked. <b>Headers</b> are the block summaries it knows about. <b>Peers</b> are other Bitcoin computers it is connected to. <b>Mempool</b> means the transactions your node knows about that are waiting to be included in a block. <b>Network</b> distinguishes real Bitcoin, called mainnet, from testing networks. The privacy profile tells you whether the Node uses direct connections, Tor or the configured VPN.</p>\n<p>The storage figure is space on the actual blockchain filesystem—the storage area on its disk—not necessarily every disk attached to the computer. Values refresh automatically. When Core is stopped or cannot be reached, the dashboard says so rather than displaying a made-up success.</p>\n<h3>Open details without crowding the dashboard</h3>\n<p><b>Show technical details</b> opens its own window. You can resize or minimize it while keeping the main dashboard tidy. The information is grouped by blockchain, network/software, pending transactions, peer connections and wallet scanning when available.</p>\n<p>Use <b>Find a field or value…</b> to look for a particular item. <b>Expand all</b> opens the groups; <b>Collapse all</b> closes them. <b>Refresh</b> takes a new snapshot—a copy of the current readings—so the list does not keep moving while you read. The <b>Raw JSON</b> tab shows the same information in a structured text format mainly useful for technical support.</p>\n<p><b>Copy snapshot</b> copies it to the clipboard, not to a server. Please review it before sharing: wallet names and other details can reveal private information. Closing this window does not stop Core.</p>\n<p>A connected Core can keep synchronizing even if a separate software-download server is unavailable. The Updates chapter explains how to distinguish those situations.</p>",
  'Encrypt & Decrypt Files': "<h2>Encrypt &amp; Decrypt Files</h2>\n<p><b>Encrypt</b> means protect a file with a passphrase. <b>Decrypt</b> means recover its contents with that passphrase. These tools use GnuPG, usually called GPG. They do not encrypt the whole installed operating system or turn an online Node into an offline signer.</p>\n<p>This separate general file-encryption tool retains its recovery checks. The copy-only change applies to the four categories in Backup and Restore, not to this utility or to authenticated decryption.</p>\n<h3>First make a proper wallet backup</h3>\n<p>If the file is a wallet, use <b>Bitcoin Core → File → Backup Wallet</b> to save a consistent database in Private Workspace. A database is a structured file Core works with. Copying its live file while Core is changing it can produce an unusable copy; the built-in Backup Wallet command avoids that problem.</p>\n<ol><li>Open <b>Encrypt Files</b> on Home and select the saved file.</li><li>Choose a new .gpg destination on USB or persistent storage.</li><li>Enter and repeat a passphrase. Extra independent layers are optional. Each layer is another encryption step with its own passphrase; all required passphrases must be available for recovery.</li><li>Wait for verification to finish, then keep separate copies and store their required passphrases separately. Originals are not overwritten.</li></ol>\n<p>A verified single Core SQLite wallet.dat is encrypted directly. Other files or folders may first be packed into a <b>TAR archive</b>, which keeps names and folders together but is not itself encryption. The output uses interoperable OpenPGP AES-256 CFB+MDC: AES protects the contents, and the integrity check helps detect damaged or altered encrypted data. The tool checks each layer and complete recovery before publishing the final file.</p>\n<h3>Open an encrypted file</h3>\n<ol><li>Choose <b>Decrypt Files</b> and select the .gpg file.</li><li>Enter the needed passphrases. For layered Node/Vault files, their order does not matter to the recovery tool. For a normal single-layer AES-256 GPG file made elsewhere, choose <b>Recover one ordinary GPG layer only</b>.</li><li>Wait for decryption and its integrity check. The recovered contents are placed in a new folder inside Private Workspace, not directly on the source USB.</li></ol>\n<p><b>Files opens Private Workspace automatically</b> after successful decryption, showing the recovery folder without another success confirmation. Wrong passphrases, failed checks and cancellation do not open the folder as if recovery succeeded. Recovered files remain in RAM until you deliberately save or restore them elsewhere. No partial recovered plaintext is published after a failed or cancelled operation.</p>\n<p>To restore a public wallet file, use <b>Bitcoin Core → File → Restore Wallet</b> and select the recovered database. Core creates a <b>persistent</b> wallet on its installed disk; the active restored wallet is no longer just a RAM file. Check addresses and labels, wait for validation/scanning and resolve pruned-history warnings. In the Node/Vault setup, keep signing-wallet recovery on offline Vault, not this online computer. Practise recovery periodically, including on another trusted machine.</p>\n<h3>Use the USB sidebar</h3>\n<p>The input selectors and encrypted-file destination selector show <b>Places</b> and <b>USB / External media</b>. Click a listed drive to open or mount it. <b>Refresh USB</b> checks again without formatting anything. A read-only drive can be an input, not an output. Open and unlock encrypted media in Files first, then refresh.</p>\n<p>Files shows <b>Core</b>, <b>Private Workspace</b> and <b>PSBT Transfer Folder</b> in its widened sidebar. Core's data view is read-only; use Core's own commands to change wallets. Saving encrypted output to USB is different from decryption: decrypted output always goes to RAM first. Use Files to copy a recovered file elsewhere only deliberately.</p>",
 -'Persistent storage': '<h2>Persistent storage</h2>\n<p><b>Persistent</b> means “still there after restarting.” The installed Node keeps its blockchain, chainstate, wallets and ordinary settings on disk. Its two temporary working folders are different:</p>\n<table border="1" cellpadding="10"><tr><th>Place</th><th>After shutdown or restart</th></tr><tr><td>Core data and ordinary files saved on disk</td><td>Kept on disk.</td></tr><tr><td>Private Workspace</td><td>Cleared: recovered files and temporary work live in RAM.</td></tr><tr><td>PSBT Transfer Folder</td><td>Cleared: public wallet/PSBT transfer files live in RAM.</td></tr><tr><td>A file copied to USB</td><td>Kept on that USB, if saving finished successfully.</td></tr></table>\n<h3>Three Places in Files</h3>\n<p>Files opens <b>Core</b>, a read-only view containing wallet folders, blocks, chainstate and logs. The left-hand Places list is Core, Private Workspace, PSBT Transfer Folder; connected drives appear under Devices. The default width is wide enough for names, and a wider manual choice is preserved.</p>\n<p>Private Workspace and PSBT Transfer Folder are separate shared RAM locations available to the desktop and Core. Closing a window does not clear them; restarting or losing power does. Ordinary suspend leaves RAM powered and is not a way to clear the workspace. The old disk-based Public Wallet Transfer folder is not automatically erased; any old files left there remain persistent.</p>\n<p>Before encryption/decryption, Node verifies that the private workspace really is on its dedicated RAM filesystem. If that check fails, it stops rather than silently writing plaintext to disk. Node disables swap and hibernation; swap is disk space an operating system might otherwise use to hold memory pages. The workspace is limited by available memory, so please keep temporary files small while Core is busy.</p>\n<p>Copying outside RAM makes that new copy persistent. Restoring a wallet into Core also makes a persistent copy. Encrypting a backup does not erase or protect its original file or the active wallet database.</p>\n<h3>USB access and safe removal</h3>\n<p>Node\'s backup and file tools, Core, KeePassXC, Editor and Files show removable media in their file sidebars. Node\'s own choosers refresh live and provide <b>Refresh USB</b>. If a USB is connected while Core\'s or KeePassXC\'s chooser is already open, reopen the chooser or select <b>USB Media</b>.</p>\n<p>Core can read and write through its checked USB view—for example a wallet backup or PSBT—without receiving write access to the rest of the operating system. Existing USB files keep their permissions; new Core exports belong to the desktop account on filesystems that support owners. A protected/read-only drive remains read-only. Unlock an encrypted drive in Files before using it in another program.</p>\n<p>For removal, finish saving and close files on that drive. Core\'s USB view can keep it busy while Core is open, so please <b>stop Core normally, then use Files → Eject/Unmount</b>. Eject asks the system to finish writes and release the drive. If another application still has a file open, close it and retry. Do not pull out the drive while copying. Reconnecting creates a fresh checked view, not a stale path to the old device.</p>\n<h3>End a session</h3>\n<p>If both RAM folders are empty, Restart and Shut Down show the ordinary confirmation. If either contains anything, including a hidden file or empty folder, two warnings are followed by a five-minute countdown. Cancel, Esc or closing that window keeps the session open. <b>Restart now</b> or <b>Shut down now</b> skips the remaining wait. Core stops carefully only when the countdown finishes or the immediate action is chosen.</p>\n<p>Please finish or cancel an open encryption job first and copy any RAM files you need. Shutdown warnings do not verify your backups. A sudden power loss also loses RAM contents. RAM-only storage limits leftovers on disk; it does not protect files from an already compromised running system or promise instant physical memory sanitization.</p>\n<h3>KeePassXC and time settings</h3>\n<p>KeePassXC opens its passphrase generator with six random EFF-list words as a starting choice. Choose a suitable length and generate each secret independently. You do not need a password database to use the generator. Its temporary profile/cache are in RAM; changes survive reopening during this session but reset after boot. Automatic clipboard clearing starts off. Enable it in <b>Tools → Settings → Security</b> if preferred. Save a password database you need to keep on USB or persistent storage, not only in RAM.</p>\n<p>Click the clock or use <b>Settings → Date &amp; Time</b>. Choose your time zone, such as Europe/Zagreb, and automatic network time. Turn automatic time off to enter a date/time manually. <b>Apply and Save</b> preserves the settings after restart. Automatic time may wait for a reachable time server. In Tor peer mode, time synchronization uses ordinary operating-system networking; in WireGuard mode it follows the VPN policy. Manual time works offline.</p>',
@@ -1892,6 +1904,21 @@ index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..4ee3f0786e0c3871a3fe1b2a4c75c36f
 +'Updates': "<h2>Updates</h2>\n<p>Open <b>Settings → Software Updates</b> to check what is available before installing anything. Updates for Debian and applications are separate from changing Bitcoin Core's version. Checking does not automatically replace your software.</p>\n<h3>Debian and KeePassXC</h3>\n<p>Choose the system update check and read the proposed package versions. A <b>package</b> is an application or system component prepared for installation. Debian packages come through Debian's signed archive; the separately supplied KeePassXC package has its release signature verified. A signature is a cryptographic check against a trusted publisher's key, not just a matching filename.</p>\n<p>Installation needs your explicit confirmation but not another login-password prompt in the active Node desktop. The progress display shows actual package steps. If the separate KeePassXC check fails, the updater reports it and you can still apply available Debian updates. The customized Calamares installer, LightDM greeter and Thunar file manager are held at project-built versions. A newer Debian version requires a refreshed project build for those packages. These updates do not deliberately stop/restart Core, although a package may restart another system service. A message indicates when restarting the computer is required or may be needed, for example after a new kernel—the core of the operating system.</p>\n<p>Updates use operating-system networking: ordinary direct Internet access when the Bitcoin peer profile is Tor, or the enforced VPN in WireGuard mode. The selected privacy policy is retained.</p>\n<h3>Change Bitcoin Core only after review</h3>\n<p>The update page shows the active verified Core version and can check the official stable-release record. Choose a supported Core 32 release and <b>Download and verify Core release</b>. Please read the version, file hashes and signing-key fingerprints before approving installation. A fingerprint identifies the full signing key.</p>\n<p>The archive must match official signed checksums with at least two distinct currently valid signers from the bundled trusted key set. Expired signers do not count. Downgrades and a new major version are refused; moving to a new major Core version needs a reviewed Node system update.</p>\n<p>Activation stops Core cleanly, makes a protected local snapshot of wallet databases/settings and installs the verified program in a separate directory. Old binaries remain available. A stopped Core stays stopped; open it when ready. Startup checks the selected Core program hash. A failed health check leaves Core stopped. Database formats can change, so the system does not automatically roll wallet data backward. Keep an independent backup on another device: the local maintenance snapshot is not that backup.</p>\n<h3>Why an update check can fail while Core still syncs</h3>\n<p>Different services use different servers. KeePassXC release lookup first contacts the project's official GitHub API, a machine-readable release listing. If that is unavailable or rate-limited, Node can use the official KeePassXC download page instead. It shows which source it used. Secure connection checks and package signature verification remain enabled.</p>\n<p><b>HTTP 503</b> means a server or gateway reported temporary unavailability. It is not automatically a Wi-Fi or clock error. DNS errors concern finding the server address; timeouts mean no answer arrived in time; TLS/certificate errors concern the secure connection; local write errors concern saving files on this computer. Changing your time zone only changes the displayed time. A wrong actual date/time can affect secure certificates, but do not reset a correct clock merely because a server returns 503.</p>\n<p>If both official sources fail, the check stays incomplete. Debian results already found remain visible, but installation is disabled until a fresh complete check succeeds. Old metadata does not trigger a downgrade or a false “up to date” result.</p>\n<p>Use normal restart/shutdown and keep free space. If Core reports database corruption, stop and preserve the data before investigating. There is no automatic wallet deletion, repair or fallback to a less-private network.</p>",
  'Troubleshooting': '<h2>Troubleshooting</h2>\n<p>Start with the message shown by the application. Please do not delete files, reset the clock or change privacy settings merely to make a warning disappear.</p>\n<table border="1" cellpadding="10"><tr><th>What you see</th><th>What to do</th></tr>\n<tr><td>Core is stopped after boot</td><td>This can be normal: open Bitcoin Core to start it. If it fails, check that its selected data disk is connected, then use Bitcoin Core Status for the actual error.</td></tr>\n<tr><td>Sync percentage stays low while headers increase</td><td>Headers are the small summaries checked early in download. Watch the header count and peer connections; the meter does not promise a finish time.</td></tr>\n<tr><td>A wallet balance is zero or provisional</td><td>Let blockchain checking and wallet scanning finish. If old blocks were pruned, recover the required history. Do not pretend an old wallet was created later to bypass the warning.</td></tr>\n<tr><td>A PSBT will not open</td><td>Check that you selected the intended file in Core. Independently review recipients, amount, fee and change before signing or broadcasting.</td></tr>\n<tr><td>Private broadcast is not visible</td><td>Check Tor and transaction status. A transaction ID does not prove successful relay. Do not silently switch to a standard route.</td></tr>\n<tr><td>A backup filename already exists</td><td>Choose a new name. Existing exports are deliberately preserved.</td></tr>\n<tr><td>Save seems inactive</td><td>Select an output folder. If encryption is on, enter and repeat the passphrase. Read the visible feedback below the controls.</td></tr>\n<tr><td>Backup no longer shows a verification stage</td><td>This is intentional for all four backup exports. Wait for writes to finish, keep multiple copies and test recovery separately. Restore still validates its input.</td></tr>\n<tr><td>Core stays stopped after blockchain backup</td><td>This is intentional. Open Core manually after the operation finishes.</td></tr>\n<tr><td>Watch-only backup is blocked during chain copying</td><td>Wallet transfer needs running Core. Finish the chain job, start Core, then retry.</td></tr>\n<tr><td>A PSBT or recovered file is gone after restart</td><td>Both working folders are RAM-only. Recover your separate USB copy; restarting does not preserve those files.</td></tr>\n<tr><td>USB is not listed or cannot be written</td><td>Reconnect it, use Refresh USB and check Files. Unlock encrypted media there first. Reopen an already-open Core/KeePassXC chooser. A read-only drive cannot receive a backup.</td></tr>\n<tr><td>USB cannot be ejected</td><td>Finish writes, close files using it and stop Core normally, then choose Eject/Unmount in Files again.</td></tr>\n<tr><td>A settings restore is staged, not applied</td><td>Restart normally, or use Check pending restore to inspect the saved request and result.</td></tr>\n<tr><td>KeePassXC reports HTTP 503</td><td>The release server/gateway is unavailable. The official download-page fallback may work. This code alone is no reason to change a correct clock.</td></tr>\n<tr><td>Keyboard or mouse feels wrong</td><td>Open Keyboard and Mouse. Check the layout and variant in the typing test; select the correct mouse and use Refresh Devices after reconnect. Greyed options are unsupported by that device.</td></tr></table>\n<p>Technical diagnostics are available in the separate details window and in Terminal. Terminal accepts advanced system and Core commands; do not paste commands you do not understand. Please inspect logs/screenshots before sharing them: public wallet data and device/network details may still be private.</p>\n<p><b>Powered by Debian GNU/Linux · Official Bitcoin Core · No signing keys required on Node.</b></p>',
  }
+diff --git a/app/input_ui.py b/app/input_ui.py
+index a1a003f6e26b8cd1f415de5a74cb69b5d75708b5..42f3ddbdfa11d8c1cda52ba4fc7f8a33aeba859f 100644
+--- a/app/input_ui.py
++++ b/app/input_ui.py
+@@ -60,8 +60,8 @@ class KeyboardMouseDialog(QDialog):
+         repeat_form.addRow('Wait before repeating',self.delay);repeat_form.addRow('Repeat speed',self.rate);layout.addLayout(repeat_form)
+         self.repeat.toggled.connect(lambda value:(self.delay.setEnabled(value),self.rate.setEnabled(value)))
+         self.delay.setEnabled(self.repeat.isChecked());self.rate.setEnabled(self.repeat.isChecked())
+-        self.numlock=QCheckBox('Turn Num Lock on when the desktop starts');self.numlock.setChecked(self.data['keyboard']['numlock']);layout.addWidget(self.numlock)
+-        self.explanation(layout,'Num Lock makes a number pad type digits. You can still turn it on or off with the key during a session. The login layout is saved, but repeat and Num Lock preferences belong to the desktop. An older encrypted installation may still use its original disk-unlock keyboard layout.')
++        self.numlock=QCheckBox('Turn Num Lock on at login and desktop startup');self.numlock.setChecked(self.data['keyboard']['numlock']);layout.addWidget(self.numlock)
++        self.explanation(layout,'Num Lock makes a number pad type digits. You can still turn it on or off with the key during a session. Your keyboard layout and Num Lock choice apply at the login screen and on the desktop. Num Lock starts on by default. Key repeat applies on the desktop. An older encrypted installation may still use its original disk-unlock keyboard layout.')
+         self.test=QPlainTextEdit();self.test.setPlaceholderText('After applying, type here to test letters, symbols and repeated keys. Do not enter passwords.');self.test.setAccessibleName('Test keyboard typing');self.test.setMaximumHeight(82);layout.addWidget(self.test)
+         layout.addStretch(1)
+ 
 diff --git a/app/keepass_launcher.py b/app/keepass_launcher.py
 index d633a6ec499034e2e1e260dfe117449ff3a94c23..3138918e8358d4aef18fbaa336a147e2ece3519c 100644
 --- a/app/keepass_launcher.py
@@ -2368,7 +2395,7 @@ index 0d984217921c01d68eb54eeb112e8beb3396599e..40c92564f70bfb8b9d79762e685d2a55
  def read_encrypted(filename,secret,caller,events):
      import encrypted_transfer as transfer
 diff --git a/app/settings_snapshot_ui.py b/app/settings_snapshot_ui.py
-index e8b867a48d2414a2cd24c5a1c680b62c4f8f3501..178961f6c2d53abf013e8dc3598fffc4ed407881 100644
+index e8b867a48d2414a2cd24c5a1c680b62c4f8f3501..4f1ed738cd84db251ab20a1622a3d86bd461572b 100644
 --- a/app/settings_snapshot_ui.py
 +++ b/app/settings_snapshot_ui.py
 @@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QDialog,QVBoxLayout,QHBoxLayout,QLabel,QPushButto
@@ -2397,7 +2424,7 @@ index e8b867a48d2414a2cd24c5a1c680b62c4f8f3501..178961f6c2d53abf013e8dc3598fffc4
  
      def encryption_changed(self,*_):
          self.invalidate();self.update_encryption_controls();self.ready()
-@@ -164,6 +165,10 @@ class SettingsSnapshotDialog(QDialog):
+@@ -164,14 +165,23 @@ class SettingsSnapshotDialog(QDialog):
                 f"Saved Wi-Fi: {value['wifi']} · Ethernet: {value['ethernet']}",
                 f"Node privacy: {value['privacy']} · WireGuard saved: {'yes' if value['wireguard'] else 'no'}",f"Keyboard: {value['keyboard']}",
                 '', 'Not included:',*value['not_included']]
@@ -2408,7 +2435,9 @@ index e8b867a48d2414a2cd24c5a1c680b62c4f8f3501..178961f6c2d53abf013e8dc3598fffc4
          prefs=value.get('desktop_input')
          if prefs:
              k=prefs['keyboard']
-@@ -172,6 +177,11 @@ class SettingsSnapshotDialog(QDialog):
+             lines[5:5]=[f"Keyboard repeat: {'on' if k['repeat'] else 'off'} · {k['delay_ms']} ms delay · {k['rate_hz']} keys/second",
+-                        f"Num Lock at desktop startup: {'on' if k['numlock'] else 'off'}",
++                        f"Num Lock at login and desktop startup: {'on' if k['numlock'] else 'off'}",
                          'Mouse/touchpad profiles: '+(', '.join(prefs['devices']) or 'none')]
          self.details.setPlainText('\n'.join(lines))
  
@@ -2861,7 +2890,7 @@ index 0000000000000000000000000000000000000000..62fd8e4ce224b59b48592c1a5672a4f0
 +    dialog.show()
 +    return app.exec()
 diff --git a/app/ui.py b/app/ui.py
-index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d4dde33f7 100644
+index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2b880f3357cddfe6990ff23b02b5c77b82a7d609 100644
 --- a/app/ui.py
 +++ b/app/ui.py
 @@ -15,7 +15,7 @@ from wallet_presence import watch_only_wallets_present
@@ -2873,25 +2902,25 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
  
  STYLE='''
  QWidget { background:#0b0b0b; color:#f2f2f2; font-size:14px; }
-@@ -190,7 +190,7 @@ class Home(DesktopSurface):
+@@ -190,6 +190,7 @@ class Home(DesktopSurface):
      def __init__(self):
          self.rpc=CoreRPC();self.job=None;self.crypto_process=None;self.power_flow_open=False
          actions=[('Bitcoin Core','Open Bitcoin Core',(),QStyle.SP_ComputerIcon,self.open_core),
--                 ('Watch-Only Wallets','Balances, addresses & history',(),QStyle.SP_ComputerIcon,lambda:self.wallet_action('WalletDialog')),
 +                 ('Wallets','Wallet types, details & deletion',(),QStyle.SP_ComputerIcon,lambda:self.wallet_action('WalletManagerDialog')),
+                  ('Watch-Only Wallets','Balances, addresses & history',(),QStyle.SP_ComputerIcon,lambda:self.wallet_action('WalletDialog')),
                   ('PSBT Transfer Folder','Temporary PSBT exchange in RAM',('folder-publicshare','folder'),QStyle.SP_DirIcon,self.psbt_workspace),
                   ('Private Workspace','Temporary files in RAM',('folder-locked','folder'),QStyle.SP_DirIcon,self.private_workspace),
-                  ('Backup and Restore','Blockchain, wallets & settings',(str(branding_file('icons/settings-chain-backup.png')),),QStyle.SP_DialogSaveButton,self.backup_restore),
-@@ -204,7 +204,7 @@ class Home(DesktopSurface):
+@@ -204,7 +205,8 @@ class Home(DesktopSurface):
                   ('Node Guide','Node workflows & help',('help-browser','help-contents'),QStyle.SP_MessageBoxInformation,self.guide)]
          card_help={
              'Bitcoin Core': 'Start Bitcoin Core to download and independently validate the blockchain, or return to its window if it is already running.',
 -            'Watch-Only Wallets': 'Manage your imported public wallets: view receiving addresses, balances and transaction history.',
 +            'Wallets': 'Identify local wallets, view watch-only balances and addresses, or securely delete selected wallets.',
++            'Watch-Only Wallets': 'View receiving addresses, balances and transaction history for public wallets open in Bitcoin Core.',
              'PSBT Transfer Folder': 'Exchange PSBTs with Bitcoin Core and an offline signer. Files stay in RAM and are lost on restart or shutdown; save needed copies to USB.',
              'Private Workspace': 'Open temporary files held in RAM. Everything in this folder is lost when you restart or shut down.',
              'Backup and Restore': 'Back up or restore blockchain data, watch-only wallets and configuration. This shortcut appears after Node use; it is not a backup-status indicator.',
-@@ -225,7 +225,7 @@ class Home(DesktopSurface):
+@@ -225,7 +227,7 @@ class Home(DesktopSurface):
          self.setStyleSheet(STYLE+DESKTOP_STYLE)
          self.all_home_cards = tuple(self.cards)
          self.wallet_manager_card = next(c for c in self.cards
@@ -2900,7 +2929,16 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
          self.wallet_manager_card.setParent(self.grid_wrap)
          self.psbt_card=next(c for c in self.cards if c.tool['title']=='PSBT Transfer Folder')
          self.psbt_card.setParent(self.grid_wrap)
-@@ -252,6 +252,9 @@ class Home(DesktopSurface):
+@@ -241,7 +243,7 @@ class Home(DesktopSurface):
+         self.wallet_inventory_pending = False
+         self.wallet_inventory_timer = QTimer(self)
+         self.wallet_inventory_timer.setInterval(5000)
+-        self.wallet_inventory_timer.timeout.connect(self.poll_wallets)
++        self.wallet_inventory_timer.timeout.connect(self.poll_wallets_if_idle)
+         self.wallet_inventory_timer.start()
+         QTimer.singleShot(0, lambda: self.poll_wallets()
+                           if self.wallet_inventory_timer.isActive() else None)
+@@ -252,6 +254,9 @@ class Home(DesktopSurface):
          self.activity_text.setTextFormat(Qt.PlainText)
          self.activity_text.setAccessibleName('Bitcoin Core status')
          self.activity_text.setStyleSheet('font-style:italic;')
@@ -2910,7 +2948,7 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
          self.activity_seen=False
          self.activity_row=QWidget();self.activity_row.setStyleSheet('background:transparent;')
          # A fresh desktop stays quiet until Core starts or reports a fault.
-@@ -264,6 +267,12 @@ class Home(DesktopSurface):
+@@ -264,6 +269,12 @@ class Home(DesktopSurface):
          activity_layout.setContentsMargins(12,0,12,0);activity_layout.setSpacing(3)
          # Keep labels above their meters. No spinning indicator or fake motion.
          activity_layout.addWidget(self.activity_text)
@@ -2923,7 +2961,7 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
          activity_layout.addWidget(self.activity,alignment=Qt.AlignHCenter)
          self.activity.setVisible(False)
          self.blockchain_storage=StorageBar(self)
-@@ -289,6 +298,7 @@ class Home(DesktopSurface):
+@@ -289,6 +300,7 @@ class Home(DesktopSurface):
          from time_ui import ClockButton
          self.clock=ClockButton(self)
          self.activity_job=None
@@ -2931,7 +2969,7 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
          self.timer=QTimer(self);self.timer.setInterval(5000)
          self.timer.timeout.connect(self.poll_activity);self.timer.start()
          QTimer.singleShot(0,lambda:self.poll_activity() if self.timer.isActive() else None)
-@@ -347,8 +357,7 @@ class Home(DesktopSurface):
+@@ -347,8 +359,7 @@ class Home(DesktopSurface):
  
      def layout_cards(self):
          self.layout_footer()
@@ -2941,7 +2979,7 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
          if hasattr(self,'activity') and hasattr(self,'blockchain_storage'):
              screen_width=self._test_size[0] if self._test_size else self.screen_ref.geometry().width()
              width=min(620,max(300,screen_width-180))
-@@ -379,8 +388,7 @@ class Home(DesktopSurface):
+@@ -379,8 +390,7 @@ class Home(DesktopSurface):
  
      def reflow_optional_cards(self):
          self.hide_card_help()
@@ -2951,7 +2989,7 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
                      self.backup_card: bool(self.backup_available)}
          for card, visible in optional.items():
              self.grid.removeWidget(card); card.setVisible(visible)
-@@ -406,7 +414,7 @@ class Home(DesktopSurface):
+@@ -406,7 +416,7 @@ class Home(DesktopSurface):
  
      def home_activity(self):
          # Existing worker, not UI-thread NM polling or another privileged daemon.
@@ -2960,7 +2998,19 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
          visible = self.backup_presence.check()
          return value, visible
  
-@@ -467,22 +475,30 @@ class Home(DesktopSurface):
+@@ -416,6 +426,11 @@ class Home(DesktopSurface):
+         self.show_activity(activity)
+         self.set_backup_available(visible)
+ 
++    def poll_wallets_if_idle(self):
++        # A slow RPC poll during initial sync must still deliver its result.
++        if self.wallet_inventory_job is None:
++            self.poll_wallets()
++
+     def poll_wallets(self):
+         if self.wallet_inventory_job is not None:
+             self.wallet_inventory_pending = True
+@@ -467,22 +482,30 @@ class Home(DesktopSurface):
          if self.activity_job is job:
              self.activity_job = None
          job.deleteLater()
@@ -2996,7 +3046,7 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..2d2b12c471d3d2664d08a04c8292bf7d
          self.activity_row.layout().invalidate()
          self.schedule_layout()
          self.queue_activity_position()
-@@ -668,7 +684,33 @@ class Home(DesktopSurface):
+@@ -668,7 +691,33 @@ class Home(DesktopSurface):
      def refresh(self, *, from_settings=False):
          from core_status_ui import CoreStatusDialog
          from modeless import open_window
@@ -3385,35 +3435,41 @@ index c9bf6640cf96c7f3586e2d9f9e7c2f374efaa76b..d5f81cc27ae559f4918193836ec2a27d
          if missing and name is not None:
              try:
 diff --git a/app/wallet_ui.py b/app/wallet_ui.py
-index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..2c163e5da1a2623286d201cd7a6d38fea8a34cb7 100644
+index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..359b8061bf0c8afd440bfde28ad4c35a81b15baf 100644
 --- a/app/wallet_ui.py
 +++ b/app/wallet_ui.py
-@@ -6,7 +6,7 @@ from pathlib import Path
+@@ -5,12 +5,13 @@ import json
+ from pathlib import Path
  from decimal import Decimal
  
- from PySide6.QtCore import Qt, QTimer
+-from PySide6.QtCore import Qt, QTimer
 -from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
++from PySide6.QtCore import Qt, QTimer, QEvent, QSignalBlocker
 +from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QFileDialog,
      QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox,
      QPlainTextEdit, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
      QAbstractItemView, QHeaderView, QScrollArea, QWidget, QLayout)
-@@ -65,7 +65,7 @@ class WorkDialog(QDialog):
+ 
++from rpc import CoreError
+ from wallets import WalletService, WalletError, amount
+ 
+ 
+@@ -65,61 +66,217 @@ class WorkDialog(QDialog):
          # Inventory is refreshed in a worker after the dialog is displayed.
          self.layout.addWidget(box); return box
  
 -    def load_wallet_names(self, box, done=None):
-+    def load_wallet_names(self, box, done=None, preferred=None):
-         def collect():
-             names = []
-             for name in self.service.rpc('listwallets'):
-@@ -74,15 +74,17 @@ class WorkDialog(QDialog):
-             return names
-         def loaded(names):
-             box.clear(); box.addItems(names)
-+            if preferred in names: box.setCurrentText(preferred)
-             self.status.setText('Please open Bitcoin Core and choose File → Restore Wallet to add your Vault watch-only export.' if not names else 'Watch-only wallets cannot sign transactions.')
-             if done: done()
-         self.run(collect, loaded)
+-        def collect():
+-            names = []
+-            for name in self.service.rpc('listwallets'):
+-                try: self.service.watch(name); names.append(name)
+-                except WalletError: pass
+-            return names
+-        def loaded(names):
+-            box.clear(); box.addItems(names)
+-            self.status.setText('Please open Bitcoin Core and choose File → Restore Wallet to add your Vault watch-only export.' if not names else 'Watch-only wallets cannot sign transactions.')
+-            if done: done()
+-        self.run(collect, loaded)
  
  
  class WalletDialog(WorkDialog):
@@ -3423,51 +3479,145 @@ index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..2c163e5da1a2623286d201cd7a6d38fe
          self.wallet = self.wallet_selector()
 +        self.actions.append(self.wallet)
          row = QHBoxLayout(); self.layout.addLayout(row)
-         self.button('Refresh wallet', self.refresh, row)
+-        self.button('Refresh wallet', self.refresh, row)
++        self.button('Refresh wallets', self.refresh, row)
          self.details = self.text('Wallet balances, transactions and outputs')
-@@ -94,19 +96,28 @@ class WalletDialog(WorkDialog):
-         self.button('New receiving address', self.receive, receive)
+         receive = QHBoxLayout(); self.layout.addLayout(receive)
+         self.label = QLineEdit(); self.label.setPlaceholderText('Receiving address label'); self.label.setAccessibleName('Receiving address label'); receive.addWidget(self.label)
+         self.kind = QComboBox()
+         for kind in ('bech32', 'bech32m', 'p2sh-segwit', 'legacy'): self.kind.addItem(kind)
+         receive.addWidget(self.kind)
+-        self.button('New receiving address', self.receive, receive)
++        self.receive_button = self.button('New receiving address', self.receive, receive)
          self.address = QLineEdit(); self.address.setReadOnly(True); self.address.setAccessibleName('New receiving address'); self.layout.addWidget(self.address)
          self.button('Close', self.reject)
 -        self.wallet.currentTextChanged.connect(lambda _: self.refresh())
-+        self.wallet.currentTextChanged.connect(self.wallet_changed)
-         def initial_wallets():
+-        def initial_wallets():
 -            self.load_wallet_names(self.wallet)
-+            self.load_wallet_names(self.wallet, preferred=preferred)
-             self.job.finished.connect(lambda: QTimer.singleShot(0, self.refresh))
-         QTimer.singleShot(0, initial_wallets)
- 
-+    def wallet_changed(self, name):
+-            self.job.finished.connect(lambda: QTimer.singleShot(0, self.refresh))
+-        QTimer.singleShot(0, initial_wallets)
++        self.preferred = preferred
++        self.refresh_pending = False
++        self.refresh_timer = QTimer(self)
++        self.refresh_timer.setSingleShot(True)
++        self.refresh_timer.timeout.connect(self.refresh)
++        self.wallet.currentIndexChanged.connect(self.wallet_changed)
++        self.receive_button.setEnabled(False)
++        self.refresh_timer.start(0)
++
++    def changeEvent(self, event):
++        super().changeEvent(event)
++        if (event.type() == QEvent.ActivationChange and self.isActiveWindow()
++                and hasattr(self, 'refresh_timer')):
++            self.refresh_timer.start(0)
++
++    def selected_name(self):
++        return self.wallet.currentText() if self.wallet.currentIndex() >= 0 else None
++
++    def clear_wallet_fields(self):
 +        self.address.clear()
 +        self.details.clear()
 +        self.label.clear()
-+        if name:
-+            self.refresh()
 +
++    def wallet_changed(self, _index):
++        self.clear_wallet_fields()
++        self.refresh()
+ 
      def refresh(self):
-         name = self.wallet.currentText()
-         if not name: return
-         def done(data):
-+            if self.wallet.currentText() != name:
-+                return
-             self.status.setText('Balance is provisional: synchronization or the wallet rescan is incomplete.' if data['incomplete'] else 'Watch-only wallet • blockchain and wallet scan are current.')
-             balance = data['balances'].get('mine', data['balances'].get('watchonly', {}))
+-        name = self.wallet.currentText()
+-        if not name: return
+-        def done(data):
+-            self.status.setText('Balance is provisional: synchronization or the wallet rescan is incomplete.' if data['incomplete'] else 'Watch-only wallet • blockchain and wallet scan are current.')
+-            balance = data['balances'].get('mine', data['balances'].get('watchonly', {}))
 -            lines = ['Wallet: '+name, 'Private keys: disabled',
-+            lines = ['Wallet: '+name, 'Public descriptor ID: '+data['descriptor_id'], 'Private keys: disabled',
-                      'Confirmed: '+amount(balance.get('trusted', 0))+' BTC',
-                      'Unconfirmed: '+amount(balance.get('untrusted_pending', 0))+' BTC',
-                      'Immature: '+amount(balance.get('immature', 0))+' BTC',
-@@ -122,4 +133,103 @@ class WalletDialog(WorkDialog):
+-                     'Confirmed: '+amount(balance.get('trusted', 0))+' BTC',
+-                     'Unconfirmed: '+amount(balance.get('untrusted_pending', 0))+' BTC',
+-                     'Immature: '+amount(balance.get('immature', 0))+' BTC',
+-                     'Rescan: '+str(data['info'].get('scanning')), '', 'UNSPENT OUTPUTS']
+-            for coin in data['utxos']:
+-                lines += [amount(coin['amount'])+' BTC • '+str(coin['confirmations'])+' confirmations', coin['txid']+':'+str(coin['vout'])]
+-            lines += ['', 'RECENT TRANSACTIONS']
+-            for tx in data['transactions']:
+-                lines += [tx.get('category', '')+'  '+str(tx.get('amount', ''))+' BTC • '+str(tx.get('confirmations', 0))+' confirmations',
+-                          tx.get('label', '')+'  '+tx.get('address', ''), tx['txid'], '']
+-            self.details.setPlainText('\n'.join(lines))
+-        self.run(lambda: self.service.snapshot(name), done)
++        if self.job and self.job.isRunning():
++            self.refresh_pending = True
++            return
++        preferred = self.selected_name()
++        if preferred is None:
++            preferred = self.preferred
++        self.refresh_pending = False
++        self.run(lambda: self.read_wallets(preferred), self.show_wallets, 'Checking open wallets…')
++        self.job.failure.connect(self.wallets_unavailable)
++
++    def read_wallets(self, preferred):
++        names = []
++        for name in self.service.rpc('listwallets'):
++            try:
++                self.service.watch(name)
++            except WalletError:
++                continue
++            except CoreError as exc:
++                if exc.code == -18:  # Closed between listwallets and getwalletinfo.
++                    continue
++                raise
++            names.append(name)
++        selected = preferred if preferred in names else next(iter(names), None)
++        data = self.service.snapshot(selected) if selected is not None else None
++        return names, selected, data
++
++    def wallets_unavailable(self, _message):
++        with QSignalBlocker(self.wallet):
++            self.wallet.clear()
++        self.clear_wallet_fields()
++
++    def show_wallets(self, result):
++        if self.refresh_pending:
++            return
++        names, name, data = result
++        if self.selected_name() != name:
++            self.clear_wallet_fields()
++        with QSignalBlocker(self.wallet):
++            self.wallet.clear()
++            self.wallet.addItems(names)
++            if name is not None:
++                self.wallet.setCurrentText(name)
++        self.preferred = None
++        if data is None:
++            self.status.setText('No watch-only wallet is open. In Bitcoin Core, choose File → Open Wallet to reopen one or File → Restore Wallet to import a public export.')
++            return
++        self.status.setText('Balance is provisional: synchronization or the wallet rescan is incomplete.' if data['incomplete'] else 'Watch-only wallet • blockchain and wallet scan are current.')
++        balance = data['balances'].get('mine', data['balances'].get('watchonly', {}))
++        lines = ['Wallet: '+name, 'Public descriptor ID: '+data['descriptor_id'], 'Private keys: disabled',
++                 'Confirmed: '+amount(balance.get('trusted', 0))+' BTC',
++                 'Unconfirmed: '+amount(balance.get('untrusted_pending', 0))+' BTC',
++                 'Immature: '+amount(balance.get('immature', 0))+' BTC',
++                 'Rescan: '+str(data['info'].get('scanning')), '', 'UNSPENT OUTPUTS']
++        for coin in data['utxos']:
++            lines += [amount(coin['amount'])+' BTC • '+str(coin['confirmations'])+' confirmations', coin['txid']+':'+str(coin['vout'])]
++        lines += ['', 'RECENT TRANSACTIONS']
++        for tx in data['transactions']:
++            lines += [tx.get('category', '')+'  '+str(tx.get('amount', ''))+' BTC • '+str(tx.get('confirmations', 0))+' confirmations',
++                      tx.get('label', '')+'  '+tx.get('address', ''), tx['txid'], '']
++        self.details.setPlainText('\n'.join(lines))
++
++    def refresh_actions(self):
++        self.receive_button.setEnabled(self.selected_name() is not None)
++        if self.refresh_pending and self.isVisible():
++            self.refresh_timer.start(0)
  
      def receive(self):
-         name, label, kind = self.wallet.currentText(), self.label.text(), self.kind.currentText()
+-        name, label, kind = self.wallet.currentText(), self.label.text(), self.kind.currentText()
 -        if name: self.run(lambda: self.service.receive(name, label, kind), lambda value: (self.address.setText(value), self.status.setText('Address created. For high-value receipts, independently verify it against offline Vault.')))
++        name, label, kind = self.selected_name(), self.label.text(), self.kind.currentText()
 +        self.address.clear()
 +        def received(value):
-+            if self.wallet.currentText() == name:
++            if self.selected_name() == name:
 +                self.address.setText(value)
 +                self.status.setText('Address created for ' + name + '. Verify it on the matching offline Vault before sharing.')
-+        if name:
++        if name is not None:
 +            self.run(lambda: self.service.receive(name, label, kind), received)
 +
 +
@@ -4416,10 +4566,19 @@ index 0000000000000000000000000000000000000000..90e86c9592f8609c3f268eb534ab1971
 +if __name__ == '__main__':
 +    main()
 diff --git a/prepare-image.sh b/prepare-image.sh
-index 351786d8c4fceb7be1515a98411020fc923a3246..a062b15371870536698359a54c22add802a9065c 100755
+index 351786d8c4fceb7be1515a98411020fc923a3246..9af9217d8a3298044b25c33013636a473c9565b0 100755
 --- a/prepare-image.sh
 +++ b/prepare-image.sh
-@@ -82,9 +82,29 @@ test -s /usr/share/plymouth/themes/core-node/core-node.plymouth
+@@ -62,6 +62,8 @@ test -s /usr/lib/x86_64-linux-gnu/qt6/plugins/iconengines/libqsvgicon.so
+ test -x /opt/bitcoin-core/32.1/bin/bitcoin-qt
+ test -x /usr/bin/xhost
+ test -x /usr/local/bin/core-node-numlock
++test -x /usr/libexec/core-node-greeter-input
++test -x /usr/bin/setpriv
+ # Use the exact Vault-derived Calamares and desktop components.
+ test "$(dpkg-query -W -f='${Version}' calamares)" = '3.3.14-1+corenode2'
+ apt-mark hold calamares
+@@ -82,9 +84,29 @@ test -s /usr/share/plymouth/themes/core-node/core-node.plymouth
  test -s /usr/share/plymouth/themes/core-node/core-node.script
  plymouth-set-default-theme -R core-node
  for node_initrd in /boot/initrd.img-*; do
@@ -4450,7 +4609,7 @@ index 351786d8c4fceb7be1515a98411020fc923a3246..a062b15371870536698359a54c22add8
  # Native Bluetooth pairing and HID support must ship in both installation modes.
  test -x /usr/bin/blueman-manager
  test -x /usr/bin/blueman-applet
-@@ -108,6 +128,16 @@ test -s /lib/firmware/regulatory.db
+@@ -108,6 +130,16 @@ test -s /lib/firmware/regulatory.db
  # Fail the image build if the private file workflow is incomplete.
  test -x /usr/libexec/core-node-private-prepare
  test -x /usr/local/bin/core-node-files-crypto
@@ -4467,7 +4626,7 @@ index 351786d8c4fceb7be1515a98411020fc923a3246..a062b15371870536698359a54c22add8
  test -x /usr/bin/setfacl
  test -s /usr/lib/bitcoin-core-node/private_workspace.py
  test -s /usr/lib/bitcoin-core-node/file_crypto.py
-@@ -142,7 +172,7 @@ test -s /opt/keepassxc/current/node-release.json
+@@ -142,7 +174,7 @@ test -s /opt/keepassxc/current/node-release.json
  test -s /usr/share/bitcoin-core-node/keepassxc-release-key.asc
  test -x /usr/libexec/core-node-software-updates
  test -s /usr/lib/systemd/system/core-node-software-install.service
@@ -4614,6 +4773,18 @@ index 0000000000000000000000000000000000000000..fc2c9dd216207a177062ffaa7a8c57d4
 +# Include Intel microcode for all supported CPUs regardless of the builder.
 +IUCODE_TOOL_INITRAMFS=early
 +IUCODE_TOOL_SCANCPUS=no
+diff --git a/runtime/etc/lightdm/lightdm.conf.d/50-core-node-session.conf b/runtime/etc/lightdm/lightdm.conf.d/50-core-node-session.conf
+index 99f2abb0129128be7e9aa5c086293915e677b6f4..14ebfd7e551d07a9b7a21504395af2b2b0731eb5 100644
+--- a/runtime/etc/lightdm/lightdm.conf.d/50-core-node-session.conf
++++ b/runtime/etc/lightdm/lightdm.conf.d/50-core-node-session.conf
+@@ -1,6 +1,7 @@
+ [Seat:*]
+ user-session=core-node
+ autologin-session=core-node
++greeter-setup-script=/usr/libexec/core-node-greeter-input
+ greeter-hide-users=false
+ greeter-show-manual-login=false
+ allow-guest=false
 diff --git a/runtime/etc/live/config.conf.d/core-node-installer.conf b/runtime/etc/live/config.conf.d/core-node-installer.conf
 new file mode 100644
 index 0000000000000000000000000000000000000000..7f13c092071e0e798b4310ec413cb9e2135358c6
@@ -4842,6 +5013,21 @@ index 076fdd08cdf1c4e00da64bae66880a429c09683d..396c137698a13e6a0cd6de58c12b2651
  except Exception:
      print('Blockchain maintenance is active or recovery needs attention. Bitcoin Core remains stopped.',file=sys.stderr)
      sys.exit(1)
+diff --git a/runtime/usr/libexec/core-node-greeter-input b/runtime/usr/libexec/core-node-greeter-input
+new file mode 100755
+index 0000000000000000000000000000000000000000..9370609e0ba33f0463c40ec2d403ccfc012c0335
+--- /dev/null
++++ b/runtime/usr/libexec/core-node-greeter-input
+@@ -0,0 +1,9 @@
++#!/bin/sh
++# LightDM runs its setup hook as root. Read private preferences as their owner.
++[ -f /etc/bitcoin-core-node/installed ] || exit 0
++setting=on
++/usr/bin/timeout -k 1 2 /usr/bin/setpriv --reuid=node --regid=node \
++    --clear-groups --no-new-privs --reset-env /usr/bin/python3 -Es \
++    /usr/lib/bitcoin-core-node/desktop_input.py --startup-numlock >/dev/null || { [ "$?" != 10 ] || setting=off; }
++# A keyboard without this modifier must still allow graphical login.
++/usr/local/bin/core-node-numlock "$setting" || :
 diff --git a/runtime/usr/libexec/core-node-install-target b/runtime/usr/libexec/core-node-install-target
 index d372f53aaac06a5f34bb4a94222519c59838a8a1..ecc08c683836a27b37367099d1d3b6c19f029ab9 100755
 --- a/runtime/usr/libexec/core-node-install-target
@@ -5124,6 +5310,152 @@ index 1ac8a79157114aefc6f72aa34ec25a73e9149470..802b61c34253c5351da5da3c83aa3fb9
      STATE="$(/usr/bin/systemctl is-system-running 2>/dev/null || true)"
      if [ "$STATE" = stopping ]; then
          while :; do sleep 10; done
+diff --git a/runtime/usr/local/bin/core-node-session b/runtime/usr/local/bin/core-node-session
+index 908c25fe3850aa8dadc22b3b2181042a7a85c285..105ed5a9bfba3e6f5e3e4eac84d4cf71dcc343df 100755
+--- a/runtime/usr/local/bin/core-node-session
++++ b/runtime/usr/local/bin/core-node-session
+@@ -9,7 +9,9 @@ umask 077
+ ulimit -c 0
+ : "${XDG_RUNTIME_DIR:?Missing local runtime directory}"
+ export LANG=C.UTF-8 LC_ALL=C.UTF-8 LANGUAGE=en
+-/usr/local/bin/core-node-numlock >"$XDG_RUNTIME_DIR/core-node-numlock.log" 2>&1 || true
++if [ ! -f /etc/bitcoin-core-node/installed ]; then
++    /usr/local/bin/core-node-numlock on >"$XDG_RUNTIME_DIR/core-node-numlock.log" 2>&1 || true
++fi
+ xset -dpms 2>/dev/null || true
+ xset s off 2>/dev/null || true
+ xset s noblank 2>/dev/null || true
+diff --git a/runtime/usr/local/bin/core-node-taskbar b/runtime/usr/local/bin/core-node-taskbar
+index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c74a819133 100755
+--- a/runtime/usr/local/bin/core-node-taskbar
++++ b/runtime/usr/local/bin/core-node-taskbar
+@@ -12,6 +12,7 @@ import json
+ import os
+ from pathlib import Path
+ import runpy
++import subprocess
+ import sys
+ 
+ from PySide6.QtCore import Qt, QSize, QTimer
+@@ -51,6 +52,9 @@ class XEvent(C.Union):
+ X11Base = runpy.run_path(str(Path(__file__).with_name('core-node-show-home')),
+                         run_name='node_taskbar_x11')['X11']
+ 
++display_outputs = runpy.run_path(str(Path(__file__).with_name('core-display-scale')),
++                                run_name='taskbar_displays')['probe']
++
+ class Windows(X11Base):
+     def __init__(self):
+         super().__init__()
+@@ -61,6 +65,8 @@ class Windows(X11Base):
+             ('XTranslateCoordinates', [C.c_void_p, C.c_ulong, C.c_ulong,
+                 C.c_int, C.c_int, C.POINTER(C.c_int), C.POINTER(C.c_int),
+                 C.POINTER(C.c_ulong)], C.c_int),
++            ('XMoveResizeWindow', [C.c_void_p, C.c_ulong, C.c_int, C.c_int,
++                                   C.c_uint, C.c_uint], C.c_int),
+             ('XMapRaised', [C.c_void_p, C.c_ulong], C.c_int),
+             ('XDeleteProperty', [C.c_void_p, C.c_ulong, C.c_ulong], C.c_int),
+             ('XSendEvent', [C.c_void_p, C.c_ulong, C.c_int, C.c_long, C.POINTER(XEvent)], C.c_int),
+@@ -89,7 +95,7 @@ class Windows(X11Base):
+             if pointer:
+                 self.lib.XFree(pointer)
+ 
+-    def native_strut(self, window):
++    def native_strut(self, window, target=None):
+         # Query actual X coordinates, including monitor offsets and fractional
+         # rounding, instead of guessing from Qt's device-independent geometry.
+         root, child = C.c_ulong(), C.c_ulong()
+@@ -99,20 +105,32 @@ class Windows(X11Base):
+                 C.byref(x), C.byref(y), C.byref(width), C.byref(height),
+                 C.byref(border), C.byref(depth)):
+             raise RuntimeError('Taskbar geometry is unavailable.')
+-        panel_width = width.value
++        panel_width, panel_height = width.value, height.value
+         if not self.lib.XTranslateCoordinates(self.display, window, self.root,
+                 0, 0, C.byref(x), C.byref(y), C.byref(child)):
+             raise RuntimeError('Taskbar position is unavailable.')
+         left, top = x.value, y.value
++        if target is not None and (left, top, panel_width, panel_height) != target:
++            # Fractional Qt scaling can publish a two-pixel resize increment.
++            # Openbox then rounds a full-width dock down to the wrong physical
++            # edge. Resize this managed dock in native pixels, independent of
++            # other monitors, and keep its EWMH reservation in the same units.
++            hints = self.property(window, 'WM_NORMAL_HINTS')
++            if isinstance(hints, list) and len(hints) >= 11 and hints[0] & (1 << 6):
++                if hints[9:11] != [1, 1]:
++                    hints[9:11] = [1, 1]
++                    self.set_cardinals(window, 'WM_NORMAL_HINTS', hints, 'WM_SIZE_HINTS')
++            self.lib.XMoveResizeWindow(self.display, window, *target)
++            self.lib.XSync(self.display, 0)
+         if not self.lib.XGetGeometry(self.display, self.root, C.byref(root),
+                 C.byref(x), C.byref(y), C.byref(width), C.byref(height),
+                 C.byref(border), C.byref(depth)):
+             raise RuntimeError('Root geometry is unavailable.')
+         return max(0, height.value - top), max(0, left), max(0, left + panel_width - 1)
+ 
+-    def set_cardinals(self, window, name, values):
++    def set_cardinals(self, window, name, values, property_type='CARDINAL'):
+         data = (C.c_ulong * len(values))(*values)
+-        self.lib.XChangeProperty(self.display, window, self.atom(name), self.atom('CARDINAL'),
++        self.lib.XChangeProperty(self.display, window, self.atom(name), self.atom(property_type),
+             32, 0, C.cast(data, C.POINTER(C.c_ubyte)), len(values))
+         self.lib.XSync(self.display, 0)
+ 
+@@ -307,16 +325,42 @@ class Taskbar(QWidget):
+         self.home_button.clicked.connect(self.x.home)
+         self.row.addWidget(self.home_button)
+         self.row.addStretch(1)
+-        self.screen = QApplication.primaryScreen()
+-        self.screen.geometryChanged.connect(self.place)
+-        self.place()
++        self.screen = None
++        self.native_target = None
++        app = QApplication.instance()
++        app.primaryScreenChanged.connect(self.follow_screen)
++        self.follow_screen(app.primaryScreen())
+         self.timer = QTimer(self)
+         self.timer.timeout.connect(self.refresh)
+         self.timer.start(250)
+         self.refresh()
+ 
++    def follow_screen(self, screen):
++        if self.screen is not None:
++            self.screen.geometryChanged.disconnect(self.place)
++            self.screen.logicalDotsPerInchChanged.disconnect(self.place)
++        self.screen = screen
++        if screen is not None:
++            screen.geometryChanged.connect(self.place)
++            screen.logicalDotsPerInchChanged.connect(self.place)
++            self.place()
++
+     def place(self, *_):
++        self.native_target = None
++        if self.screen is None:
++            return
+         geometry = self.screen.geometry()
++        try:
++            outputs = display_outputs()
++        except (OSError, subprocess.SubprocessError):
++            outputs = []
++        output = next((entry for entry in outputs if entry['name'] == self.screen.name()), None)
++        if output is None and len(outputs) == 1:
++            output = outputs[0]
++        if output is not None:
++            height = round(HEIGHT * self.screen.devicePixelRatio())
++            self.native_target = (output['x'], output['y'] + output['height'] - height,
++                                  output['width'], height)
+         self.setGeometry(geometry.x(), geometry.y()+geometry.height()-HEIGHT, geometry.width(), HEIGHT)
+         self.sync_reservation()
+ 
+@@ -326,7 +370,7 @@ class Taskbar(QWidget):
+         # Home is open. Iconified applications remain managed tasks.
+         if self.panel_active:
+             QApplication.sync()  # Flush Qt/XCB geometry before querying via Xlib.
+-            bottom, left, right = self.x.native_strut(wid)
++            bottom, left, right = self.x.native_strut(wid, self.native_target)
+             short = [0, 0, 0, bottom]
+             partial = [0, 0, 0, bottom, 0, 0, 0, 0, 0, 0, left, right]
+             if self.x.prop(wid, '_NET_WM_STRUT') != short:
 diff --git a/runtime/usr/local/bin/core-node-text-clipping b/runtime/usr/local/bin/core-node-text-clipping
 new file mode 100755
 index 0000000000000000000000000000000000000000..9104834470ca70e722274048ed2fbcd3b5c76594
@@ -5163,7 +5495,7 @@ index 6b652bf5a51f9d5604645c963c774d87b23c7840..43ad16dc8eee4cfb0e4b73d147e8f9fd
  Terminal=false
  Categories=System;
 diff --git a/runtime/usr/share/bitcoin-core-node/GUIDE.html b/runtime/usr/share/bitcoin-core-node/GUIDE.html
-index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..679e161bfb70402d9d371bf64838c8f6ac776779 100644
+index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..5d558a8dd294d53d9b2152a5fd6754d5abbfc268 100644
 --- a/runtime/usr/share/bitcoin-core-node/GUIDE.html
 +++ b/runtime/usr/share/bitcoin-core-node/GUIDE.html
 @@ -8,7 +8,7 @@
@@ -5241,7 +5573,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..679e161bfb70402d9d371bf64838c8f6
  <h3>Use the correct import path</h3>
  <p>A single <b>watch-only.dat</b> from Vault belongs in <b>Core → File → Restore Wallet</b>. A <b>.json/.gpg collection</b> created by Node's watch-only backup belongs in <b>Backup and Restore → Watch-only wallets → Restore</b>. The formats are intentionally different; no manual descriptor JSON editing is needed for the native .dat flow.</p>
 -<p>When Node detects a loaded supported public-only wallet, Watch-Only Wallets and PSBT Transfer Folder appear together on Home. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.</p>
-+<p>The Wallets launcher is always on Home. The PSBT Transfer Folder shortcut appears when Node detects a supported watch-only wallet. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.</p>
++<p>Wallets and Watch-Only Wallets are always on Home. Open Watch-Only Wallets for balances and receiving addresses. Its list refreshes when you return from Bitcoin Core or choose Refresh wallets. The PSBT Transfer Folder shortcut appears when Node detects a supported watch-only wallet. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.</p>
  <p>Public information can reveal balances and transaction history. Use the optional login password and physical access precautions described in Device privacy &amp; login. Protect public exports and backups too; watch-only does not make them nonsensitive.</p>
  <p>Technical source: Bitcoin Core's offline-signing-tutorial.md and release-notes-32.0.md under github.com/bitcoin/bitcoin/doc describe exportwatchonlywallet and restorewallet. This Guide uses the corresponding GUI actions in the bundled Core.</p>
  <h2>Receiving bitcoin</h2>
@@ -5317,6 +5649,15 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..679e161bfb70402d9d371bf64838c8f6
  <tr><td>Tor</td><td>Core's peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system's other traffic, including software updates, still uses its ordinary connection.</td></tr>
  <tr><td>WireGuard VPN</td><td>The computer routes traffic through the configured encrypted VPN tunnel. Its protection rules block ordinary fallback outside that tunnel, apart from reaching the VPN server and essential connection setup. The VPN provider becomes someone you must trust.</td></tr></table>
  <p>A <b>firewall</b> is a set of rules allowing or blocking network traffic. The VPN's <b>kill switch</b> means these rules block fallback if the tunnel stops. <b>DNS</b> is the service that translates website names into network addresses. This Node's managed WireGuard setup protects against unintended traffic outside its tunnel, including ordinary DNS and IPv6 traffic. Neither Tor nor a VPN guarantees anonymity.</p>
+@@ -197,7 +201,7 @@
+ <p>If no Bluetooth adapter appears, please check any airplane-mode switch and the computer's firmware settings. Common adapter firmware is included, but some devices need different firmware or a compatible USB adapter.</p>
+ <h3>Keyboard and Mouse</h3>
+ <p>Open <b>Settings → Keyboard and Mouse</b>. On the <b>Keyboard</b> tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after <b>Apply and Save</b>; please do not type passwords there.</p>
+-<p>The chosen layout applies to your current desktop and to the login screen after restart. Repeat and Num Lock preferences are applied when the desktop starts. They do not replace an older encrypted installation's disk-unlock keyboard configuration.</p>
++<p>The chosen layout applies to your current desktop and to the login screen after restart. Num Lock follows your saved choice on the login screen and when the desktop starts. It starts on by default. Key repeat applies on the desktop. They do not replace an older encrypted installation's disk-unlock keyboard configuration.</p>
+ <p>On <b>Mouse and Touchpad</b>, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.</p>
+ <h2>Status &amp; diagnostics</h2>
+ <p>Open <b>Settings → Bitcoin Core Status</b> for a live overview of this computer's Core. It reads information locally; it does not ask a public website to tell you what your node is doing.</p>
 @@ -226,6 +230,8 @@
  <h2>Persistent storage</h2>
  <p><b>Persistent</b> means “still there after restarting.” The installed Node keeps its blockchain, chainstate, wallets and ordinary settings on disk. Its two temporary working folders are different:</p>
@@ -5343,7 +5684,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..679e161bfb70402d9d371bf64838c8f6
  <h3>Change Bitcoin Core only after review</h3>
  <p>The update page shows the active verified Core version and can check the official stable-release record. Choose a supported Core 32 release and <b>Download and verify Core release</b>. Please read the version, file hashes and signing-key fingerprints before approving installation. A fingerprint identifies the full signing key.</p>
 diff --git a/runtime/usr/share/bitcoin-core-node/GUIDE.txt b/runtime/usr/share/bitcoin-core-node/GUIDE.txt
-index 0e65e9ba6f15648e3aee4678177924896922ff55..c5c2f6295eb5be0c4460cd53c59781a17bab108e 100644
+index 0e65e9ba6f15648e3aee4678177924896922ff55..c76ee6dd0f484895011b2ac1f71353f8e2d8925a 100644
 --- a/runtime/usr/share/bitcoin-core-node/GUIDE.txt
 +++ b/runtime/usr/share/bitcoin-core-node/GUIDE.txt
 @@ -18,7 +18,7 @@ Open Bitcoin Core. In its first-start window, choose the intended data location
@@ -5447,7 +5788,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..c5c2f6295eb5be0c4460cd53c59781a1
  A single watch-only.dat from Vault belongs in Core → File → Restore Wallet. A .json/.gpg collection created by Node's watch-only backup belongs in Backup and Restore → Watch-only wallets → Restore. The formats are intentionally different; no manual descriptor JSON editing is needed for the native .dat flow.
  
 -When Node detects a loaded supported public-only wallet, Watch-Only Wallets and PSBT Transfer Folder appear together on Home. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.
-+The Wallets launcher is always on Home. The PSBT Transfer Folder shortcut appears when Node detects a supported watch-only wallet. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.
++Wallets and Watch-Only Wallets are always on Home. Open Watch-Only Wallets for balances and receiving addresses. Its list refreshes when you return from Bitcoin Core or choose Refresh wallets. The PSBT Transfer Folder shortcut appears when Node detects a supported watch-only wallet. Closing the wallet is not deletion: reopen it with File → Open Wallet. Keep it loaded during pruning so it can stay caught up before old blocks disappear.
  
  Public information can reveal balances and transaction history. Use the optional login password and physical access precautions described in Device privacy & login. Protect public exports and backups too; watch-only does not make them nonsensitive.
  
@@ -5552,6 +5893,15 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..c5c2f6295eb5be0c4460cd53c59781a1
 +ClearnetCore connects directly to Bitcoin peers. Node runs the Tor service only when the Tor peer profile or private transaction broadcast needs it. Peers see your public IP address; your Internet provider may recognize Bitcoin traffic.
  
  TorCore's peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system's other traffic, including software updates, still uses its ordinary connection.
+ 
+@@ -502,7 +512,7 @@ Keyboard and Mouse
+ 
+ Open Settings → Keyboard and Mouse. On the Keyboard tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after Apply and Save; please do not type passwords there.
+ 
+-The chosen layout applies to your current desktop and to the login screen after restart. Repeat and Num Lock preferences are applied when the desktop starts. They do not replace an older encrypted installation's disk-unlock keyboard configuration.
++The chosen layout applies to your current desktop and to the login screen after restart. Num Lock follows your saved choice on the login screen and when the desktop starts. It starts on by default. Key repeat applies on the desktop. They do not replace an older encrypted installation's disk-unlock keyboard configuration.
+ 
+ On Mouse and Touchpad, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.
  
 @@ -578,6 +588,10 @@ PSBT Transfer FolderCleared: public wallet/PSBT transfer files live in RAM.
  
@@ -5927,6 +6277,114 @@ index 082801af9478db9b13d5f63116be27a7f9262d87..c792321b8b463f3dd716483fed0ce680
      },
      "var/lib/lightdm": {
        "uid": 102,
+diff --git a/tests/taskbar_edges_x11.py b/tests/taskbar_edges_x11.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4b0396793bf168eb3db9bbb1430aa0bee4f5a6a
+--- /dev/null
++++ b/tests/taskbar_edges_x11.py
+@@ -0,0 +1,102 @@
++#!/usr/bin/python3
++"""Check the painted dock, EWMH bounds, progress and storage with a real X11 display."""
++import argparse
++import ctypes
++from pathlib import Path
++import runpy
++import subprocess
++import sys
++import time
++from types import SimpleNamespace
++
++from PySide6.QtWidgets import QApplication, QWidget
++
++parser = argparse.ArgumentParser()
++mode = parser.add_mutually_exclusive_group(required=True)
++mode.add_argument('--isolated', action='store_true', help='Run in a new Xvfb display with no window manager')
++mode.add_argument('--installed', action='store_true', help='Use the installed Node panel in its QA desktop')
++args = parser.parse_args()
++if args.installed:
++    bindir = Path('/usr/local/bin')
++    appdir = Path('/usr/lib/bitcoin-core-node')
++else:
++    source = Path(__file__).resolve().parents[1]
++    bindir = source / 'runtime/usr/local/bin'
++    appdir = source / 'app'
++app = QApplication([])
++panel_module = runpy.run_path(str(bindir / 'core-node-taskbar'), run_name='visual_check')
++wm = None
++task = None
++panel = None
++
++def wait(predicate, timeout=8):
++    end = time.monotonic() + timeout
++    while time.monotonic() < end:
++        app.processEvents()
++        result = predicate()
++        if result:
++            return result
++        time.sleep(.05)
++    raise AssertionError('Timed out waiting for ' + predicate.__name__)
++
++try:
++    x = panel_module['Windows']()
++    if args.isolated:
++        assert not x.prop(x.root, '_NET_SUPPORTING_WM_CHECK'), 'Use a fresh Xvfb display'
++        wm = subprocess.Popen(['openbox'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++        wait(lambda: x.prop(x.root, '_NET_SUPPORTING_WM_CHECK'))
++    task = QWidget()
++    task.setWindowTitle('Bitcoin Core Node display test')
++    task.resize(240, 120)
++    task.show()
++    wait(lambda: int(task.winId()) in x.managed())
++    if args.isolated:
++        panel = panel_module['Taskbar'](SimpleNamespace(
++            assets=source / 'runtime/usr/share/bitcoin-core-node', preview=False))
++    def panel_window():
++        return next((wid for wid in x.managed() if x.title(wid) == 'Core Node Taskbar'), None)
++    wid = wait(panel_window)
++    screen = app.primaryScreen()
++    probe = runpy.run_path(str(bindir / 'core-display-scale'), run_name='screen_probe')['probe']
++    output = next(o for o in probe() if o['name'] == screen.name())
++    left, right = output['x'], output['x'] + output['width'] - 1
++    x.lib.XDisplayHeight.argtypes = [ctypes.c_void_p, ctypes.c_int]
++    root_height = x.lib.XDisplayHeight(x.display, x.screen)
++    bottom = root_height - output['y'] - output['height'] + round(40 * screen.devicePixelRatio())
++    def painted_panel_reserves_exact_output():
++        s = x.prop(wid, '_NET_WM_STRUT_PARTIAL')
++        return (s and (s[3], s[10], s[11]) == (bottom, left, right)
++                and x.native_strut(wid) == (bottom, left, right))
++    wait(painted_panel_reserves_exact_output)
++    pixels = screen.grabWindow(0).toImage()
++    assert pixels.width() == output['width'] and pixels.height() == output['height']
++    for col in (0, pixels.width()-2, pixels.width()-1):
++        assert pixels.pixelColor(col, pixels.height()-4).name() == '#111111', col
++
++    sys.path.insert(0, str(appdir))
++    from activity_ui import ActivityIndicator, StorageBar
++    from pruning_space import GB, pruning_estimate
++    from chain_storage import reading
++    assert GB == 1_000_000_000
++    assert '60 GB' in pruning_estimate(100 * GB, 'main')['caption']
++    storage = StorageBar()
++    storage.update_space(reading(30 * GB, 60 * GB))
++    assert '60.0 GB free of 90.0 GB' in storage.caption.text()
++    storage.hide()
++    indicator = ActivityIndicator()
++    indicator.resize(400, 13)
++    for state, estimate, expected in [('syncing', .5, '#f2c94c'), ('synchronized', 1., '#55d68b')]:
++        indicator.set_state(state, progress=estimate)
++        painted = indicator.grab().toImage()
++        row = [painted.pixelColor(i, painted.height()//2).name() for i in range(painted.width())]
++        length = round(painted.width() * estimate)
++        assert all(pixel == expected for pixel in row[:length-1])
++        assert all(pixel == '#353535' for pixel in row[length+1:])
++    print(f"PASS panel and last pixel at {output['width']}x{output['height']} "
++          f"scale {screen.devicePixelRatio()}, continuous sync colors and decimal GB", flush=True)
++finally:
++    if task is not None:
++        task.hide()
++    if wm is not None:
++        wm.terminate()
++        wm.wait(timeout=5)
 diff --git a/tests/test_activity_stages.py b/tests/test_activity_stages.py
 index c8f6627fb7b608e0a9da290fffd0f64159113905..7d0f1ca8795321d96fd26176c8600e3539a9eff3 100644
 --- a/tests/test_activity_stages.py
@@ -5963,7 +6421,7 @@ index d10aea2b2ff7bceff51439f5264bc8d7fa8f4752..6fe78c2fa0ea152a8dca19589149eb11
   def test_bridge_no_shell_or_mutation_of_source_permissions(self):
    text=(R/'app/removable_media.py').read_text()
 diff --git a/tests/test_backup_ux_revision.py b/tests/test_backup_ux_revision.py
-index fe3764224be8f50a3ee454c38beee538cd7815ce..8f64ca45dfbb8f6b424098f748ade8678606f2b6 100644
+index fe3764224be8f50a3ee454c38beee538cd7815ce..69e92f5a6e5dbda521a3684863398a388b88ca37 100644
 --- a/tests/test_backup_ux_revision.py
 +++ b/tests/test_backup_ux_revision.py
 @@ -17,11 +17,14 @@ from operation_locks import guard,OperationBusy
@@ -5989,7 +6447,7 @@ index fe3764224be8f50a3ee454c38beee538cd7815ce..8f64ca45dfbb8f6b424098f748ade867
              home=ui.Home();self.assertNotIn('PSBT Transfer Folder',[c.tool['title'] for c in home.cards])
              home.set_watch_only_available(True);names=[c.tool['title'] for c in home.cards]
 -            self.assertEqual(names[:4],['Bitcoin Core','Watch-Only Wallets','PSBT Transfer Folder','Private Workspace'])
-+            self.assertEqual(names[:4],['Bitcoin Core','Wallets','PSBT Transfer Folder','Private Workspace'])
++            self.assertEqual(names[:5],['Bitcoin Core','Wallets','Watch-Only Wallets','PSBT Transfer Folder','Private Workspace'])
              home.set_watch_only_available(None);self.assertEqual(names,[c.tool['title'] for c in home.cards])
              for t in (home.timer,home.wallet_inventory_timer,home.connection_button.timer,home.clock.timer):t.stop()
              home.hide();home.deleteLater()
@@ -6189,6 +6647,24 @@ index 77d48406ee6eb42eef42a678061f170d3db3ac9a..dbd12e60ce02f24201f13fba9ef7daf8
     result=watch._perform('watch-preview',{'path':str(self.root/'watch.json'),'passphrase':''},os.getuid(),cb.Events(emit=lambda _:None))
     probe.assert_called_once();self.assertEqual(result['fingerprint'],'a'*64)
  
+diff --git a/tests/test_desktop_polish.py b/tests/test_desktop_polish.py
+index c128918b8bd2ee92475c19c9efc5d46d94e68fe7..f8154a72bef775c14f5afe1cade26ee52fabf289 100644
+--- a/tests/test_desktop_polish.py
++++ b/tests/test_desktop_polish.py
+@@ -87,8 +87,11 @@ class LayoutAndContent(unittest.TestCase):
+     for _ in range(30):self.app.processEvents();h.layout_cards();h.position_activity()
+     cards={c.tool['title']:c for c in h.cards}
+     def xy(c):return c.mapTo(h,QPoint(0,0))
+-    for bottom,above in [('Editor','Decrypt Files'),('Terminal','KeePassXC'),('Node Guide','Settings')]:
+-     self.assertEqual(xy(cards[bottom]).x(),xy(cards[above]).x(),(w,bottom))
++    # Four final-row cards center between adjacent columns of the full row.
++    upper = ['Backup and Restore','Encrypt Files','Decrypt Files','KeePassXC','Settings']
++    for bottom, left, right in zip(['Files','Editor','Terminal','Node Guide'], upper, upper[1:]):
++     midpoint_sum = xy(cards[left]).x() + xy(cards[right]).x()
++     self.assertLessEqual(abs(2 * xy(cards[bottom]).x() - midpoint_sum), 1, (w,bottom))
+     top=xy(h.grid_wrap).y()+h.grid_wrap.height();logo=xy(h.debian_logo).y();row=xy(h.activity_row).y();height=h.activity_row.height()
+     self.assertLessEqual(abs((row-top)-(logo-row-height)),2,(w,row,top,logo,height))
+     self.assertGreaterEqual(row-top,8)
 diff --git a/tests/test_file_delete_and_clipping.py b/tests/test_file_delete_and_clipping.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..a4ecc9fd48e5ff261b702371b14c0bf96066f36c
@@ -6455,16 +6931,61 @@ index 76af02aa433075e923d32661378964d050662b55..e4359d36c8e94d747d3811de97bc40c4
   def test_passphrases_never_enter_arguments_or_environment(self):
    import gpg_backend
    original=gpg_backend.subprocess.Popen
+diff --git a/tests/test_greeter_numlock.py b/tests/test_greeter_numlock.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..eb746f66885b469ec2ae1800a199d7050f1bb088
+--- /dev/null
++++ b/tests/test_greeter_numlock.py
+@@ -0,0 +1,36 @@
++import json
++import os
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++import unittest
++
++ROOT = Path(__file__).resolve().parents[1]
++sys.path.insert(0,str(ROOT / 'app'))
++import desktop_input
++
++
++class GreeterNumLock(unittest.TestCase):
++    def test_saved_preference_and_default_follow_the_desktop(self):
++        with tempfile.TemporaryDirectory() as home:
++            env = dict(os.environ, HOME=home)
++            command = [sys.executable, '-Es', str(ROOT / 'app/desktop_input.py'), '--startup-numlock']
++            prefs = Path(home) / '.config/bitcoin-core-node/input.json'
++            prefs.parent.mkdir(parents=True)
++            for saved, expected in ((None, 0), (False, 10), (True, 0)):
++                with self.subTest(saved=saved):
++                    if saved is not None:
++                        data=desktop_input.load(prefs)
++                        data['keyboard']['numlock']=saved
++                        prefs.write_text(json.dumps(data))
++                    result=subprocess.run(command,env=env,timeout=3)
++                    self.assertEqual(result.returncode,expected)
++
++    def test_greeter_hook_reads_as_the_desktop_account(self):
++        hook = ROOT / 'runtime/usr/libexec/core-node-greeter-input'
++        config = ROOT / 'runtime/etc/lightdm/lightdm.conf.d/50-core-node-session.conf'
++        self.assertIn('greeter-setup-script=/usr/libexec/core-node-greeter-input',config.read_text())
++        self.assertTrue(os.access(hook,os.X_OK))
++        self.assertIn('--reuid=node --regid=node',hook.read_text())
++        subprocess.run(['/bin/sh','-n',str(hook)],check=True)
 diff --git a/tests/test_home_backup.py b/tests/test_home_backup.py
-index 48d5659d759490db865b5de3785e61ef4f40c7f2..1e075634ad8e755bc2b71d42d9dadc1d79ae0ef4 100644
+index 48d5659d759490db865b5de3785e61ef4f40c7f2..36396cd11120ba5e84c03ff31920bb5747a81c9f 100644
 --- a/tests/test_home_backup.py
 +++ b/tests/test_home_backup.py
-@@ -108,7 +108,7 @@ class HomeCards(unittest.TestCase):
+@@ -106,9 +106,9 @@ class HomeCards(unittest.TestCase):
+    self.assertNotIn('Backup and Restore',[c.tool['title'] for c in home.cards])
+    home.set_backup_available(True);names=[c.tool['title'] for c in home.cards]
     i=names.index('Private Workspace');self.assertEqual(names[i+1:i+3],['Backup and Restore','Encrypt Files'])
-    home.set_watch_only_available(True);self.assertEqual(len(home.cards),13)
+-   home.set_watch_only_available(True);self.assertEqual(len(home.cards),13)
++   home.set_watch_only_available(True);self.assertEqual(len(home.cards),14)
     home.set_watch_only_available(False);home.set_backup_available(False)
 -   self.assertIn(home.backup_card,home.cards);self.assertEqual(len(home.cards),11)
-+   self.assertIn(home.backup_card,home.cards);self.assertEqual(len(home.cards),12)
++   self.assertIn(home.backup_card,home.cards);self.assertEqual(len(home.cards),13)
     home.backup_card.click();one=home._modeless_windows['backup_restore']
     home.backup_restore();self.assertIs(home._modeless_windows['backup_restore'],one);self.assertFalse(one.isModal())
     one.reject()
@@ -6878,7 +7399,7 @@ index 8a3b7f1a59bb1cfdf2a3327d8ad457f32b408be6..c0ccd13d73c9a5f68fa7685b013f1c04
          for output in ['Remv thunar [4.20]', 'Inst bitcoin-qt [32.1] (33.0 Debian [amd64])',
                         'Inst calamares [3.3.14-1+corenode2] (3.3.15 Debian [amd64])']:
 diff --git a/tests/test_status_centering.py b/tests/test_status_centering.py
-index a9b558583b45d77e09066ba1add8aabe4d70db10..09bd6b5c7f52b12b9e986c37f7d1a1a41843e0f3 100644
+index a9b558583b45d77e09066ba1add8aabe4d70db10..ceb432c2f4bf7fbe833064550e2cd809e77ea4c5 100644
 --- a/tests/test_status_centering.py
 +++ b/tests/test_status_centering.py
 @@ -1,12 +1,12 @@
@@ -6918,17 +7439,19 @@ index a9b558583b45d77e09066ba1add8aabe4d70db10..09bd6b5c7f52b12b9e986c37f7d1a1a4
    for obj,name,result in ((ui.Home,'poll_activity',lambda _:None),(ui.Home,'poll_wallets',lambda _:None),(connection_ui.ConnectionButton,'poll',lambda _:None)):
     self.scope.enter_context(patch.object(obj,name,result))
    self.scope.enter_context(patch.object(home_backup.BackupPresence,'remembered',return_value=False))
-@@ -56,8 +61,8 @@ class StatusCentering(unittest.TestCase):
+@@ -56,9 +61,9 @@ class StatusCentering(unittest.TestCase):
    self.assertEqual(h.activity_row.height(),last-first)
   def test_all_states_sizes_card_counts_and_taskbar_changes(self):
    count=0
 -  for cards in (10,11,13):
 -   if cards==11:self.h.set_backup_available(True)
-+  for cards in (11,12,13):
-+   if cards==12:self.h.set_backup_available(True)
-    if cards==13:self.h.set_watch_only_available(True)
+-   if cards==13:self.h.set_watch_only_available(True)
++  for cards in (12,13,14):
++   if cards==13:self.h.set_backup_available(True)
++   if cards==14:self.h.set_watch_only_available(True)
     self.assertEqual(len(self.h.cards),cards)
     for w,ht in ((800,600),(1024,768),(1280,800),(1366,768),(1920,1080)):
+     for panel in (40,0):
 @@ -66,6 +71,26 @@ class StatusCentering(unittest.TestCase):
       for value in STATES:
        self.h.show_activity(value);self.settle();self.assert_centered();count+=1
@@ -7078,15 +7601,46 @@ index 014686b369ec963a15b055fac0e2946910bcc1c4..91ee9440e473d7d43ecf6323e548e65c
  class ConnectionActions(unittest.TestCase):
      def prepare(self,state='online',active=True):
          application()
+diff --git a/tests/test_taskbar_reservation.py b/tests/test_taskbar_reservation.py
+index c34d54fb9918effa1e44de49103b6396c0bf2ee3..5648dbc77f20d4a96b38ec0aff8e53fdabca8230 100644
+--- a/tests/test_taskbar_reservation.py
++++ b/tests/test_taskbar_reservation.py
+@@ -10,14 +10,14 @@ Taskbar=runpy.run_path(str(root/'runtime/usr/local/bin/core-node-taskbar'),run_n
+ 
+ class X:
+  def __init__(self):self.bottom=400;self.values={};self.writes=[]
+- def native_strut(self,wid):return self.bottom,0,1279
++ def native_strut(self,wid,target):return self.bottom,0,1279
+  def prop(self,wid,name):return self.values.get(name,[])
+  def set_cardinals(self,wid,name,value):self.values[name]=list(value);self.writes.append(name)
+  def clear_property(self,wid,name):self.values.pop(name,None)
+ 
+ class TaskbarReservation(unittest.TestCase):
+  def test_settled_geometry_replaces_stale_strut_without_notification_churn(self):
+-  x=X();panel=SimpleNamespace(x=x,panel_active=True,winId=lambda:1)
++  x=X();panel=SimpleNamespace(x=x,panel_active=True,native_target=None,winId=lambda:1)
+   Taskbar.sync_reservation(panel)
+   self.assertEqual(x.values['_NET_WM_STRUT'][3],400)
+   x.bottom=40;Taskbar.sync_reservation(panel)
+@@ -25,7 +25,7 @@ class TaskbarReservation(unittest.TestCase):
+   self.assertEqual(x.values['_NET_WM_STRUT_PARTIAL'],[0,0,0,40,0,0,0,0,0,0,0,1279])
+   count=len(x.writes);Taskbar.sync_reservation(panel);self.assertEqual(len(x.writes),count)
+  def test_hidden_panel_releases_both_reservations(self):
+-  x=X();panel=SimpleNamespace(x=x,panel_active=True,winId=lambda:1)
++  x=X();panel=SimpleNamespace(x=x,panel_active=True,native_target=None,winId=lambda:1)
+   Taskbar.sync_reservation(panel);panel.panel_active=False;Taskbar.sync_reservation(panel)
+   self.assertEqual(x.values,{})
+ 
 diff --git a/tests/test_wallet_address_selection.py b/tests/test_wallet_address_selection.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..4f23ebcd31d500731ec2f6428690bd4b2c30fee1
+index 0000000000000000000000000000000000000000..c9e70e2959a5c714d42cb066c83426410c021952
 --- /dev/null
 +++ b/tests/test_wallet_address_selection.py
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,111 @@
 +"""A receiving address always belongs to the currently selected wallet."""
 +import os
 +import sys
++import time
 +import unittest
 +from pathlib import Path
 +from unittest.mock import Mock, patch
@@ -7096,6 +7650,7 @@ index 0000000000000000000000000000000000000000..4f23ebcd31d500731ec2f6428690bd4b
 +from PySide6.QtCore import QObject, Signal
 +from PySide6.QtWidgets import QApplication, QWidget
 +from wallet_ui import WalletDialog
++from wallets import WalletError
 +
 +
 +class PendingJob(QObject):
@@ -7139,6 +7694,55 @@ index 0000000000000000000000000000000000000000..4f23ebcd31d500731ec2f6428690bd4b
 +            dialog.wallet.setCurrentText('first')
 +            self.assertEqual(dialog.address.text(),'')
 +            dialog.job.running = False
++            dialog.close()
++
++    def test_dialog_reloads_native_wallets_after_close_and_reopen(self):
++        from PySide6.QtCore import QEventLoop, QTimer
++        app = QApplication.instance() or QApplication([])
++        parent = QWidget()
++        parent.rpc = Mock()
++        open_wallets = ['signing', 'public']
++        service = Mock()
++        service.rpc.side_effect = lambda method: list(open_wallets) if method == 'listwallets' else self.fail(method)
++        def identify(name):
++            if name == 'signing':
++                raise WalletError('Private keys enabled')
++        service.watch.side_effect = identify
++        service.snapshot.side_effect = lambda name: dict(
++            incomplete=False, balances={}, info={'scanning': False}, utxos=[], transactions=[], descriptor_id='synthetic'
++        )
++        def finished():
++            until = time.monotonic() + 4
++            while dialog.job is None or dialog.job.isRunning() or dialog.refresh_timer.isActive():
++                self.assertLess(time.monotonic(), until)
++                loop = QEventLoop()
++                QTimer.singleShot(10, loop.quit)
++                loop.exec()
++            app.processEvents()
++        with patch('wallet_ui.WalletService', return_value=service):
++            dialog = WalletDialog(parent)
++            dialog.show()
++            finished()
++            self.assertEqual(dialog.wallet.count(), 1)
++            self.assertEqual(dialog.selected_name(), 'public')
++            dialog.address.setText('still-valid')
++            dialog.refresh()
++            finished()
++            self.assertEqual(dialog.address.text(), 'still-valid')
++            open_wallets.remove('public')
++            dialog.refresh()
++            finished()
++            self.assertEqual(dialog.wallet.count(), 0)
++            self.assertFalse(dialog.receive_button.isEnabled())
++            self.assertIn('File → Open Wallet', dialog.status.text())
++            self.assertEqual(dialog.address.text(), '')
++            open_wallets.append('restored')
++            dialog.refresh()
++            finished()
++            self.assertEqual(dialog.selected_name(), 'restored')
++            self.assertTrue(dialog.receive_button.isEnabled())
++            self.assertIn('Wallet: restored', dialog.details.toPlainText())
++            self.assertEqual(dialog.address.text(), '')
 +            dialog.close()
 +
 +
@@ -7292,10 +7896,10 @@ index 5b9354786515793509ee6ee4aa85bc861a7d6943..3be4c6085a455cffa01b4de182da69dd
    self.assertTrue(w.is_watch(dict(private_keys_enabled=False,descriptors=True)))
    for x in (dict(private_keys_enabled=True,descriptors=True),dict(private_keys_enabled=False,descriptors=False),dict(private_keys_enabled=False,descriptors=True,external_signer=True),{}):
 diff --git a/tests/wallet_visibility_ui.py b/tests/wallet_visibility_ui.py
-index 62817f15a6bba49d7fff621e1b4e54f5f676be0d..08485ea726dbd94ca54c7566d6d308770c786622 100644
+index 62817f15a6bba49d7fff621e1b4e54f5f676be0d..733fd62c0b085a762cab69b11a634095641c824d 100644
 --- a/tests/wallet_visibility_ui.py
 +++ b/tests/wallet_visibility_ui.py
-@@ -32,12 +32,12 @@ def spin(predicate):
+@@ -32,12 +32,14 @@ def spin(predicate):
   for _ in range(4):app.processEvents()
  def check(home,visible):
   assert home.watch_only_available is visible
@@ -7308,10 +7912,23 @@ index 62817f15a6bba49d7fff621e1b4e54f5f676be0d..08485ea726dbd94ca54c7566d6d30877
   assert titles[-1]=='Node Guide'
 - assert titles.count('Watch-Only Wallets')==int(visible)
 + assert titles.count('Wallets')==1
++ assert titles.count('Watch-Only Wallets')==1
++ assert not next(c for c in home.cards if c.tool['title']=='Watch-Only Wallets').isHidden()
   assert all(c.parentWidget() is home.grid_wrap for c in home.cards)
   for size in [(800,600),(1366,768)]:
    home._test_size=size;home.fit_screen()
-@@ -68,4 +68,4 @@ with tempfile.TemporaryDirectory() as tmp,patch('ui.CoreRPC',return_value=rpc),p
+@@ -61,6 +63,10 @@ with tempfile.TemporaryDirectory() as tmp,patch('ui.CoreRPC',return_value=rpc),p
+  probe();check(home,True)
+  state['offline']=True;probe();check(home,True)
+  state['offline']=False;state['wallets']={};probe();check(home,False)
++ state['block']=True;started.clear();release.clear();home.poll_wallets();spin(started.is_set)
++ home.poll_wallets_if_idle();assert not home.wallet_inventory_pending
++ release.set();spin(lambda:home.wallet_inventory_job is None)
++ started.clear();release.clear()
+  # An old empty response must not hide the card after a confirmed import.
+  state['block']=True;home.poll_wallets();spin(started.is_set)
+  state['wallets']={'new-import':{'private_keys_enabled':False,'descriptors':True}}
+@@ -68,4 +74,4 @@ with tempfile.TemporaryDirectory() as tmp,patch('ui.CoreRPC',return_value=rpc),p
   spin(lambda:home.wallet_inventory_job is None and not home.wallet_inventory_pending)
   check(home,True)
   home.hide()
