@@ -1017,10 +1017,10 @@ index 6c8ccf04157deca355bbf6751002ff045a7d2ec3..7f74a8560b90d6bd32db827a72736b11
              self.progress.setValue(0)
 diff --git a/app/chain_wallet_history.py b/app/chain_wallet_history.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..54eca5eb1cd1b854b960908e8c8ebdbdaef689ea
+index 0000000000000000000000000000000000000000..85edfce7fa0446cae7312316c7a477111c63c419
 --- /dev/null
 +++ b/app/chain_wallet_history.py
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,138 @@
 +"""Check startup wallets against the imported history using native Core and private RAM."""
 +from contextlib import contextmanager
 +import os
@@ -1034,8 +1034,9 @@ index 0000000000000000000000000000000000000000..54eca5eb1cd1b854b960908e8c8ebdbd
 +from rpc import CoreError, CoreRPC
 +from wallet_startup import read_settings
 +
-+READ = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
-+DIRECTORY = READ | os.O_DIRECTORY
++# Maintenance protects DATA with mode 0710. The service account needs only
++# directory traversal, never permission to list each parent.
++DIRECTORY = os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 +
 +
 +def startup_entries(data):
@@ -1079,20 +1080,24 @@ index 0000000000000000000000000000000000000000..54eca5eb1cd1b854b960908e8c8ebdbd
 +
 +
 +def copy_regular(parent, filename, dest, *, optional=False):
++    # Pin and inspect the inode before opening it for reading. O_PATH never
++    # opens the device behind a special filename introduced in a wallet folder.
 +    try:
-+        fd = os.open(filename, READ, dir_fd=parent)
++        handle = os.open(filename, os.O_PATH | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent)
 +    except FileNotFoundError:
 +        if optional:
 +            return
 +        raise
-+    with os.fdopen(fd, 'rb') as src:
-+        st = os.fstat(src.fileno())
++    try:
++        st = os.fstat(handle)
 +        if not stat.S_ISREG(st.st_mode):
 +            raise ValueError('The wallet is not a regular file.')
 +        if optional and st.st_size == 0:
 +            return
-+        with dest.open('xb') as out:
++        with open('/proc/self/fd/' + str(handle), 'rb') as src, dest.open('xb') as out:
 +            shutil.copyfileobj(src, out, length=1024 * 1024)
++    finally:
++        os.close(handle)
 +
 +
 +def copy_wallet(root, entry, work):
@@ -7724,10 +7729,10 @@ index 0000000000000000000000000000000000000000..f65e4eb51d01ebaa4278e79cf01f26b1
 +        self.assertFalse(result.get('requires_pruned_mode'))
 diff --git a/tests/test_chain_wallet_history.py b/tests/test_chain_wallet_history.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..0303a0b5473ab97fce6462326296c07702405d6d
+index 0000000000000000000000000000000000000000..9066f5ef4ffcc9966bf66655ed0964b6845d2acb
 --- /dev/null
 +++ b/tests/test_chain_wallet_history.py
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,115 @@
 +from pathlib import Path
 +from tempfile import TemporaryDirectory
 +from unittest.mock import patch
@@ -7795,6 +7800,23 @@ index 0000000000000000000000000000000000000000..0303a0b5473ab97fce6462326296c077
 +            self.assertEqual(seen, [('loadwallet',b'bad'),('loadwallet',b'good'),('unloadwallet',b'changed by native Core')])
 +            self.assertEqual((data/'good/wallet.dat').read_bytes(), b'good')
 +            self.assertEqual((data/'bad/wallet.dat').read_bytes(), b'bad')
++
++    @unittest.skipIf(os.geteuid() == 0, 'run as the unprivileged Core account')
++    def test_traverses_search_only_parents_during_maintenance(self):
++        with TemporaryDirectory() as temp:
++            root = Path(temp)
++            protected = root/'protected'
++            folder = protected/'wallets/restore'
++            folder.mkdir(parents=True)
++            (folder/'wallet.dat').write_bytes(b'target wallet')
++            ram = root/'ram'
++            ram.mkdir()
++            protected.chmod(0o100)
++            try:
++                history.copy_wallet(protected/'wallets','restore',ram)
++                self.assertEqual((ram/'wallet.dat').read_bytes(),b'target wallet')
++            finally:
++                protected.chmod(0o700)
 +
 +    def test_links_and_special_files_cannot_be_opened_as_wallets(self):
 +        with TemporaryDirectory() as temp:
