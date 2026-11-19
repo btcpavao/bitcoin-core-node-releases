@@ -51,7 +51,7 @@ dpkg-query -W > /out/builder.packages
 # Mastering adds the El Torito catalog and patches the ISOLINUX boot image.
 # Read the finished ISO so each manifest entry verifies against that image.
 iso_tree=$(mktemp -d)
-trap 'rm -rf -- "$iso_tree"' EXIT
+trap 'find "$iso_tree" -type d -exec chmod u+w {} +; rm -rf -- "$iso_tree"' EXIT
 xorriso -abort_on FAILURE -osirrox on -indev /out/bitcoin-core-node-candidate-amd64.iso \
     -extract / "$iso_tree"
 (cd "$iso_tree" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0r sha256sum) > /out/iso-files.sha256
