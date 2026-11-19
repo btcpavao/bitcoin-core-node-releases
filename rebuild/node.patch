@@ -2696,7 +2696,7 @@ index cc0bf87340d444b738eef69319e6f80fcc67d76c..f80184247ffe1b47345d49bc2a7651ed
              except (OSError, subprocess.TimeoutExpired):
                  raise WalletError('The login settings service did not respond. Please keep this session open and try again.') from None
 diff --git a/app/media_file_dialog.py b/app/media_file_dialog.py
-index acec2bb1c75cd863b5920c3f47cc0c3ff224cdb1..340d8bb0a9934e5c5549e77c6065f188063edf4b 100644
+index acec2bb1c75cd863b5920c3f47cc0c3ff224cdb1..cb27179380f4c3bfa40fd2eeb8962fd320d550a0 100644
 --- a/app/media_file_dialog.py
 +++ b/app/media_file_dialog.py
 @@ -116,7 +116,7 @@ class MediaFileDialog(QFileDialog):
@@ -2708,6 +2708,16 @@ index acec2bb1c75cd863b5920c3f47cc0c3ff224cdb1..340d8bb0a9934e5c5549e77c6065f188
          if not drives:
              self.section('No USB filesystem detected')
          for i in range(self.places.count()):
+@@ -281,6 +281,9 @@ def choose_media_folder(parent, title, initial, *, writable=False):
+ 
+ def _choose_media(parent, title, initial, **options):
+     dialog = MediaFileDialog(parent, title, initial, **options)
++    # An independent backup window owns its picker; other Home tools stay usable.
++    if hasattr(parent, 'navigation_owner'):
++        dialog.setWindowModality(Qt.WindowModal)
+     try:
+         if dialog.exec() != QDialog.Accepted:
+             return None
 diff --git a/app/network.py b/app/network.py
 index 795869c8947072d61bd4877a1034dee24555b60d..d9260a50242d403944486d671a17d1c2591b684a 100644
 --- a/app/network.py
@@ -3507,7 +3517,7 @@ index 0000000000000000000000000000000000000000..62fd8e4ce224b59b48592c1a5672a4f0
 +    dialog.show()
 +    return app.exec()
 diff --git a/app/ui.py b/app/ui.py
-index ef4813a01249a821368bf5d9c6869b02d6f6d13c..6772a6dba2c9582b425224858b4d8498620fd248 100644
+index ef4813a01249a821368bf5d9c6869b02d6f6d13c..898aa6d6dd7c96f811bfbde084c002967b813cdf 100644
 --- a/app/ui.py
 +++ b/app/ui.py
 @@ -15,7 +15,7 @@ from wallet_presence import watch_only_wallets_present
@@ -3524,7 +3534,7 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..6772a6dba2c9582b425224858b4d8498
          self.rpc=CoreRPC();self.job=None;self.crypto_process=None;self.power_flow_open=False
          actions=[('Bitcoin Core','Open Bitcoin Core',(),QStyle.SP_ComputerIcon,self.open_core),
 -                 ('Watch-Only Wallets','Balances, addresses & history',(),QStyle.SP_ComputerIcon,lambda:self.wallet_action('WalletDialog')),
-+                 ('Wallets','Wallet types, details & deletion',(),QStyle.SP_ComputerIcon,lambda:self.wallet_action('WalletManagerDialog')),
++                 ('Wallets','Wallet types, details & deletion',(),QStyle.SP_ComputerIcon,self.wallets),
                   ('PSBT Transfer Folder','Temporary PSBT exchange in RAM',('folder-publicshare','folder'),QStyle.SP_DirIcon,self.psbt_workspace),
                   ('Private Workspace','Temporary files in RAM',('folder-locked','folder'),QStyle.SP_DirIcon,self.private_workspace),
                   ('Backup and Restore','Blockchain, wallets & settings',(str(branding_file('icons/settings-chain-backup.png')),),QStyle.SP_DialogSaveButton,self.backup_restore),
@@ -3698,6 +3708,38 @@ index ef4813a01249a821368bf5d9c6869b02d6f6d13c..6772a6dba2c9582b425224858b4d8498
  
      def show_bitcoin_core_status(self,rows,*,from_settings=False):
          dialog=self.refresh(from_settings=from_settings)
+@@ -712,11 +759,16 @@ class Home(DesktopSurface):
+         except (WorkspaceError,OSError) as exc:
+             self.status.setText(str(exc) if isinstance(exc,WorkspaceError) else 'The file encryption tool could not open.')
+ 
+-    def wallet_action(self,name):
+-        import wallet_ui
+-        dialog=getattr(wallet_ui,name)(self)
+-        dialog.exec()
+-        self.poll_wallets()
++    def wallets(self):
++        from modeless import open_window
++        from wallet_ui import WalletManagerDialog
++
++        def create():
++            manager = WalletManagerDialog(self)
++            manager.finished.connect(self.poll_wallets)
++            return manager
++
++        return open_window(self, 'wallets', create)
+ 
+     def privacy(self):
+         if self.job and self.job.isRunning():
+@@ -771,7 +823,8 @@ class Home(DesktopSurface):
+ 
+     def guide(self):
+         from guide_ui import Guide
+-        dialog=Guide(self);dialog.exec()
++        from modeless import open_window
++        return open_window(self, 'guide', lambda: Guide(self))
+ 
+     def closeEvent(self,event):
+         event.ignore()  # Match the Vault desktop surface; applications close independently.
 diff --git a/app/usb_dialog.py b/app/usb_dialog.py
 index 49227e4297d19ad7a77a563a95701ecbf7792133..debee9a0982cf4dfeb75f2f013101356c1ac5063 100644
 --- a/app/usb_dialog.py
@@ -4052,10 +4094,10 @@ index c9bf6640cf96c7f3586e2d9f9e7c2f374efaa76b..d5f81cc27ae559f4918193836ec2a27d
          if missing and name is not None:
              try:
 diff --git a/app/wallet_ui.py b/app/wallet_ui.py
-index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..359b8061bf0c8afd440bfde28ad4c35a81b15baf 100644
+index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..382404429362bc5791d83e0685e22f70d5843ff4 100644
 --- a/app/wallet_ui.py
 +++ b/app/wallet_ui.py
-@@ -5,12 +5,13 @@ import json
+@@ -5,12 +5,14 @@ import json
  from pathlib import Path
  from decimal import Decimal
  
@@ -4067,11 +4109,29 @@ index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..359b8061bf0c8afd440bfde28ad4c35a
      QPlainTextEdit, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
      QAbstractItemView, QHeaderView, QScrollArea, QWidget, QLayout)
  
++from modeless import root_of
 +from rpc import CoreError
  from wallets import WalletService, WalletError, amount
  
  
-@@ -65,61 +66,217 @@ class WorkDialog(QDialog):
+@@ -19,7 +21,7 @@ class WorkDialog(QDialog):
+         super().__init__(parent)
+         from ui import STYLE
+         self.setWindowTitle(title); self.setStyleSheet(STYLE); self.resize(840, 680)
+-        self.service = WalletService(parent.rpc); self.job = None; self.actions = []
++        self.service = WalletService(root_of(parent).rpc); self.job = None; self.actions = []
+         outer = QVBoxLayout(self); outer.setContentsMargins(24, 24, 24, 24); outer.setSpacing(14)
+         heading = QLabel(title); heading.setObjectName('Title'); outer.addWidget(heading)
+         self.status = QLabel(''); self.status.setWordWrap(True); self.status.setTextFormat(Qt.PlainText)
+@@ -58,68 +60,231 @@ class WorkDialog(QDialog):
+ 
+     def closeEvent(self, event):
+         if self.job and self.job.isRunning(): event.ignore(); self.reject()
+-        else: event.accept()
++        else: super().closeEvent(event)
+ 
+     def wallet_selector(self):
+         box = QComboBox(); box.setAccessibleName('Watch-only wallet')
          # Inventory is refreshed in a worker after the dialog is displayed.
          self.layout.addWidget(box); return box
  
@@ -4313,7 +4373,12 @@ index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..359b8061bf0c8afd440bfde28ad4c35a
 +
 +    def details(self):
 +        row, = self.selected()
-+        WalletDialog(self.home, preferred=row['rpc_name']).exec()
++        details = WalletDialog(self, preferred=row['rpc_name'])
++        details.setWindowModality(Qt.WindowModal)
++        try:
++            details.exec()
++        finally:
++            details.deleteLater()
 +
 +    def secure_delete(self):
 +        from wallet_delete_ui import WalletDeletionDialog, WalletDeletionProgress
@@ -4322,9 +4387,11 @@ index 2e7cce0d5f76fd886152698aaa486a0021e0ec52..359b8061bf0c8afd440bfde28ad4c35a
 +        if not names or not all(row['managed'] for row in rows):
 +            return
 +        confirmation = WalletDeletionDialog(names, self, kinds=[row['kind'] for row in rows])
++        confirmation.setWindowModality(Qt.WindowModal)
 +        if confirmation.exec() != QDialog.Accepted:
 +            return
 +        progress = WalletDeletionProgress(names, self)
++        progress.setWindowModality(Qt.WindowModal)
 +        QTimer.singleShot(0, progress.launch)
 +        progress.exec()
 +        self.refresh()
@@ -6015,18 +6082,37 @@ index 908c25fe3850aa8dadc22b3b2181042a7a85c285..105ed5a9bfba3e6f5e3e4eac84d4cf71
  xset s off 2>/dev/null || true
  xset s noblank 2>/dev/null || true
 diff --git a/runtime/usr/local/bin/core-node-taskbar b/runtime/usr/local/bin/core-node-taskbar
-index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c74a819133 100755
+index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..06c8d4095fa7d8fa3374c4f89ad143657b1dc4bd 100755
 --- a/runtime/usr/local/bin/core-node-taskbar
 +++ b/runtime/usr/local/bin/core-node-taskbar
-@@ -12,6 +12,7 @@ import json
+@@ -12,13 +12,14 @@ import json
  import os
  from pathlib import Path
  import runpy
 +import subprocess
  import sys
  
- from PySide6.QtCore import Qt, QSize, QTimer
-@@ -51,6 +52,9 @@ class XEvent(C.Union):
+-from PySide6.QtCore import Qt, QSize, QTimer
+-from PySide6.QtGui import QIcon, QImage, QPixmap
+-from PySide6.QtWidgets import QApplication, QHBoxLayout, QMenu, QPushButton, QWidget
++from PySide6.QtCore import QEvent, QSize, QTimer
++from PySide6.QtGui import QIcon, QImage, QPixmap, Qt
++from PySide6.QtWidgets import QApplication, QHBoxLayout, QLayout, QMenu, QPushButton, QStyle, QWidget
+ 
+-VERSION = 'taskbar-controls-v3-restore-dialogs'
++VERSION = 'taskbar-controls-v4-compact-tasks'
+ HEIGHT = 40
+ MAX_PROPERTY = 262144
+ STYLE = '''
+@@ -30,6 +31,7 @@ QPushButton:pressed { background: #171717; }
+ QPushButton:focus { background: #333333; }
+ QPushButton[active="true"] { background: #272727; color: white; }
+ QPushButton[minimized="true"] { color: #999999; }
++QPushButton[compact="true"] { padding: 0px; text-align: center; }
+ QPushButton#HomeButton { padding: 0px; border-radius: 4px; text-align: center; }
+ QMenu { background: #191919; border: 1px solid #484848; color: #f0f0f0; padding: 4px; }
+ QMenu::item { padding: 7px 28px 7px 14px; }
+@@ -51,6 +53,9 @@ class XEvent(C.Union):
  X11Base = runpy.run_path(str(Path(__file__).with_name('core-node-show-home')),
                          run_name='node_taskbar_x11')['X11']
  
@@ -6036,7 +6122,7 @@ index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c7
  class Windows(X11Base):
      def __init__(self):
          super().__init__()
-@@ -61,6 +65,8 @@ class Windows(X11Base):
+@@ -61,6 +66,8 @@ class Windows(X11Base):
              ('XTranslateCoordinates', [C.c_void_p, C.c_ulong, C.c_ulong,
                  C.c_int, C.c_int, C.POINTER(C.c_int), C.POINTER(C.c_int),
                  C.POINTER(C.c_ulong)], C.c_int),
@@ -6045,7 +6131,7 @@ index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c7
              ('XMapRaised', [C.c_void_p, C.c_ulong], C.c_int),
              ('XDeleteProperty', [C.c_void_p, C.c_ulong, C.c_ulong], C.c_int),
              ('XSendEvent', [C.c_void_p, C.c_ulong, C.c_int, C.c_long, C.POINTER(XEvent)], C.c_int),
-@@ -89,7 +95,7 @@ class Windows(X11Base):
+@@ -89,7 +96,7 @@ class Windows(X11Base):
              if pointer:
                  self.lib.XFree(pointer)
  
@@ -6054,7 +6140,7 @@ index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c7
          # Query actual X coordinates, including monitor offsets and fractional
          # rounding, instead of guessing from Qt's device-independent geometry.
          root, child = C.c_ulong(), C.c_ulong()
-@@ -99,20 +105,32 @@ class Windows(X11Base):
+@@ -99,20 +106,32 @@ class Windows(X11Base):
                  C.byref(x), C.byref(y), C.byref(width), C.byref(height),
                  C.byref(border), C.byref(depth)):
              raise RuntimeError('Taskbar geometry is unavailable.')
@@ -6090,7 +6176,61 @@ index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c7
              32, 0, C.cast(data, C.POINTER(C.c_ubyte)), len(values))
          self.lib.XSync(self.display, 0)
  
-@@ -307,16 +325,42 @@ class Taskbar(QWidget):
+@@ -251,7 +270,20 @@ class Windows(X11Base):
+         if len(desktops) == 1:
+             self.minimize(desktops[0])
+ 
+-class TaskButton(QPushButton):
++class PanelButton(QPushButton):
++    def event(self, event):
++        handled = super().event(event)
++        if event.type() == QEvent.ToolTip:
++            # Qt puts the popup next to the pointer, overlapping a bottom dock.
++            # Preserve native tooltip timing and horizontal screen-edge fitting.
++            for tip in QApplication.topLevelWidgets():
++                if tip.windowType() == Qt.ToolTip and tip.isVisible():
++                    tip.move(tip.x(), self.parentWidget().frameGeometry().top() - tip.height() - 2)
++                    break
++        return handled
++
++
++class TaskButton(PanelButton):
+     def __init__(self, panel, window):
+         super().__init__(panel)
+         self.panel, self.window = panel, window
+@@ -261,6 +293,8 @@ class TaskButton(QPushButton):
+         self.setContextMenuPolicy(Qt.CustomContextMenu)
+         self.customContextMenuRequested.connect(self.context_menu)
+         self.title, self.icon_signature = '', None
++        self.window_icon = QIcon()
++        self.compact_icon = QIcon()
+ 
+     def mouseReleaseEvent(self, event):
+         if event.button() == Qt.MiddleButton and self.rect().contains(event.position().toPoint()):
+@@ -290,11 +324,14 @@ class Taskbar(QWidget):
+         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus)
+         self.setAttribute(Qt.WA_X11NetWmWindowTypeDock, True)
+         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
++        self.setAttribute(Qt.WA_AlwaysShowToolTips, True)
+         self.setStyleSheet(STYLE)
+         self.row = QHBoxLayout(self)
+         self.row.setContentsMargins(0, 0, 6, 0)
+         self.row.setSpacing(6)
+-        self.home_button = QPushButton(self)
++        self.row.setSizeConstraint(QLayout.SetNoConstraint)
++        self.fallback_icon = self.style().standardIcon(QStyle.SP_FileIcon)
++        self.home_button = PanelButton(self)
+         self.home_button.setObjectName('HomeButton')
+         self.home_button.setFixedSize(40, 40)
+         home_icon = QIcon(str(args.assets/'icons/debian-white.png'))
+@@ -302,21 +339,47 @@ class Taskbar(QWidget):
+             raise RuntimeError('Bundled Debian Home icon could not be loaded.')
+         self.home_button.setIcon(home_icon)
+         self.home_button.setIconSize(QSize(28, 28))
+-        self.home_button.setToolTip('Home')
+-        self.home_button.setAccessibleName('Home')
++        self.home_button.setToolTip('Back to desktop')
++        self.home_button.setAccessibleName('Back to desktop')
          self.home_button.clicked.connect(self.x.home)
          self.row.addWidget(self.home_button)
          self.row.addStretch(1)
@@ -6136,7 +6276,7 @@ index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c7
          self.setGeometry(geometry.x(), geometry.y()+geometry.height()-HEIGHT, geometry.width(), HEIGHT)
          self.sync_reservation()
  
-@@ -326,7 +370,7 @@ class Taskbar(QWidget):
+@@ -326,7 +389,7 @@ class Taskbar(QWidget):
          # Home is open. Iconified applications remain managed tasks.
          if self.panel_active:
              QApplication.sync()  # Flush Qt/XCB geometry before querying via Xlib.
@@ -6145,6 +6285,68 @@ index 7b15ddb50e6a189f61a59ab9e23f4cd4246f674c..4fc9eee7966d11b20f4f2e3f260792c7
              short = [0, 0, 0, bottom]
              partial = [0, 0, 0, bottom, 0, 0, 0, 0, 0, 0, left, right]
              if self.x.prop(wid, '_NET_WM_STRUT') != short:
+@@ -366,32 +429,43 @@ class Taskbar(QWidget):
+             title = self.x.title(window)
+             if button.title != title:
+                 button.title = title
+-                button.setToolTip(title)
++                button.setToolTip(Qt.convertFromPlainText(title) if Qt.mightBeRichText(title) else title)
+                 button.setAccessibleName(title)
+             # Icons change rarely. Hash the bounded property to avoid continually
+             # allocating Qt images while still honoring application icon changes.
+             signature = hash(tuple(self.x.property(window, '_NET_WM_ICON') or ()))
+             if button.icon_signature != signature:
+                 button.icon_signature = signature
+-                button.setIcon(self.x.icon(window))
++                button.window_icon = self.x.icon(window)
++                button.compact_icon = button.window_icon
++                if button.compact_icon.isNull():
++                    for parent in self.x.ancestors(window):
++                        button.compact_icon = self.x.icon(parent)
++                        if not button.compact_icon.isNull():
++                            break
++                    else:
++                        button.compact_icon = self.fallback_icon
++            icon_space = 0 if button.window_icon.isNull() else 28
++            button.natural_width = max(32, button.fontMetrics().horizontalAdvance(title) + 18 + icon_space)
+         active = self.x.prop(self.x.root, '_NET_ACTIVE_WINDOW')
+-        # VAULT_TASKBAR_NATURAL_WIDTH_V2: fit each full title and its icon.
+-        # Only a genuinely crowded bar needs elision; unused space stays empty.
+-        natural = {}
+-        for window, button in self.buttons.items():
+-            icon_space = 28 if not button.icon().isNull() else 0
+-            natural[window] = max(32, button.fontMetrics().horizontalAdvance(button.title)+18+icon_space)
+-            button.natural_width = natural[window]
+-        available = max(24, self.width()-46-len(windows)*6)
+-        total = sum(natural.values())
++        # Keep full titles until they no longer fit. Recompute from the panel's
++        # width and original titles so closing a window restores labels at once.
++        margins = self.row.contentsMargins()
++        room = self.width() - margins.left() - margins.right() - self.home_button.width()
++        per_task = max(1, room // max(1, len(self.buttons)))
++        spacing = min(6, max(0, per_task - 24))
++        self.row.setSpacing(spacing)
++        compact = sum(b.natural_width + spacing for b in self.buttons.values()) > room
++        icon_width = min(36, per_task - spacing)
+         for window, button in self.buttons.items():
+-            width = natural[window] if total <= available else max(24, int(natural[window]*available/total))
+-            button.setFixedWidth(width)
+-            icon_space = 28 if not button.icon().isNull() else 0
+-            label = button.title if width >= natural[window] else button.fontMetrics().elidedText(
+-                button.title, Qt.ElideRight, max(0, width-18-icon_space))
+-            button.setText(label.replace('&', '&&'))
+-            for name, value in (('active', active == [window]), ('minimized', self.x.minimized(window))):
++            button.setFixedWidth(icon_width if compact else button.natural_width)
++            button.setIconSize(QSize(min(24, icon_width), 24) if compact else QSize(24, 24))
++            icon = button.compact_icon if compact else button.window_icon
++            if button.icon().cacheKey() != icon.cacheKey():
++                button.setIcon(icon)
++            button.setText('' if compact else button.title.replace('&', '&&'))
++            for name, value in (('compact', compact), ('active', active == [window]),
++                                ('minimized', self.x.minimized(window))):
+                 if button.property(name) != value:
+                     button.setProperty(name, value)
+                     button.style().unpolish(button)
 diff --git a/runtime/usr/local/bin/core-node-text-clipping b/runtime/usr/local/bin/core-node-text-clipping
 new file mode 100755
 index 0000000000000000000000000000000000000000..9104834470ca70e722274048ed2fbcd3b5c76594
@@ -7323,6 +7525,120 @@ index 0000000000000000000000000000000000000000..f4b0396793bf168eb3db9bbb1430aa0b
 +    if wm is not None:
 +        wm.terminate()
 +        wm.wait(timeout=5)
+diff --git a/tests/taskbar_overflow_x11.py b/tests/taskbar_overflow_x11.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..bcab48ced8e4dc52fdac65d7e6595f598b46e9bd
+--- /dev/null
++++ b/tests/taskbar_overflow_x11.py
+@@ -0,0 +1,108 @@
++#!/usr/bin/python3
++"""Exercise the bottom panel with an external active client in an isolated X server."""
++from pathlib import Path
++import runpy
++import subprocess
++import sys
++import time
++from types import SimpleNamespace
++
++from PySide6.QtCore import Qt
++from PySide6.QtWidgets import QApplication, QDialog, QToolTip, QWidget
++
++root = Path(__file__).resolve().parents[1]
++sys.path.insert(0, str(root / 'app'))
++from media_file_dialog import MediaFileDialog
++
++app = QApplication([])
++app.setQuitOnLastWindowClosed(False)
++module = runpy.run_path(str(root / 'runtime/usr/local/bin/core-node-taskbar'))
++x = module['Windows']()
++assert not x.prop(x.root, '_NET_SUPPORTING_WM_CHECK'), 'Run in a fresh Xvfb display'
++
++
++def wait(condition):
++    end = time.monotonic() + 8
++    while time.monotonic() < end:
++        app.processEvents()
++        value = condition()
++        if value:
++            return value
++        time.sleep(.025)
++    raise AssertionError('Timed out waiting for ' + condition.__name__)
++
++
++def hover(button):
++    point = button.mapToGlobal(button.rect().center())
++    scale = button.devicePixelRatioF()
++    subprocess.run(['xdotool', 'mousemove', str(round(point.x() * scale)),
++                    str(round(point.y() * scale))], check=True)
++    wait(lambda: QToolTip.isVisible() and QToolTip.text() == button.toolTip())
++    tip = next(w for w in app.topLevelWidgets() if w.isVisible() and w.windowType() == Qt.ToolTip)
++    assert tip.geometry().bottom() < panel.geometry().top(), tip.geometry()
++
++
++wm = subprocess.Popen(['openbox'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++external = None
++try:
++    wait(lambda: x.prop(x.root, '_NET_SUPPORTING_WM_CHECK'))
++    panel = module['Taskbar'](SimpleNamespace(
++        assets=root / 'runtime/usr/share/bitcoin-core-node', preview=False))
++    home = QWidget()
++    home.setWindowTitle('Bitcoin Core Node')
++    home.setAttribute(Qt.WA_X11NetWmWindowTypeDesktop, True)
++    home.show()
++    clients = []
++    for title in ('USB', 'Private Workspace', 'Terminal', 'Mousepad',
++                  'Settings', 'Backup and Restore', 'Node Configuration'):
++        client = QDialog(home)
++        client.setWindowTitle(title)
++        client.show()
++        clients.append(client)
++    wait(lambda: len(panel.buttons) == len(clients))
++    assert all(b.text() == b.title for b in panel.buttons.values())
++
++    # Give the editor a filename long enough to use the remaining width,
++    # leaving room for all its peers but not for the chooser opened next.
++    editor = clients[3]
++    button = panel.buttons[int(editor.winId())]
++    metrics = button.fontMetrics()
++    room = panel.width() - panel.home_button.width() - panel.row.contentsMargins().right()
++    free = room - sum(b.natural_width + panel.row.spacing() for b in panel.buttons.values())
++    editor.setWindowTitle('Mousepad' + 'm' * max(0, (free - 20) // metrics.horizontalAdvance('m')))
++    wait(lambda: button.title == editor.windowTitle())
++    assert all(b.text() == b.title for b in panel.buttons.values())
++
++    chooser = MediaFileDialog(clients[-1], 'Choose settings backup destination',
++                              '/tmp', autostart=False, directory=True)
++    chooser.show()
++    wait(lambda: int(chooser.winId()) in panel.buttons)
++    assert all(not b.text() and not b.icon().isNull() for b in panel.buttons.values())
++    assert all(b.toolTip() == b.title == b.accessibleName() for b in panel.buttons.values())
++    assert all(panel.rect().contains(b.geometry()) for b in panel.buttons.values())
++
++    # A dock is not the active window when a person hovers its buttons.
++    external = subprocess.Popen(['xmessage', '-title', 'External test client', 'test'],
++                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++    outside = wait(lambda: next((w for w in panel.buttons if x.title(w) == 'External test client'), None))
++    subprocess.run(['xdotool', 'windowactivate', '--sync', str(outside)], timeout=5, check=True)
++    assert x.prop(x.root, '_NET_ACTIVE_WINDOW') == [outside]
++    hover(panel.buttons[int(chooser.winId())])
++    hover(panel.home_button)
++    assert panel.home_button.toolTip() == 'Back to desktop'
++    assert x.prop(x.root, '_NET_ACTIVE_WINDOW') == [outside]
++    external.terminate()
++    external.wait()
++    external = None
++    chooser.reject()
++    wait(lambda: len(panel.buttons) == len(clients) and all(
++        b.text() == b.title for b in panel.buttons.values()))
++    print(f'PASS {panel.screen.geometry().width()} logical pixels, {panel.devicePixelRatioF():g}x: '
++          'full labels, chooser triggers icons, real hover without activation, labels restore.')
++finally:
++    if external is not None:
++        external.terminate()
++        external.wait()
++    wm.terminate()
++    wm.wait()
++    x.close()
 diff --git a/tests/test_activity_stages.py b/tests/test_activity_stages.py
 index c8f6627fb7b608e0a9da290fffd0f64159113905..7d0f1ca8795321d96fd26176c8600e3539a9eff3 100644
 --- a/tests/test_activity_stages.py
@@ -8291,6 +8607,70 @@ index 48d5659d759490db865b5de3785e61ef4f40c7f2..1e075634ad8e755bc2b71d42d9dadc1d
     home.show_activity(('syncing','Blockchain download and validation in progress · 73.25%',False,.7325,dict(total=850*1024**3,free=255*1024**3,used_percent=70,free_percent=30)))
     for _ in range(25):self.app.processEvents();home.layout_cards()
     self.assertEqual(home.scroll.verticalScrollBar().maximum(),0)
+diff --git a/tests/test_home_wallet_guide.py b/tests/test_home_wallet_guide.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a4e18c1f867f990562bae651f5a201948a86a30
+--- /dev/null
++++ b/tests/test_home_wallet_guide.py
+@@ -0,0 +1,58 @@
++"""The desktop, wallets and guide are independent even in the same Qt process."""
++import os
++from pathlib import Path
++import sys
++import unittest
++from unittest.mock import Mock, patch
++
++os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
++from PySide6.QtCore import Qt
++from PySide6.QtWidgets import QApplication, QDialog, QWidget
++
++from guide_ui import Guide
++from ui import Home
++from wallet_ui import WalletManagerDialog
++
++
++class HomeNavigation(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.app = QApplication.instance() or QApplication([])
++
++    def test_wallets_and_guide_restore_existing_windows_and_release_them_on_close(self):
++        owner = QWidget()
++        owner.rpc = Mock()
++        owner.poll_wallets = Mock(spec=Home.poll_wallets)
++        with patch.object(QDialog, 'exec', side_effect=AssertionError('Home was blocked')), \
++             patch.object(WalletManagerDialog, 'refresh'):
++            for opener, kind in ((Home.wallets, WalletManagerDialog), (Home.guide, Guide)):
++                window = opener(owner)
++                self.assertIsInstance(window, kind)
++                self.assertIsNone(window.parentWidget())
++                self.assertEqual(window.windowModality(), Qt.NonModal)
++                window.showMinimized()
++                self.app.processEvents()
++                self.assertIs(opener(owner), window)
++                self.assertFalse(window.isMinimized())
++                window.close()
++                self.assertFalse(owner._modeless_windows)
++            owner.poll_wallets.assert_called_once()
++
++    def test_watch_details_are_modal_only_to_the_manager_and_keep_the_selected_wallet(self):
++        owner = QWidget()
++        owner.rpc = Mock()
++        owner.poll_wallets = Mock()
++        with patch.object(WalletManagerDialog, 'refresh'), patch('wallet_ui.WalletDialog.refresh'):
++            manager = Home.wallets(owner)
++            row = {'rpc_name': 'selected-public-wallet'}
++            children = []
++            with patch.object(manager, 'selected', return_value=[row]), \
++                 patch.object(QDialog, 'exec', lambda child: children.append(child)):
++                manager.details()
++            child, = children
++            self.assertIs(child.parentWidget(), manager)
++            self.assertEqual(child.windowModality(), Qt.WindowModal)
++            self.assertEqual(child.preferred, row['rpc_name'])
++            self.assertIs(child.service.rpc, owner.rpc)
++            manager.close()
 diff --git a/tests/test_installer_disks.py b/tests/test_installer_disks.py
 index 6418f931011d301a497f8b72624843686477efdd..602f566cd6f14d0bad8009b74490fc9d91c6de6d 100644
 --- a/tests/test_installer_disks.py
