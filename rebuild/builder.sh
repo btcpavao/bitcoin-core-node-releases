@@ -48,4 +48,10 @@ install -m 644 artifacts/bitcoin-core-node-development-amd64.iso /out/bitcoin-co
 cp build/chroot.packages.live /out/filesystem.packages
 (cd /out && sha256sum bitcoin-core-node-candidate-amd64.iso > SHA256SUMS)
 dpkg-query -W > /out/builder.packages
-(cd build/binary && find . -type f -print0 | LC_ALL=C sort -z | xargs -0r sha256sum) > /out/iso-files.sha256
+# Mastering adds the El Torito catalog and patches the ISOLINUX boot image.
+# Read the finished ISO so each manifest entry verifies against that image.
+iso_tree=$(mktemp -d)
+trap 'rm -rf -- "$iso_tree"' EXIT
+xorriso -abort_on FAILURE -osirrox on -indev /out/bitcoin-core-node-candidate-amd64.iso \
+    -extract / "$iso_tree"
+(cd "$iso_tree" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0r sha256sum) > /out/iso-files.sha256
