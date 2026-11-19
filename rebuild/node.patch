@@ -260,7 +260,7 @@ index 9868f7f6cb0142c86cee7d670b921b751ce9be5e..d1a5c52604ac10e1e5967dee4c46d038
                  'Debian, apps, wallets, other files and filesystem-reserved space are excluded. '
                  'This is not a fixed reservation: other files can reduce the available space. '
 diff --git a/app/chain_backup.py b/app/chain_backup.py
-index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9d073557a 100644
+index f55cf7c5a613b94fe64688ce318dcd2814656d87..b5e8fbd2ebcf835ce87cefb212cd2a82c298dd05 100644
 --- a/app/chain_backup.py
 +++ b/app/chain_backup.py
 @@ -6,7 +6,7 @@ checksummed manifest is published after a clean stop, streaming copy and flush.
@@ -377,17 +377,31 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
          fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
          yield
      except BlockingIOError:
-@@ -426,17 +475,21 @@ def core_lock(root):
+@@ -424,27 +473,43 @@ def core_lock(root):
+     finally: os.close(fd)
  
- def probe(root, network, events):
+ 
+-def probe(root, network, events):
++def probe(root, network, events, *, prune_mib=1, wallet_history=False):
      """Validate only a staged import; keep bounded, actionable diagnostics."""
 -    events.update('Opening the copied databases with Bitcoin Core (offline)', force=True)
-+    phase = 'Opening the copied databases with Bitcoin Core (offline)'
+-    with tempfile.TemporaryFile(mode='w+b') as diagnostic:
+-        process = subprocess.Popen(['/usr/bin/unshare', '--net', '--', '/usr/bin/python3',
+-                                    '/usr/lib/bitcoin-core-node/chain_probe.py', str(root), network],
+-                                   stdout=subprocess.PIPE, stderr=diagnostic, text=True, env=ENV)
++    phase = ('Checking local startup wallets against the imported history (offline)' if wallet_history
++             else 'Opening the copied databases with Bitcoin Core (offline)')
 +    events.update(phase, force=True)
-     with tempfile.TemporaryFile(mode='w+b') as diagnostic:
-         process = subprocess.Popen(['/usr/bin/unshare', '--net', '--', '/usr/bin/python3',
-                                     '/usr/lib/bitcoin-core-node/chain_probe.py', str(root), network],
-                                    stdout=subprocess.PIPE, stderr=diagnostic, text=True, env=ENV)
++    args = ['/usr/bin/unshare', '--net']
++    if wallet_history:
++        args.append('--mount')
++    args += ['--','/usr/bin/python3','/usr/lib/bitcoin-core-node/chain_probe.py',
++             str(root),network,'archive' if prune_mib == 0 else 'manual']
++    if wallet_history:
++        args.append('wallet-history')
++    with tempfile.TemporaryFile(mode='w+b') as diagnostic, tempfile.TemporaryFile(mode='w+') as output:
++        process = subprocess.Popen(args, stdout=output if wallet_history else subprocess.PIPE,
++                                   stderr=diagnostic, text=True, env=ENV)
          try:
 -            deadline = time.monotonic() + 900
 +            started = time.monotonic()
@@ -401,9 +415,35 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
 +                    events.update(f'{phase} · {minutes} min elapsed', force=True)
 +                    reported_minutes = minutes
                  time.sleep(.1)
-             raw = process.stdout.read(8193)
-             if process.returncode or len(raw) > 8192:
-@@ -498,7 +551,7 @@ def publish_latest(parent, directory, network, caller):
+-            raw = process.stdout.read(8193)
+-            if process.returncode or len(raw) > 8192:
++            limit = 8 * 1024 * 1024 if wallet_history else 8192
++            if wallet_history:
++                output.seek(0)
++            raw = (output if wallet_history else process.stdout).read(limit + 1)
++            if process.returncode or len(raw) > limit:
+                 diagnostic.seek(0, os.SEEK_END)
+                 diagnostic.seek(max(0, diagnostic.tell() - 2000))
+                 reason = diagnostic.read(2000).decode('utf-8', 'replace')
+                 reason = ' '.join(reason.split())[:1000]
+-                raise ChainError('Bitcoin Core could not validate the imported blockchain. Existing data was kept.'
++                message = ('Bitcoin Core could not verify local startup wallets.' if wallet_history
++                           else 'Bitcoin Core could not validate the imported blockchain.')
++                raise ChainError(message + ' Existing data was kept.'
+                                  + (' Reason: ' + reason if reason else ' The validation process exited without a diagnostic.'))
+             result = json.loads(raw)
+             if (result['chain'] != network or type(result['blocks']) is not int or result['blocks'] < 0
+@@ -457,7 +522,8 @@ def probe(root, network, events):
+                 try: process.wait(timeout=150)
+                 except subprocess.TimeoutExpired:
+                     process.kill(); process.wait()
+-            process.stdout.close()
++            if process.stdout is not None:
++                process.stdout.close()
+ 
+ 
+ def read_tip_hint(network):
+@@ -498,7 +564,7 @@ def publish_latest(parent, directory, network, caller):
              except FileNotFoundError: pass
  
  
@@ -412,7 +452,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
      """An exact snapshot, a new drive-root shortcut, or a legacy snapshot folder."""
      fd, resolved, fs = external(source, caller)
      try:
-@@ -507,7 +560,7 @@ def open_backup(source, caller, network, version):
+@@ -507,7 +573,7 @@ def open_backup(source, caller, network, version):
              except FileNotFoundError: direct = False
              else: direct = True
          if direct:
@@ -421,7 +461,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
          pointer = latest_name(network)
          with identity(caller):
              try: os.stat(pointer, dir_fd=fd, follow_symlinks=False)
-@@ -536,6 +589,7 @@ def open_backup(source, caller, network, version):
+@@ -536,6 +602,7 @@ def open_backup(source, caller, network, version):
                  raise ChainError('There are too many snapshots here. Please select the backup folder directly.')
              candidates = []
              for n in names:
@@ -429,7 +469,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
                  with identity(caller): info = os.stat(n, dir_fd=fd, follow_symlinks=False)
                  if not stat.S_ISDIR(info.st_mode): continue
                  with directory_at(fd, (n,), caller) as child:
-@@ -550,7 +604,7 @@ def open_backup(source, caller, network, version):
+@@ -550,7 +617,7 @@ def open_backup(source, caller, network, version):
              name = max(candidates)[1]
          with identity(caller): child = os.open(name, DIR_FLAGS, dir_fd=fd)
          try:
@@ -438,7 +478,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
          except BaseException:
              os.close(child); raise
          os.close(fd)
-@@ -588,37 +642,82 @@ def restore_settings(root, raw, owner):
+@@ -588,37 +655,82 @@ def restore_settings(root, raw, owner):
      os.replace(temporary, path); sync_dir(root)
  
  
@@ -540,10 +580,13 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
          restore_settings(data, raw, (account.pw_uid, account.pw_gid))
      elif (tx/'receipt.json').exists():
          # Commit the first-start decision with the chain. This is idempotent
-@@ -636,36 +735,41 @@ def recover(data=DATA):
+@@ -636,37 +748,47 @@ def recover(data=DATA):
      shutil.rmtree(tx); sync_dir(data)
  
  
+-def activate(data, staging, manifest, owner, events):
+-    root = chain_root(manifest['network'], data)
+-    candidate = chain_root(manifest['network'], staging / 'candidate')
 +def recover_chain_storage(data=DATA):
 +    """Under the maintenance lock, finish recovery and free abandoned imports."""
 +    recover(data)
@@ -557,9 +600,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
 +    sync_dir(data)
 +
 +
- def activate(data, staging, manifest, owner, events):
--    root = chain_root(manifest['network'], data)
--    candidate = chain_root(manifest['network'], staging / 'candidate')
++def activate(data, staging, manifest, owner, events, *, deferred_wallets=()):
      previous = staging / 'previous'; previous.mkdir(mode=0o700)
      # The managed GUI explicitly uses DATA/settings.json for every network.
      raw, settings = settings_read(data)
@@ -587,6 +628,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
 -                os.rename(root / name, previous / name); sync_dir(root); sync_dir(previous)
 -            if name in new:
 -                os.rename(candidate / name, root / name); sync_dir(candidate); sync_dir(root)
+-        # Keep every other Core preference, including loaded wallet names.
 +        with transaction_dirs(data, staging, manifest['network']) as (root, previous_fd, candidate):
 +            old = [name for name in ROOTS if has_directory(root, name)]
 +            new = [name for name in ROOTS if has_directory(candidate, name)]
@@ -596,10 +638,16 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
 +            for name in ROOTS:
 +                if name in old: move_directory(name, root, previous_fd)
 +                if name in new: move_directory(name, candidate, root)
-         # Keep every other Core preference, including loaded wallet names.
++        if deferred_wallets:
++            entries = settings.get('wallet', [''])
++            if not set(deferred_wallets).issubset(entries):
++                raise ChainError('Wallet startup settings changed during validation. Existing data was kept.')
++            settings['wallet'] = [name for name in entries if name not in deferred_wallets]
++        # Preserve every other preference and all compatible startup wallets.
          settings['prune'] = str(manifest['prune_mib'])
          restore_settings(data, (json.dumps(settings, indent=2) + '\n').encode(), owner)
-@@ -688,7 +792,8 @@ def backup(destination, caller, setup, release, events, *, tip_hint=None):
+         j['phase'] = 'committed'; atomic_json(data / JOURNAL, j)
+@@ -688,7 +810,8 @@ def backup(destination, caller, setup, release, events, *, tip_hint=None):
          with core_lock(root):
              src = os.open(root, DIR_FLAGS)
              try:
@@ -609,7 +657,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
                  if os.fstatvfs(dest).f_bavail * os.fstatvfs(dest).f_frsize < total + 128 * 1024**2:
                      raise ChainError('The selected drive does not have enough free space for this backup.')
                  if fs == 'vfat' and any(f['size'] >= 2**32 for f in files):
-@@ -737,8 +842,8 @@ def backup(destination, caller, setup, release, events, *, tip_hint=None):
+@@ -737,8 +860,8 @@ def backup(destination, caller, setup, release, events, *, tip_hint=None):
          os.close(dest)
  
  
@@ -620,7 +668,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
      staging = DATA / ('.core-node-chain-' + uuid.uuid4().hex)
      try:
          if shutil.disk_usage(DATA).free < m['total_bytes'] + 512 * 1024**2:
-@@ -750,12 +855,13 @@ def import_backup(source, caller, setup, release, events):
+@@ -750,30 +873,42 @@ def import_backup(source, caller, setup, release, events):
          candidate = staging / 'candidate'; candidate.mkdir(mode=0o700)
          os.chown(candidate, *owner)
          target = chain_root(setup['network'], candidate)
@@ -637,17 +685,43 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
 +            make_dirs(dst, m['directories'], uid=account.pw_uid)
 +            copy_files(src, dst, m['files'], events, src_uid=caller, dst_uid=account.pw_uid)
          finally: os.close(dst)
-         details = probe(candidate, setup['network'], events)
+-        details = probe(candidate, setup['network'], events)
++        details = probe(candidate, setup['network'], events, prune_mib=m['prune_mib'])
          if m['version'] == 1 and (details['blocks'] != m['height'] or details['bestblockhash'] != m['bestblockhash']):
-@@ -773,7 +879,6 @@ def import_backup(source, caller, setup, release, events):
+             raise ChainError('The copied databases do not match the recorded chain tip. Existing data was kept.')
+         # v2's pre-stop RPC observation is only a hint: the clean flush can
+         # legitimately include additional blocks. Record the exact validated tip.
+         m = dict(m, height=details['blocks'], bestblockhash=details['bestblockhash'])
+-        if details.get('pruneheight', 0) > 0 and m['prune_mib'] == 0:
++        if details.get('requires_pruned_mode') and m['prune_mib'] == 0:
+             m['prune_mib'] = 1024
++        deferred = []
++        if details.get('pruneheight', 0) > 0 or 'chainstate_snapshot' in m['directories']:
++            from chain_wallet_history import startup_entries
++            with identity(account.pw_uid):
++                entries = startup_entries(DATA)
++            if entries:
++                checked = probe(candidate, setup['network'], events, prune_mib=m['prune_mib'], wallet_history=True)
++                deferred = checked.get('deferred_wallets')
++                if (not isinstance(deferred, list) or not all(isinstance(name, str) for name in deferred)
++                        or not set(deferred).issubset(entries)):
++                    raise ChainError('Invalid Bitcoin Core wallet history result. Existing data was kept.')
+         current=chain_root(setup['network'])
+         if not current.exists():
+             current.mkdir(mode=0o700);os.chown(current,*owner);sync_dir(DATA)
+         with core_lock(current):
+-            activate(DATA, staging, m, owner, events)
++            activate(DATA, staging, m, owner, events, deferred_wallets=deferred)
          return dict(ok=True, height=m['height'], bestblockhash=m['bestblockhash'],
-                     directory=str(resolved), bytes=m['total_bytes'], prune_mib=m['prune_mib'])
+-                    directory=str(resolved), bytes=m['total_bytes'], prune_mib=m['prune_mib'])
++                    directory=str(resolved), bytes=m['total_bytes'], prune_mib=m['prune_mib'],
++                    deferred_wallets=[name or '(default)' for name in deferred])
      finally:
 -        os.close(src)
          if staging.exists() and not (DATA / JOURNAL).exists():
              shutil.rmtree(staging)
  
-@@ -785,20 +890,22 @@ def perform(action, request, caller, events):
+@@ -785,20 +920,22 @@ def perform(action, request, caller, events):
          raise ChainError('Blockchain copies are available only in the local Node desktop.')
      from upgrades import active_release
      setup = load_setup(); verify_data_mount(setup); release = active_release()
@@ -682,7 +756,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
          inhibitor=subprocess.Popen(['/usr/bin/systemd-inhibit','--what=shutdown:sleep','--mode=block',
              '--who=Bitcoin Core Node','--why=Blockchain copy in progress','/usr/bin/cat'],
              stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=ENV)
-@@ -806,9 +913,10 @@ def perform(action, request, caller, events):
+@@ -806,9 +943,10 @@ def perform(action, request, caller, events):
          if inhibitor.poll() is not None:raise ChainError('The system could not protect the copy from shutdown. Please try again.')
          events.update('Stopping Bitcoin Core cleanly', force=True)
          stop_core(); stopped = True
@@ -696,7 +770,7 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
          result['core_was_running']=running
      except ChainError as exc:
          failure = exc
-@@ -818,6 +926,7 @@ def perform(action, request, caller, events):
+@@ -818,6 +956,7 @@ def perform(action, request, caller, events):
                               + '. Please check the drive connection, permissions and free space. Existing data was kept.')
          raise failure from exc
      finally:
@@ -705,14 +779,36 @@ index f55cf7c5a613b94fe64688ce318dcd2814656d87..2ec0cb2b2b8490bc2c3b0ee3503442d9
          # The start preflight independently checks/replays a durable journal.
          if stopped and running and action == 'chain-import':
 diff --git a/app/chain_probe.py b/app/chain_probe.py
-index 02535972673c27ddb099497a6ebe5dc2b623682f..d44b14e61561e730178de3e862838c6c182ddd9e 100644
+index 02535972673c27ddb099497a6ebe5dc2b623682f..eaa664a0c3b17a94267000743102d7d7e3388f61 100644
 --- a/app/chain_probe.py
 +++ b/app/chain_probe.py
-@@ -28,6 +28,29 @@ def verify_private_network():
+@@ -28,8 +28,69 @@ def verify_private_network():
          raise RuntimeError('Validation namespace contains a network interface.')
  
  
-+def validate_databases(process, rpc, diagnostic):
++class ArchiveRequiresPruning(RuntimeError):
++    """Core's block index records that blocks have previously been pruned."""
++
++
++UNPRUNED_MODE_ERROR = ('You need to rebuild the database using -reindex to go back to unpruned mode. '
++                       'This will redownload the entire blockchain')
++
++
++def check_storage_mode(run, mode):
++    if mode == 'manual':
++        return run('1')
++    if mode != 'archive':
++        raise ValueError('Invalid validation storage mode.')
++    try:
++        return run('0')
++    except ArchiveRequiresPruning:
++        # Legacy or stopped-node metadata can still say archive after pruning.
++        result = run('1')
++        result['requires_pruned_mode'] = True
++        return result
++
++
++def validate_databases(process, rpc, diagnostic, wallet_check=None):
 +    # On a slow disk a healthy full block index may take considerable time to
 +    # load. The calling broker monitors cancellation throughout startup and stop.
 +    while True:
@@ -720,6 +816,8 @@ index 02535972673c27ddb099497a6ebe5dc2b623682f..d44b14e61561e730178de3e862838c6c
 +            diagnostic.seek(0, os.SEEK_END)
 +            diagnostic.seek(max(0, diagnostic.tell() - 1800))
 +            reason = ' '.join(diagnostic.read(1800).decode('utf-8', 'replace').split())
++            if UNPRUNED_MODE_ERROR in reason:
++                raise ArchiveRequiresPruning(reason)
 +            raise RuntimeError('Core refused the copied databases.' + (' ' + reason if reason else ' Exit code: ' + str(process.returncode)))
 +        try:
 +            details = rpc('getblockchaininfo')
@@ -729,19 +827,68 @@ index 02535972673c27ddb099497a6ebe5dc2b623682f..d44b14e61561e730178de3e862838c6c
 +            if exc.code not in (None, -28):
 +                raise
 +            time.sleep(.2)
++    if wallet_check is not None:
++        details['deferred_wallets'] = wallet_check()
 +    rpc('stop')
 +    if process.wait() != 0:
 +        raise RuntimeError('Validation did not stop cleanly.')
 +    return details
 +
 +
++class ValidationCancelled(RuntimeError):
++    pass
++
++
++def interrupt_validation(signum, frame):
++    # CoreRPC retries transport failures, including OSError/InterruptedError.
++    # A real cancellation must reach the finally block that reaps bitcoind.
++    raise ValidationCancelled('Blockchain validation cancelled.')
++
++
  def main():
-     if os.geteuid() != 0 or len(sys.argv) != 3:
+-    if os.geteuid() != 0 or len(sys.argv) != 3:
++    broker_pid = os.getppid()
++    if (os.geteuid() != 0 or len(sys.argv) not in (4, 5) or sys.argv[3] not in ('archive', 'manual')
++            or len(sys.argv) == 5 and sys.argv[4] != 'wallet-history'):
          raise RuntimeError('Invalid validation context.')
-@@ -66,20 +89,7 @@ def main():
+     root = Path(sys.argv[1]); network = sys.argv[2]
+     if (root.resolve() != root or network not in ('main', 'regtest', 'signet') or
+@@ -46,53 +107,57 @@ def main():
+     if info.st_uid != 0 or info.st_mode & 0o022 or digest != release['binary_sha256']:
+         raise RuntimeError('Unverified Core executable.')
+     account = pwd.getpwnam('bitcoinnode')
++    ram = None
++    if len(sys.argv) == 5:
++        if root == DATA:
++            raise RuntimeError('Wallet validation requires a staged import.')
++        from chain_wallet_history import prepare_ram
++        ram = prepare_ram(root, account)
+     os.setgroups([]); os.setgid(account.pw_gid); os.setuid(account.pw_uid); os.umask(0o077)
+     # A vanished broker must not leave a validation daemon holding the chain
+     # directory. Credential changes clear this setting, so set it afterwards.
+-    if ctypes.CDLL(None).prctl(1,signal.SIGTERM,0,0,0)!=0:raise RuntimeError('Parent lifetime guard failed.')
++    signal.signal(signal.SIGTERM, interrupt_validation)
++    signal.signal(signal.SIGINT, interrupt_validation)
++    if ctypes.CDLL(None).prctl(1,signal.SIGTERM,0,0,0)!=0 or broker_pid <= 1 or os.getppid() != broker_pid:
++        raise RuntimeError('Parent lifetime guard failed.')
+     env = {'PATH':'/usr/bin:/bin', 'LANG':'C.UTF-8', 'HOME':'/var/lib/bitcoin-core-node/gui'}
+     args = [str(binary), '-conf=/dev/null', '-nosettings', '-datadir='+str(root), '-chain='+network,
+-            '-disablewallet=1', '-server=1', '-daemon=0', '-prune=1', '-networkactive=0', '-listen=0',
++            '-server=1', '-daemon=0', '-networkactive=0', '-listen=0',
+             '-dnsseed=0', '-fixedseeds=0', '-discover=0', '-natpmp=0', '-listenonion=0', '-connect=0',
+             '-rpcbind=127.0.0.1', '-rpcallowip=127.0.0.1', '-rpcport=18487', '-debuglogfile=/dev/null',
+             '-printtoconsole=0', '-persistmempool=0', '-dbcache=64', '-par=1']
+-    def interrupted(*_): raise InterruptedError()
+-    signal.signal(signal.SIGTERM, interrupted); signal.signal(signal.SIGINT, interrupted)
++    args += ['-disablewallet=1'] if ram is None else ['-nowallet','-walletbroadcast=0','-walletdir='+str(ram)]
+     parent_pid=os.getpid()
+     def child_guard():
+         if ctypes.CDLL(None).prctl(1,signal.SIGTERM,0,0,0)!=0 or os.getppid()!=parent_pid:os._exit(1)
+-    diagnostic = tempfile.TemporaryFile()
+-    process = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=diagnostic, env=env,preexec_fn=child_guard)
      cookie = root / ('' if network == 'main' else network) / '.cookie'
      rpc = CoreRPC(cookie=cookie, port=18487, timeout=2)
-     try:
+-    try:
 -        end = time.monotonic() + 780
 -        while True:
 -            if process.poll() is not None:
@@ -749,22 +896,60 @@ index 02535972673c27ddb099497a6ebe5dc2b623682f..d44b14e61561e730178de3e862838c6c
 -                diagnostic.seek(max(0, diagnostic.tell() - 1800))
 -                reason = ' '.join(diagnostic.read(1800).decode('utf-8', 'replace').split())
 -                raise RuntimeError('Core refused the copied databases.' + (' ' + reason if reason else ' Exit code: ' + str(process.returncode)))
--            try:
++
++    check = None
++    if ram is not None:
++        from chain_wallet_history import WalletHistoryRPC, check_startup_wallets
++        wallet_rpc = WalletHistoryRPC(cookie=cookie, port=18487, timeout=None)
++        check = lambda: check_startup_wallets(wallet_rpc, DATA, ram)
++
++    def run(prune):
++        with tempfile.TemporaryFile() as diagnostic:
++            process = subprocess.Popen([*args, '-prune=' + prune], stdout=subprocess.DEVNULL, stderr=diagnostic,
++                                       env=env, preexec_fn=child_guard)
+             try:
 -                details = rpc('getblockchaininfo'); break
 -            except CoreError:
 -                if time.monotonic() > end: raise RuntimeError('Validation timed out.')
 -                time.sleep(.2)
 -        rpc('stop')
 -        if process.wait(timeout=120) != 0: raise RuntimeError('Validation did not stop cleanly.')
-+        details = validate_databases(process, rpc, diagnostic)
-         print(json.dumps(details), flush=True)
-     finally:
-         if process.poll() is None:
+-        print(json.dumps(details), flush=True)
+-    finally:
+-        if process.poll() is None:
+-            process.terminate()
+-            try: process.wait(timeout=120)
+-            except subprocess.TimeoutExpired:
+-                process.kill(); process.wait()
+-        diagnostic.close()
++                return validate_databases(process, rpc, diagnostic, check)
++            finally:
++                if process.poll() is None:
++                    process.terminate()
++                    try: process.wait(timeout=120)
++                    except subprocess.TimeoutExpired:
++                        process.kill(); process.wait()
++
++    print(json.dumps(check_storage_mode(run, sys.argv[3])), flush=True)
+ 
+ 
+ if __name__ == '__main__':
+     try: main()
+     except Exception as exc:
+-        # Wallets are disabled and RPC credentials are never logged.
++        # Raw wallet contents and RPC credentials are never logged.
+         print(str(exc) or type(exc).__name__, file=sys.stderr)
+         sys.exit(1)
 diff --git a/app/chain_ui.py b/app/chain_ui.py
-index 6c8ccf04157deca355bbf6751002ff045a7d2ec3..6e2b30e41dfd494fbc71233ce89f0a0015d4e196 100644
+index 6c8ccf04157deca355bbf6751002ff045a7d2ec3..7f74a8560b90d6bd32db827a72736b1144b07ab0 100644
 --- a/app/chain_ui.py
 +++ b/app/chain_ui.py
-@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QFileDialog, QHBoxLayout, QLa
+@@ -4,11 +4,11 @@ from pathlib import Path
+ import subprocess
+ from PySide6.QtCore import QProcess, Qt
+ from PySide6.QtWidgets import (QCheckBox, QDialog, QFileDialog, QHBoxLayout, QLabel,
+-                              QLineEdit, QProgressBar, QPushButton, QVBoxLayout)
++                              QLineEdit, QPlainTextEdit, QProgressBar, QPushButton, QVBoxLayout)
  
  
  def size_text(value):
@@ -782,6 +967,193 @@ index 6c8ccf04157deca355bbf6751002ff045a7d2ec3..6e2b30e41dfd494fbc71233ce89f0a00
          detail=QLabel(text);detail.setWordWrap(True);layout.addWidget(detail)
          note=QLabel('Wallets, passwords and network settings are kept separately. This is a blockchain copy, not a wallet backup.')
          note.setWordWrap(True);note.setObjectName('Muted');layout.addWidget(note)
+@@ -59,6 +59,12 @@ class ChainDialog(QDialog):
+         self.progress.hide();layout.addWidget(self.progress)
+         self.feedback=QLabel('');self.feedback.setWordWrap(True);self.feedback.setTextFormat(Qt.PlainText)
+         self.feedback.setAccessibleName('Blockchain copy status');layout.addWidget(self.feedback)
++        self.deferred_wallets=QPlainTextEdit()
++        self.deferred_wallets.setReadOnly(True)
++        self.deferred_wallets.setAccessibleName('Wallets left closed')
++        self.deferred_wallets.setMaximumHeight(68)
++        self.deferred_wallets.hide()
++        layout.addWidget(self.deferred_wallets)
+         layout.addStretch()
+         buttons=QHBoxLayout();self.back=QPushButton('Back to Backup and Restore');self.back.clicked.connect(self.go_back)
+         self.cancel_job=QPushButton('Cancel backup' if mode=='backup' else 'Cancel import');self.cancel_job.clicked.connect(self.request_cancel);self.cancel_job.hide()
+@@ -102,6 +108,8 @@ class ChainDialog(QDialog):
+         if self.busy or not self.confirm.isChecked() or not self.directory.text():return
+         self.busy=True;self.cancellable=True;self.result=None
+         self.buffer.clear();self.error.clear()
++        self.deferred_wallets.clear()
++        self.deferred_wallets.hide()
+         self.start.setEnabled(False);self.browse.setEnabled(False);self.usb.setEnabled(False);self.confirm.setEnabled(False)
+         self.cancel_job.show();self.cancel_job.setEnabled(True);self.open_folder.hide();self.progress.show();self.progress.setRange(0,0)
+         self.feedback.setText('Waiting for local authorization…')
+@@ -122,7 +130,10 @@ class ChainDialog(QDialog):
+ 
+     def read_output(self):
+         self.buffer.extend(bytes(self.process.readAllStandardOutput()))
+-        if len(self.buffer)>65536:
++        # Import results can contain wallet names from up to 1 MiB of Core
++        # settings. JSON Unicode escapes can expand those names on the wire.
++        limit = 8 * 1024 * 1024 if self.mode == 'import' else 65536
++        if len(self.buffer) > limit:
+             self.request_cancel();return
+         while b'\n' in self.buffer:
+             line,_,rest=self.buffer.partition(b'\n');self.buffer=bytearray(rest)
+@@ -163,6 +174,13 @@ class ChainDialog(QDialog):
+             elif self.result.get('core_restarted'):message+='\nBitcoin Core is starting again.'
+             elif self.result.get('core_was_running'):message+='\nAutomatic Core restart did not complete. Use the Bitcoin Core button and check Node status.'
+             else:message+='\nOpen Bitcoin Core when you are ready.'
++            if self.mode=='import' and self.result.get('deferred_wallets'):
++                message+=('\nThe wallets listed below remain closed. Their original wallet files still contain your labels. '
++                          'In Bitcoin Core, choose File → Open Wallet and select a wallet. If Core gives a block height, '
++                          'let background validation reach that height and reopen the wallet. If Core says the blocks '
++                          'it needs were pruned, restore a trusted blockchain backup with those blocks and reopen it.')
++                self.deferred_wallets.setPlainText('\n'.join(self.result['deferred_wallets']))
++                self.deferred_wallets.show()
+             self.feedback.setText(message);self.confirm.setChecked(False)
+         else:
+             self.progress.setValue(0)
+diff --git a/app/chain_wallet_history.py b/app/chain_wallet_history.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..54eca5eb1cd1b854b960908e8c8ebdbdaef689ea
+--- /dev/null
++++ b/app/chain_wallet_history.py
+@@ -0,0 +1,133 @@
++"""Check startup wallets against the imported history using native Core and private RAM."""
++from contextlib import contextmanager
++import os
++from pathlib import Path
++import re
++import shutil
++import stat
++import subprocess
++import tempfile
++
++from rpc import CoreError, CoreRPC
++from wallet_startup import read_settings
++
++READ = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
++DIRECTORY = READ | os.O_DIRECTORY
++
++
++def startup_entries(data):
++    """An explicitly empty list suppresses Core's unnamed default wallet."""
++    record, _ = read_settings(data / 'settings.json', os.geteuid())
++    entries = (record or {}).get('wallet')
++    if entries is not None:
++        return entries
++    return [''] if (data / 'wallets/wallet.dat').is_file() else []
++
++
++def prepare_ram(root, account):
++    # root.parent is the broker-owned transaction, unwritable by the service
++    # account. The mount exists only in this validator's private namespace.
++    own = os.stat('/proc/self/ns/mnt')
++    parent = os.stat('/proc/' + str(os.getppid()) + '/ns/mnt')
++    if (own.st_dev, own.st_ino) == (parent.st_dev, parent.st_ino):
++        raise RuntimeError('Private wallet validation mount was not established.')
++    ram = root.parent / 'wallet-check-ram'
++    ram.mkdir(mode=0o700)
++    options = f'noswap,nosuid,nodev,noexec,mode=0700,uid={account.pw_uid},gid={account.pw_gid},size=50%'
++    subprocess.run(['/usr/bin/mount','-t','tmpfs','-o',options,'tmpfs',str(ram)],check=True,capture_output=True)
++    return ram
++
++
++@contextmanager
++def wallet_directory(path):
++    # Traverse without following links, under the service uid. Never read a
++    # named device or FIFO, including for externally located startup wallets.
++    fd = os.open('/', DIRECTORY)
++    try:
++        for part in path.parts[1:]:
++            if part == '..':
++                raise ValueError('Parent traversal in a wallet path.')
++            child = os.open(part, DIRECTORY, dir_fd=fd)
++            os.close(fd)
++            fd = child
++        yield fd
++    finally:
++        os.close(fd)
++
++
++def copy_regular(parent, filename, dest, *, optional=False):
++    try:
++        fd = os.open(filename, READ, dir_fd=parent)
++    except FileNotFoundError:
++        if optional:
++            return
++        raise
++    with os.fdopen(fd, 'rb') as src:
++        st = os.fstat(src.fileno())
++        if not stat.S_ISREG(st.st_mode):
++            raise ValueError('The wallet is not a regular file.')
++        if optional and st.st_size == 0:
++            return
++        with dest.open('xb') as out:
++            shutil.copyfileobj(src, out, length=1024 * 1024)
++
++
++def copy_wallet(root, entry, work):
++    path = root / entry
++    # Core accepts an existing directory (including the unnamed wallet), and
++    # a wallet file. Use lstat and fail closed on links or special files.
++    st = path.lstat()
++    if stat.S_ISDIR(st.st_mode):
++        path = path / 'wallet.dat'
++    elif (not stat.S_ISREG(st.st_mode) or Path(entry).is_absolute()
++          or len(Path(entry).parts) != 1):
++        raise ValueError('Core requires a wallet directory or top-level wallet filename.')
++    with wallet_directory(path.parent) as fd:
++        copy_regular(fd, path.name, work / 'wallet.dat')
++        for suffix in ('-journal', '-wal'):
++            copy_regular(fd, path.name + suffix, work / ('wallet.dat' + suffix), optional=True)
++
++
++def history_error(code, message):
++    if code != -4 or not isinstance(message, str):
++        return False
++    return message in (
++        'Wallet loading failed. Prune: last wallet synchronisation goes beyond pruned data. You need to -reindex (download the whole blockchain again in case of a pruned node)',
++    ) or bool(re.fullmatch(r'Wallet loading failed\. Error loading wallet\. Wallet requires blocks to be downloaded, and software does not currently support loading wallets while blocks are being downloaded out of order when using assumeutxo snapshots\. Wallet should be able to load successfully after node sync reaches height [0-9]+', message))
++
++
++class WalletHistoryRPC(CoreRPC):
++    @staticmethod
++    def rpc_error(code, message):
++        error = CoreRPC.rpc_error(code, message)
++        error.history_unavailable = history_error(code, message)
++        error.wrong_network = code == -4 and message == 'Wallet loading failed. Wallet files should not be reused across chains. Restart bitcoind with -walletcrosschain to override.'
++        return error
++
++
++def check_startup_wallets(rpc, data, ram):
++    if os.geteuid() == 0:
++        raise RuntimeError('Wallet copies must be handled by the Core account.')
++    entries = startup_entries(data)
++    deferred = []
++    for entry in dict.fromkeys(entries):
++        with tempfile.TemporaryDirectory(prefix='wallet-', dir=ram) as temp:
++            work = Path(temp)
++            try:
++                copy_wallet(data / 'wallets', entry, work)
++            except FileNotFoundError:
++                # Core already skips missing startup wallet files.
++                continue
++            except (OSError, ValueError):
++                raise RuntimeError('Could not check a startup wallet in private RAM. Close that wallet in Bitcoin Core and retry, or use a backup with fuller block history. Wallet: ' + (entry or '(default)')) from None
++            try:
++                rpc('loadwallet', work.name, False)
++            except CoreError as error:
++                if getattr(error, 'history_unavailable', False):
++                    deferred.append(entry)
++                    continue
++                if getattr(error, 'wrong_network', False):
++                    raise RuntimeError('A startup wallet belongs to another Bitcoin network. Close it in Bitcoin Core and retry. Wallet: ' + (entry or '(default)')) from None
++                raise RuntimeError('Bitcoin Core could not verify a local startup wallet. Close that wallet in Bitcoin Core and retry. Wallet: ' + (entry or '(default)')) from None
++            rpc('unloadwallet', work.name, False)
++    return deferred
 diff --git a/app/core_status_ui.py b/app/core_status_ui.py
 index 13ea0a91bfe884d450d447548d6f13064682760b..c47d9f09d9f72c93c54a26af818871be8b318125 100644
 --- a/app/core_status_ui.py
@@ -2089,7 +2461,7 @@ index 0000000000000000000000000000000000000000..18e503ee348f0fa5d37a43a40135a161
 +            result.message += " " + " ".join(notes)
 +    return result
 diff --git a/app/guide_content.py b/app/guide_content.py
-index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..cc279829b032c2382e4626c48892a37bc5f7a848 100644
+index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..42f7badbabb1a18bba159f1bb0f8a9b373be59cb 100644
 --- a/app/guide_content.py
 +++ b/app/guide_content.py
 @@ -2,23 +2,23 @@
@@ -2115,7 +2487,7 @@ index a8267e53baa1c317dfcb86b31cd59c9d27e8d25d..cc279829b032c2382e4626c48892a37b
 +'Receiving bitcoin': "<h2>Receiving bitcoin</h2>\n<p>Once the correct watch-only wallet is restored, Node can generate receiving addresses without asking Vault to sign anything. The private keys remain offline. Vault does not need to be running to receive a payment.</p>\n<h3>Open a Mac text clipping</h3>\n<p>In Files, double-click a Finder <b>.textClipping</b> on your USB drive. Select <b>Copy Text</b> and paste it where you need it. When using a receiving address, compare it with the address shown by the recipient. For an older clipping on removable media, copy it using Finder so its associated data travels with it.</p>\n<ol><li>Open Bitcoin Core on Node and select the intended watch-only wallet.</li><li>Open <b>Receive</b>. Add a label that will help identify the payment later. An optional requested amount is information for the payer, not a restriction on what that address can receive.</li><li>Choose <b>Create new receiving address</b>. Copy the displayed address or show the QR code.</li><li>Before a significant deposit, independently confirm the address belongs to your corresponding Vault wallet and the correct Bitcoin network. Checking only two displays on the online computer is not an independent check.</li><li>Share the address with the sender. Use a fresh receiving address for a new payment when practical to reduce simple address reuse.</li><li>Wait for the payment to appear and for confirmations. Keep Core synchronized and the wallet scan complete when checking status.</li></ol>\n<h3>Compare the same address, not different requests</h3>\n<p>Both wallet copies can generate a sequence of addresses. Creating more requests on one side advances its next-address index, so the next request on Vault is not necessarily the same as the latest request on Node. For the initial pairing, compare corresponding addresses at the same index before making extra requests. For an address not already visible in Vault's address information, resolve that match using Core's wallet/address tools rather than accepting a visually similar address or a familiar wallet name.</p>\n<p>A receiving address is public but can link payments to you. Do not publish a whole watch-only export merely to request payment; share only the address needed. Labels/history are local useful records, so keep a watch-only backup after important changes. Backing up Node never substitutes for recovering the offline signing wallet.</p>",
 +'PSBT transactions': "<h2>PSBT transactions</h2>\n<p><b>Node prepares → Vault reviews and signs → Node broadcasts.</b> A PSBT is a Partially Signed Bitcoin Transaction: it carries transaction details and supporting public data so the offline wallet can sign without connecting to the network. An unsigned PSBT has no authority to spend. A fully signed payment may be broadcast by anyone holding it, so handle the returned file deliberately.</p>\n<h3>1. Prepare on the online Node</h3>\n<ol><li>Wait for blockchain synchronization and wallet scanning. Select the correct watch-only wallet in Core.</li><li>In <b>Send</b>, enter the recipient's address and amount. Review the fee; Coin Control is available when you want to choose specific outputs.</li><li>Use <b>Create Unsigned</b> rather than expecting Node to sign. Save the .psbt to PSBT Transfer Folder or directly to writable USB. A filename such as payment-unsigned.psbt helps distinguish it from the returned file.</li><li>If the file is in a RAM working folder, use Files to copy it to the transfer USB. Finish writing and eject/unmount safely.</li></ol>\n<h3>2. Review and sign on offline Vault</h3>\n<ol><li>Copy the unsigned PSBT to Vault's Private Workspace. Open the corresponding signing wallet and choose <b>File → Load PSBT from file</b>.</li><li>The Node desktop and Core share the online display and transfer folder. Any unsigned file there or on the USB could have been replaced. On offline Vault, compare every recipient address and amount with the original payment instructions from a separate trusted source. Check the fee and identify every change output as returning to your own wallet. Stop if any output is unexpected.</li><li>When satisfied, unlock the wallet with its Core passphrase if required and choose <b>Sign Tx</b>.</li><li>Save the signed .psbt directly to the transfer USB, or copy it from Private Workspace using Files. Keep the signing wallet and its secrets offline.</li></ol>\n<h3>3. Return to Node and broadcast</h3>\n<ol><li>Connect the USB to Node. Choose <b>File → Load PSBT from file</b> in Bitcoin Core and select the signed file. A RAM copy is optional.</li><li>Recheck that the intended transaction is complete and matches the payment approved in Vault. An incomplete PSBT cannot be broadcast as a complete transaction.</li><li>Choose <b>Broadcast Tx</b>. Node sends the signed transaction to its peers using the configured route.</li><li>Inspect the transaction in Core afterwards. Broadcast does not guarantee inclusion in a block; confirmations arrive after miners include it. A fee estimate is not a guarantee of confirmation time.</li></ol>\n<p>There is no extra custom Node transaction app or proprietary proposal file in this flow. Core handles the PSBT and transaction. Do not select an original signing wallet backup when asked for a PSBT.</p>\n<p>Keep unfinished payment files you still need outside RAM before shutdown. A PSBT is not your wallet recovery backup. If private broadcast is enabled and fails, inspect that route rather than silently switching to a different privacy setting.</p>\n<p>Technical source: Bitcoin Core doc/psbt.md and doc/offline-signing-tutorial.md (github.com/bitcoin/bitcoin). The standard separates transaction creation, signing and broadcast; the GUI combines the intermediate PSBT processing steps.</p>",
 +'Backups & recovery': '<h2>Backups &amp; recovery</h2>\n<p>Start at <b>Settings → Backup and Restore</b>. A backup is a separate saved copy; a restore uses that copy to recover something. The four rows keep different kinds of information separate. This is not a copy of the entire disk.</p>\n<table border="1" cellpadding="10"><tr><th>Choose this row</th><th>To keep this information</th></tr>\n<tr><td><img src="icons/settings-chain-backup.png" width="30" height="30"> Blockchain</td><td>Your existing blockchain data, so another Node can continue without downloading the same history again. No wallets or network passwords.</td></tr>\n<tr><td><img src="bitcoin-ui.png" width="30" height="30"> Watch-only wallets</td><td>Your public wallet information, names, labels and transaction records. No signing keys.</td></tr>\n<tr><td><img src="icons/settings-software-updates.png" width="30" height="30"> Bitcoin Core configuration</td><td>Supported Core preferences, such as storage/cache and selected interface choices.</td></tr>\n<tr><td><img src="icons/settings-network-connections.png" width="30" height="30"> Node configuration</td><td>Supported saved networks and passwords, managed VPN, time and desktop settings. This already includes the portable Core preferences.</td></tr></table>\n<h3>Export finishes after copying and saving</h3>\n<p><b>All four Backup and Restore categories now finish after the backup is prepared, written and flushed to the destination.</b> There is no second pass that reads the saved USB data back, decrypts a newly encrypted export to test it, or opens the outgoing watch-only collection in another Core process. A successful message means the copy/write operation completed, not that a recovery test was performed.</p>\n<p>Core still stops cleanly for a consistent blockchain copy. The tools still refuse unsafe paths, incomplete reads, failed writes, insufficient space and unsupported input. Checksums are calculated as data are already being copied or packaged, without another USB read pass. File formats remain compatible with existing backups. <b>Restore checks remain enabled</b> before existing data or settings are changed; GPG authentication is not disabled.</p>\n<p>Keep at least two separate copies of important backups and periodically test recovery on another installation. A latent media fault may first be noticed on restore without export read-back testing. Wait for the saved confirmation and eject/unmount properly; flushing pending writes can still take time on a slow drive and is not a verification pass.</p>\n<h3>Choose whether to encrypt the backup</h3>\n<p><b>Encrypt backup (optional)</b> is selected by default for watch-only wallets and full Node configuration. The separate Core configuration backup starts with it unchecked. An unencrypted file ends in <b>.json</b>; a GPG-encrypted one ends in <b>.gpg</b>. JSON is structured text data, not encryption. With encryption selected, enter the same nonempty passphrase twice. The tool accepts even one character, but that is not a sensible way to protect valuable private information. A random passphrase from KeePassXC is much harder to guess. An encryption error never quietly saves plaintext instead.</p>\n<p><b>Privacy matters:</b> a plain Node configuration may contain Wi-Fi passwords and VPN private keys. A public wallet can reveal addresses and balances. Keep these backups private and restore only a copy you trust. A <b>checksum</b> is a file fingerprint used to detect damage or a bad copy; by itself it cannot prove who created the file or that a stranger\'s replacement is trustworthy.</p>\n<h3>Find your USB</h3>\n<p>The file chooser lists <b>USB / External media</b> on the left. Connect the drive, or use <b>Refresh USB</b>. Click it to open it; if needed, the tool first mounts it, which means making its files available. Configuration and wallet collections use a .json/.gpg file. Blockchain restore uses a whole completed backup folder or the USB root with <b>Use latest backup</b>. A read-only drive can supply a restore but cannot receive a new backup. Choosing a file does not immediately apply it: review and confirmation still follow.</p>\n<h3>Continue using Settings while copying</h3>\n<p>Settings, the backup menu and the progress windows are independent. Minimize a window or switch with the bottom taskbar. Closing or minimizing a busy progress window does not cancel its work. Use <b>Cancel operation</b> when offered. You can export Node and Core settings while blockchain data is being copied. A watch-only transfer needs running Core, so finish the blockchain copy and start Core manually first.</p>\n<h3>Move to a new computer</h3>\n<ol><li>Back up Node configuration and supported watch-only wallets to USB. Add a blockchain backup if you want to reuse the downloaded history.</li><li>Install a compatible Node on the other computer. Installation erases its selected disk.</li><li>Restore Node configuration, review it and restart to apply it.</li><li>Restore the blockchain copy, if you made one.</li><li>Start Core, restore the watch-only collection, compare addresses and labels, and let any necessary scan finish.</li></ol>\n<p>Keep the old copies until the new setup works. Offline Vault and its signing-wallet backups remain a separate responsibility. Showing a balance on Node does not prove that you can restore the signing wallet.</p>\n<h3>Backup and Restore on Home</h3>\n<p>After the first saved customization or use—such as connecting Wi-Fi, changing time zone/mouse settings, starting Core or importing a wallet—a second <b>Backup and Restore</b> shortcut appears on Home, after <b>Private Workspace</b> and before <b>Encrypt Files</b>. Settings keeps its entry. Both open the same menu and existing work. The Home shortcut stays after restart or after Core stops; it does not make a backup automatically or certify that an old backup is current.</p>',
-+'Blockchain backup': "<h2>Blockchain backup</h2>\n<p>Use <b>Settings → Backup and Restore → Blockchain</b> to reuse downloaded and validated chain data on another Node, or to avoid repeating that work after a disk replacement. <b>Chainstate</b> is the current unspent-output database; this feature also copies the related retained blocks, block index, undo/XOR information and supported indexes. It is not just a loose copy of the chainstate folder.</p>\n<h3>Create a backup</h3>\n<ol><li>Connect an external drive with enough free space for the retained data. Choose <b>Blockchain → Backup</b> and the destination through <b>USB / External Drive…</b> or the folder selector.</li><li>Check <b>I understand that Core will stop while the backup is created.</b> and choose <b>Create backup</b>.</li><li>Core stops cleanly and finishes writing its databases. The tool copies the files once, calculating their restore checksums as those bytes pass through the copy.</li><li>Wait for <b>Blockchain backup saved</b>. There is no separate read-back verification stage. <b>Core remains stopped:</b> open Bitcoin Core manually when ready.</li><li>Finish other writes, eject/unmount the drive and keep the completed folder intact, including its manifest. Make another copy on different media as needed.</li></ol>\n<p>Each run creates a new <b>complete snapshot</b> of the retained data, not an incremental update. Earlier completed folders remain, so the drive needs space for another full copy. Cancelling or a failed write does not publish a partial folder as the latest completed backup. FAT32 limits each file to 4,294,967,295 bytes (about 4.29 GB); use a suitable filesystem such as exFAT, ext4 or NTFS when necessary.</p>\n<h3>What it does not contain</h3>\n<p>No wallet databases, private keys, Wi-Fi passwords or full system configuration are included. Use the separate backup rows for public wallets and settings. Pruned blocks that have already been deleted cannot appear in the snapshot. A blockchain backup does not recover signing keys and is not a guarantee that an old wallet can rescan all its history.</p>\n<h3>Restore a trusted copy</h3>\n<ol><li>Use a compatible Node with the <b>same Core version and Bitcoin network</b>. Keep the source drive connected.</li><li>Open <b>Blockchain → Restore</b>. Select the USB root and <b>Use latest backup</b>, or choose the specific completed bitcoin-chain folder.</li><li>Choose Verify and import. Node checks the backup file list, stops Core, and copies the data into a separate folder. It checks the copied files and opens the databases offline. On a large blockchain, the database check can take several minutes. The window shows elapsed minutes during this stage. You can minimize it and return through the same Restore button. Cancel import is available until activation begins.</li><li>Allow room for the incoming copy beside the current chain. Existing chain data is not replaced until those checks succeed; wallet data is not part of that replacement.</li><li>Start Core if necessary. It continues from the saved tip and validates newer blocks. Restore restarts a Core that had been running before import; backup export never starts it automatically.</li></ol>\n<p>Import can therefore still have verification stages. The change is to <b>backup export</b>, not to safeguards for applying data from removable media. Use a backup from your own trusted Node. The hashes used for the restore check are stored with the backup. Anyone who can replace both the data and those hashes can make them agree. If you cannot establish where the copy came from, sync from the network. Arbitrary UTXO dump files are not accepted by this workflow.</p>\n<p>You can minimize the copy window and continue using Settings, including exporting Node/Core configuration. Watch-only backup needs running Core and must wait. Avoid forcing shutdown, unplugging media or trying to start Core while its blockchain files are being copied.</p>",
++'Blockchain backup': "<h2>Blockchain backup</h2>\n<p>Use <b>Settings → Backup and Restore → Blockchain</b> to reuse downloaded and validated chain data on another Node, or to avoid repeating that work after a disk replacement. <b>Chainstate</b> is the current unspent-output database; this feature also copies the related retained blocks, block index, undo/XOR information and supported indexes. It is not just a loose copy of the chainstate folder.</p>\n<h3>Create a backup</h3>\n<ol><li>Connect an external drive with enough free space for the retained data. Choose <b>Blockchain → Backup</b> and the destination through <b>USB / External Drive…</b> or the folder selector.</li><li>Check <b>I understand that Core will stop while the backup is created.</b> and choose <b>Create backup</b>.</li><li>Core stops cleanly and finishes writing its databases. The tool copies the files once, calculating their restore checksums as those bytes pass through the copy.</li><li>Wait for <b>Blockchain backup saved</b>. There is no separate read-back verification stage. <b>Core remains stopped:</b> open Bitcoin Core manually when ready.</li><li>Finish other writes, eject/unmount the drive and keep the completed folder intact, including its manifest. Make another copy on different media as needed.</li></ol>\n<p>Each run creates a new <b>complete snapshot</b> of the retained data, not an incremental update. Earlier completed folders remain, so the drive needs space for another full copy. Cancelling or a failed write does not publish a partial folder as the latest completed backup. FAT32 limits each file to 4,294,967,295 bytes (about 4.29 GB); use a suitable filesystem such as exFAT, ext4 or NTFS when necessary.</p>\n<h3>What it does not contain</h3>\n<p>No wallet databases, private keys, Wi-Fi passwords or full system configuration are included. Use the separate backup rows for public wallets and settings. Pruned blocks that have already been deleted cannot appear in the snapshot. A blockchain backup does not recover signing keys and is not a guarantee that an old wallet can rescan all its history.</p>\n<h3>Restore a trusted copy</h3>\n<ol><li>Use a compatible Node with the <b>same Core version and Bitcoin network</b>. Keep the source drive connected.</li><li>Open <b>Blockchain → Restore</b>. Select the USB root and <b>Use latest backup</b>, or choose the specific completed bitcoin-chain folder.</li><li>Choose Verify and import. Node checks the backup file list, stops Core, and copies the data into a separate folder. It checks the copied files and opens the databases offline. On a large blockchain, the database check can take several minutes. The window shows elapsed minutes during this stage. You can minimize it and return through the same Restore button. Cancel import is available until activation begins.</li><li>Allow room for the incoming copy beside the current chain. Existing chain data is not replaced until those checks succeed; wallet data is not part of that replacement.</li><li>Start Core if necessary. It continues from the saved tip and validates newer blocks. Restore restarts a Core that had been running before import; backup export never starts it automatically.</li></ol>\n<p>On a fresh Node, restore the blockchain first. Then start Bitcoin Core and restore your watch-only wallet backup. A pruned blockchain backup contains only the blocks retained when the copy was made. A wallet may need earlier blocks to find its transactions.</p>\n<p>If Core cannot yet open a wallet set to open at startup, Node can leave it closed and list its name after the import. Its original wallet file still contains its addresses and labels. In Bitcoin Core, choose <b>File → Open Wallet</b> and select the wallet. If Core gives a block height while validating an AssumeUTXO snapshot, leave Core running until background validation reaches that height, then reopen the wallet. You can keep the imported chain. If Core reports that the blocks the wallet needs were pruned, restore a trusted blockchain backup with those blocks and reopen the wallet. Another option is to scan a copy of your watch-only wallet on a trusted node that has the required history. Wait for the wallet scan to finish before relying on its balance.</p>\n<p>Import can therefore still have verification stages. The change is to <b>backup export</b>, not to safeguards for applying data from removable media. Use a backup from your own trusted Node. The hashes used for the restore check are stored with the backup. Anyone who can replace both the data and those hashes can make them agree. If you cannot establish where the copy came from, sync from the network. Arbitrary UTXO dump files are not accepted by this workflow.</p>\n<p>You can minimize the copy window and continue using Settings, including exporting Node/Core configuration. Watch-only backup needs running Core and must wait. Avoid forcing shutdown, unplugging media or trying to start Core while its blockchain files are being copied.</p>",
 +'Watch-only backups': "<h2>Watch-only backups</h2>\n<p><b>Settings → Backup and Restore → Watch-only wallets</b> saves a collection of supported public wallets from this Node. It is useful for moving addresses, labels and history to another Node. It deliberately excludes signing wallets and private keys.</p>\n<h3>Make a collection</h3>\n<ol><li>Start Core and finish any blockchain-copy operation.</li><li>Choose <b>Backup</b> and a destination folder. Encryption is selected by default to protect the public wallets and their history.</li><li>Choose <b>Create wallet backup</b>. The tool identifies supported watch-only wallets and asks Core to make a consistent native public-only export.</li><li>Keep the saved .json or .gpg file private. Check the number of skipped wallets. Keep a separate trusted record of each public descriptor ID and the backup file SHA-256.</li></ol>\n<p>A wallet that was closed may be loaded briefly for inspection and then put back in its previous state. The collection keeps public descriptors, receiving/change-address state, labels, address-book entries and transaction records. Descriptors are the wallet's address instructions. The collection cannot authorize spending and cannot replace your original offline signing wallet.</p>\n<p>The export is packaged, optionally encrypted, written and flushed to the destination. It is not reopened in a second Core process and is not read back from USB before the saved confirmation. This avoids the extra export verification step; Core's native public-only export is still used rather than copying an active wallet database.</p>\n<h3>Restore it</h3>\n<ol><li>Use the same Core version and Bitcoin network, and start Core on the target Node.</li><li>Choose <b>Restore</b> in the Watch-only wallets row. Select the collection file; supply its passphrase only if it is encrypted.</li><li>Choose <b>Review backup</b>, compare the backup file SHA-256 and each public descriptor ID with the record you kept separately. When they match, approve the review and choose <b>Restore wallets</b>.</li><li>If a name already exists, a new restored name is used rather than overwriting the existing wallet. Repeating this backup's restore does not duplicate wallets already restored successfully.</li><li>Compare addresses and labels in Core and let any needed scan finish.</li></ol>\n<p>A multi-wallet restore can succeed partly: wallets already completed remain if a later one fails. Repeating the restore can continue the work. Limits are 32 wallets, 32 MiB for one public export and 64 MiB combined, also limited by free private RAM. MiB is a storage-size unit; those limits keep the temporary in-memory work bounded.</p>\n<p>A pruned chain cannot provide old blocks it no longer has. Public exports also cannot recreate missing <b>hardened</b> address derivations that require private-key information: please keep the original Vault and review any address/scan warning.</p>\n<p>A single <b>watch-only.dat</b> exported straight from Vault is different from this collection. Open that file with <b>Bitcoin Core → File → Restore Wallet</b>. This menu expects Node's .json/.gpg collection format.</p>",
  'Core configuration': "<h2>Core configuration</h2>\n<p><b>Configuration</b> means settings, not your money or transaction history. Use <b>Settings → Backup and Restore → Bitcoin Core configuration</b> to transfer supported Core preferences without copying the operating system's network settings.</p>\n<h3>What is included?</h3>\n<p>Examples include the pruning limit; database cache, which is memory used to speed up data access; the number of verification threads, which are workers checking data; limits for pending transactions; maximum peer connections; and the upload target. Selected Core interface preferences include <b>Coin Control</b>, which lets you choose which available coins to spend, and the PSBT controls.</p>\n<p>Only recognized, validated options are copied. This is not an unchecked copy of every line in bitcoin.conf, Core's manual configuration file.</p>\n<h3>Save and restore</h3>\n<ol><li>Choose <b>Backup</b>, select a USB folder and choose whether to encrypt.</li><li>Choose <b>Save backup</b> and wait for the saved confirmation; there is no read-back verification pass.</li><li>On the target Node choose <b>Restore</b>, select the file and choose <b>Review backup</b>.</li><li>Read the settings, approve them and choose <b>Restore on next restart</b>.</li><li>Restart normally, then check Core's settings.</li></ol>\n<p>Wallets, wallet registrations, blocks, network credentials, source-computer data paths and commands/scripts are excluded. Unsupported options are not silently copied. A Node configuration backup already includes this portable Core subset, so a separate Core backup is optional when you also save Node configuration.</p>\n<p>Restoring a smaller pruning target can later remove older blocks. Restoring a setting does not bring back block files that are missing.</p>",
 -'Node configuration': "<h2>Node configuration</h2>\n<p>This backup is a shortcut for setting up another Node the way you like it. Open <b>Settings → Backup and Restore → Node configuration</b>. A <b>snapshot</b> here means a saved selection of your current settings, not a complete copy of the computer's disk.</p>\n<h3>What it keeps</h3>\n<p>It can keep supported saved Wi-Fi networks and their stored passwords, Ethernet profiles, the managed WireGuard VPN and privacy choice, time zone and automatic-time choice, keyboard layout, display scale, mouse speed for matching device names and supported Core preferences. New backups also keep Keyboard and Mouse repeat/Num Lock choices and supported mouse/touchpad options. Restore these newer backups on a Node with this feature; older Node versions may reject the new format. This Node still reads earlier configuration backups.</p>\n<p>A network profile is the saved information needed to connect. Display scale controls how large interface elements look. The backup does not save an old clock reading to set the computer back to that time later.</p>\n<h3>Create the copy</h3>\n<ol><li>Finish applying the settings you want to keep and connect a USB drive.</li><li>Choose <b>Backup → Choose folder…</b> and select the drive or a folder on it.</li><li>Leave <b>Encrypt backup (optional)</b> off for a plain .json file, or turn it on and enter the same passphrase twice.</li><li>Choose <b>Save backup</b> or <b>Save encrypted backup</b>. Wait for the saved confirmation and note the filename. There is no read-back verification pass.</li></ol>\n<p><b>A plain Node backup can expose saved Wi-Fi passwords and VPN private keys.</b> Keep it private. Encryption protects the saved file, not the running computer. Please do not store the only copy of the passphrase inside the file that needs that passphrase to open.</p>\n<h3>Apply it to another Node</h3>\n<ol><li>Open the same category and choose <b>Restore</b>.</li><li>Select the .json or .gpg file. Only an encrypted file needs its backup passphrase.</li><li>Choose <b>Review backup</b>. Check the time zone, network counts, privacy profile and any omissions.</li><li>Tick <b>I trust this backup and approve the settings shown above</b>, then choose <b>Restore on next restart</b>.</li><li>Restart normally. The checked settings are applied before networking starts. <b>Check pending restore</b> shows the staged request or its result; <b>Cancel pending restore</b> cancels an unapplied request before restart.</li></ol>\n<h3>What does not move</h3>\n<p>The restore keeps local wallets and network profiles found only on the target computer. It does not clone login passwords/accounts, disk encryption, disk identifiers, Bluetooth pairing keys, arbitrary scripts, external certificates or unsupported VPN plug-ins. Pair Bluetooth devices again on a different adapter. Mouse settings apply only when the device name matches, and only to capabilities that device offers.</p>\n<p>Only passwords actually stored in supported profiles can be transferred. Some workplace authentication tools store credentials elsewhere; missing passwords are not invented. Unsupported values and omissions are reported for you to review.</p>\n<p>If the old and new computers will be online together, they may need different manually assigned IP addresses and different WireGuard peers. Reusing the same address or tunnel identity can cause a conflict.</p>\n<p><b>This contains no blockchain or wallet database.</b> Use those separate backup rows. You do not normally need a separate Core configuration backup because Node configuration already includes the supported Core settings.</p>",
@@ -2515,7 +2887,7 @@ index 0000000000000000000000000000000000000000..f5b17276330eed7d98bddba8dacd393d
 +    except (OSError, RuntimeError, ValueError, KeyError, subprocess.SubprocessError):
 +        return None
 diff --git a/app/rpc.py b/app/rpc.py
-index ec522a3d229cc373f337da90c3c216d8ea249ad9..9fb1bdfb269f9a7f86f588f819d7d9f7230bf134 100644
+index ec522a3d229cc373f337da90c3c216d8ea249ad9..90c21b33aa25332cf652d7307ba7155b625f599e 100644
 --- a/app/rpc.py
 +++ b/app/rpc.py
 @@ -2,9 +2,14 @@
@@ -2533,7 +2905,7 @@ index ec522a3d229cc373f337da90c3c216d8ea249ad9..9fb1bdfb269f9a7f86f588f819d7d9f7
  
  class CoreError(RuntimeError):
      def __init__(self, message, code=None):
-@@ -13,17 +18,40 @@ class CoreError(RuntimeError):
+@@ -13,17 +18,45 @@ class CoreError(RuntimeError):
  
  
  class CoreRPC:
@@ -2566,6 +2938,11 @@ index ec522a3d229cc373f337da90c3c216d8ea249ad9..9fb1bdfb269f9a7f86f588f819d7d9f7
 +        finally:
 +            os.close(directory)
 +
++    @staticmethod
++    def rpc_error(code, message):
++        # Never expose native diagnostics that may contain wallet details.
++        return CoreError('Bitcoin Core could not complete this operation (code ' + str(code) + ').', code)
++
      def __call__(self, method, *params, wallet=None):
          # Literal loopback endpoint and direct HTTPConnection deliberately ignore
          # proxy environment variables. Never log authentication or RPC payloads.
@@ -2579,6 +2956,15 @@ index ec522a3d229cc373f337da90c3c216d8ea249ad9..9fb1bdfb269f9a7f86f588f819d7d9f7
              raise CoreError('Bitcoin Core is not ready or local RPC access is unavailable.') from None
          path = '/' if wallet is None else '/wallet/' + quote(wallet, safe='')
          body = json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': method, 'params': list(params)})
+@@ -43,7 +76,7 @@ class CoreRPC:
+             result = json.loads(raw)
+             if response.status != 200 or not isinstance(result, dict) or result.get('error'):
+                 code = (result.get('error') or {}).get('code') if isinstance(result, dict) else None
+-                raise CoreError('Bitcoin Core could not complete this operation (code ' + str(code) + ').', code)
++                raise self.rpc_error(code, (result.get('error') or {}).get('message') if isinstance(result, dict) else None)
+             return result['result']
+         except (OSError, ValueError, KeyError, http.client.HTTPException):
+             raise CoreError('The local Bitcoin Core connection failed.') from None
 diff --git a/app/settings_snapshot.py b/app/settings_snapshot.py
 index 0d984217921c01d68eb54eeb112e8beb3396599e..40c92564f70bfb8b9d79762e685d2a554edaaf51 100644
 --- a/app/settings_snapshot.py
@@ -5723,7 +6109,7 @@ index 6b652bf5a51f9d5604645c963c774d87b23c7840..43ad16dc8eee4cfb0e4b73d147e8f9fd
  Terminal=false
  Categories=System;
 diff --git a/runtime/usr/share/bitcoin-core-node/GUIDE.html b/runtime/usr/share/bitcoin-core-node/GUIDE.html
-index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd6342d5c248 100644
+index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..3924badb96b3f65d31606a9ab3da622651c57d22 100644
 --- a/runtime/usr/share/bitcoin-core-node/GUIDE.html
 +++ b/runtime/usr/share/bitcoin-core-node/GUIDE.html
 @@ -8,7 +8,7 @@
@@ -5829,7 +6215,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
  <p><b>Privacy matters:</b> a plain Node configuration may contain Wi-Fi passwords and VPN private keys. A public wallet can reveal addresses and balances. Keep these backups private and restore only a copy you trust. A <b>checksum</b> is a file fingerprint used to detect damage or a bad copy; by itself it cannot prove who created the file or that a stranger's replacement is trustworthy.</p>
  <h3>Find your USB</h3>
  <p>The file chooser lists <b>USB / External media</b> on the left. Connect the drive, or use <b>Refresh USB</b>. Click it to open it; if needed, the tool first mounts it, which means making its files available. Configuration and wallet collections use a .json/.gpg file. Blockchain restore uses a whole completed backup folder or the USB root with <b>Use latest backup</b>. A read-only drive can supply a restore but cannot receive a new backup. Choosing a file does not immediately apply it: review and confirmation still follow.</p>
-@@ -132,21 +136,21 @@
+@@ -132,21 +136,23 @@
  <p>Use <b>Settings → Backup and Restore → Blockchain</b> to reuse downloaded and validated chain data on another Node, or to avoid repeating that work after a disk replacement. <b>Chainstate</b> is the current unspent-output database; this feature also copies the related retained blocks, block index, undo/XOR information and supported indexes. It is not just a loose copy of the chainstate folder.</p>
  <h3>Create a backup</h3>
  <ol><li>Connect an external drive with enough free space for the retained data. Choose <b>Blockchain → Backup</b> and the destination through <b>USB / External Drive…</b> or the folder selector.</li><li>Check <b>I understand that Core will stop while the backup is created.</b> and choose <b>Create backup</b>.</li><li>Core stops cleanly and finishes writing its databases. The tool copies the files once, calculating their restore checksums as those bytes pass through the copy.</li><li>Wait for <b>Blockchain backup saved</b>. There is no separate read-back verification stage. <b>Core remains stopped:</b> open Bitcoin Core manually when ready.</li><li>Finish other writes, eject/unmount the drive and keep the completed folder intact, including its manifest. Make another copy on different media as needed.</li></ol>
@@ -5841,6 +6227,8 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
 -<ol><li>Use a compatible Node with the <b>same Core version and Bitcoin network</b>. Keep the source drive connected.</li><li>Open <b>Blockchain → Restore</b>. Select the USB root and <b>Use latest backup</b>, or choose the specific completed bitcoin-chain folder.</li><li>Review and confirm. Core stops during import. The restore copies into a separate candidate area, checks the file checksums and opens the candidate databases with an isolated Core process.</li><li>Allow room for the incoming copy beside the current chain. Existing chain data is not replaced until those checks succeed; wallet data is not part of that replacement.</li><li>Start Core if necessary. It continues from the saved tip and validates newer blocks. Restore restarts a Core that had been running before import; backup export never starts it automatically.</li></ol>
 -<p>Import can therefore still have verification stages. The change is to <b>backup export</b>, not to safeguards for applying data from removable media. A checksum detects damage but does not prove that a stranger's chain snapshot is trustworthy; use your own trusted source. Arbitrary UTXO dump files are not accepted by this workflow.</p>
 +<ol><li>Use a compatible Node with the <b>same Core version and Bitcoin network</b>. Keep the source drive connected.</li><li>Open <b>Blockchain → Restore</b>. Select the USB root and <b>Use latest backup</b>, or choose the specific completed bitcoin-chain folder.</li><li>Choose Verify and import. Node checks the backup file list, stops Core, and copies the data into a separate folder. It checks the copied files and opens the databases offline. On a large blockchain, the database check can take several minutes. The window shows elapsed minutes during this stage. You can minimize it and return through the same Restore button. Cancel import is available until activation begins.</li><li>Allow room for the incoming copy beside the current chain. Existing chain data is not replaced until those checks succeed; wallet data is not part of that replacement.</li><li>Start Core if necessary. It continues from the saved tip and validates newer blocks. Restore restarts a Core that had been running before import; backup export never starts it automatically.</li></ol>
++<p>On a fresh Node, restore the blockchain first. Then start Bitcoin Core and restore your watch-only wallet backup. A pruned blockchain backup contains only the blocks retained when the copy was made. A wallet may need earlier blocks to find its transactions.</p>
++<p>If Core cannot yet open a wallet set to open at startup, Node can leave it closed and list its name after the import. Its original wallet file still contains its addresses and labels. In Bitcoin Core, choose <b>File → Open Wallet</b> and select the wallet. If Core gives a block height while validating an AssumeUTXO snapshot, leave Core running until background validation reaches that height, then reopen the wallet. You can keep the imported chain. If Core reports that the blocks the wallet needs were pruned, restore a trusted blockchain backup with those blocks and reopen the wallet. Another option is to scan a copy of your watch-only wallet on a trusted node that has the required history. Wait for the wallet scan to finish before relying on its balance.</p>
 +<p>Import can therefore still have verification stages. The change is to <b>backup export</b>, not to safeguards for applying data from removable media. Use a backup from your own trusted Node. The hashes used for the restore check are stored with the backup. Anyone who can replace both the data and those hashes can make them agree. If you cannot establish where the copy came from, sync from the network. Arbitrary UTXO dump files are not accepted by this workflow.</p>
  <p>You can minimize the copy window and continue using Settings, including exporting Node/Core configuration. Watch-only backup needs running Core and must wait. Avoid forcing shutdown, unplugging media or trying to start Core while its blockchain files are being copied.</p>
  <h2>Watch-only backups</h2>
@@ -5856,7 +6244,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
  <p>A multi-wallet restore can succeed partly: wallets already completed remain if a later one fails. Repeating the restore can continue the work. Limits are 32 wallets, 32 MiB for one public export and 64 MiB combined, also limited by free private RAM. MiB is a storage-size unit; those limits keep the temporary in-memory work bounded.</p>
  <p>A pruned chain cannot provide old blocks it no longer has. Public exports also cannot recreate missing <b>hardened</b> address derivations that require private-key information: please keep the original Vault and review any address/scan warning.</p>
  <p>A single <b>watch-only.dat</b> exported straight from Vault is different from this collection. Open that file with <b>Bitcoin Core → File → Restore Wallet</b>. This menu expects Node's .json/.gpg collection format.</p>
-@@ -165,10 +169,10 @@
+@@ -165,10 +171,10 @@
  <p>It can keep supported saved Wi-Fi networks and their stored passwords, Ethernet profiles, the managed WireGuard VPN and privacy choice, time zone and automatic-time choice, keyboard layout, display scale, mouse speed for matching device names and supported Core preferences. New backups also keep Keyboard and Mouse repeat/Num Lock choices and supported mouse/touchpad options. Restore these newer backups on a Node with this feature; older Node versions may reject the new format. This Node still reads earlier configuration backups.</p>
  <p>A network profile is the saved information needed to connect. Display scale controls how large interface elements look. The backup does not save an old clock reading to set the computer back to that time later.</p>
  <h3>Create the copy</h3>
@@ -5869,7 +6257,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
  <h3>What does not move</h3>
  <p>The restore keeps local wallets and network profiles found only on the target computer. It does not clone login passwords/accounts, disk encryption, disk identifiers, Bluetooth pairing keys, arbitrary scripts, external certificates or unsupported VPN plug-ins. Pair Bluetooth devices again on a different adapter. Mouse settings apply only when the device name matches, and only to capabilities that device offers.</p>
  <p>Only passwords actually stored in supported profiles can be transferred. Some workplace authentication tools store credentials elsewhere; missing passwords are not invented. Unsupported values and omissions are reported for you to review.</p>
-@@ -182,7 +186,7 @@
+@@ -182,7 +188,7 @@
  <h3>Choose a privacy connection deliberately</h3>
  <p>Open <b>Settings → Bitcoin Core Network &amp; Privacy</b>. These choices affect how information leaves the computer; they do not make an unsafe computer safe.</p>
  <table border="1" cellpadding="10"><tr><th>Choice</th><th>What it does</th></tr>
@@ -5878,7 +6266,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
  <tr><td>Tor</td><td>Core's peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system's other traffic, including software updates, still uses its ordinary connection.</td></tr>
  <tr><td>WireGuard VPN</td><td>The computer routes traffic through the configured encrypted VPN tunnel. Its protection rules block ordinary fallback outside that tunnel, apart from reaching the VPN server and essential connection setup. The VPN provider becomes someone you must trust.</td></tr></table>
  <p>A <b>firewall</b> is a set of rules allowing or blocking network traffic. The VPN's <b>kill switch</b> means these rules block fallback if the tunnel stops. <b>DNS</b> is the service that translates website names into network addresses. This Node's managed WireGuard setup protects against unintended traffic outside its tunnel, including ordinary DNS and IPv6 traffic. Neither Tor nor a VPN guarantees anonymity.</p>
-@@ -197,7 +201,7 @@
+@@ -197,7 +203,7 @@
  <p>If no Bluetooth adapter appears, please check any airplane-mode switch and the computer's firmware settings. Common adapter firmware is included, but some devices need different firmware or a compatible USB adapter.</p>
  <h3>Keyboard and Mouse</h3>
  <p>Open <b>Settings → Keyboard and Mouse</b>. On the <b>Keyboard</b> tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after <b>Apply and Save</b>; please do not type passwords there.</p>
@@ -5887,7 +6275,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
  <p>On <b>Mouse and Touchpad</b>, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.</p>
  <h2>Status &amp; diagnostics</h2>
  <p>Open <b>Settings → Bitcoin Core Status</b> for a live overview of this computer's Core. It reads information locally; it does not ask a public website to tell you what your node is doing.</p>
-@@ -226,6 +230,8 @@
+@@ -226,6 +232,8 @@
  <h2>Persistent storage</h2>
  <p><b>Persistent</b> means “still there after restarting.” The installed Node keeps its blockchain, chainstate, wallets and ordinary settings on disk. Its two temporary working folders are different:</p>
  <table border="1" cellpadding="10"><tr><th>Place</th><th>After shutdown or restart</th></tr><tr><td>Core data and ordinary files saved on disk</td><td>Kept on disk.</td></tr><tr><td>Private Workspace</td><td>Cleared: recovered files and temporary work live in RAM.</td></tr><tr><td>PSBT Transfer Folder</td><td>Cleared: public wallet/PSBT transfer files live in RAM.</td></tr><tr><td>A file copied to USB</td><td>Kept on that USB, if saving finished successfully.</td></tr></table>
@@ -5896,7 +6284,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
  <h3>Three Places in Files</h3>
  <p>Files opens <b>Core</b>, a read-only view containing wallet folders, blocks, chainstate and logs. The left-hand Places list is Core, Private Workspace, PSBT Transfer Folder; connected drives appear under Devices. The default width is wide enough for names, and a wider manual choice is preserved.</p>
  <p>Private Workspace and PSBT Transfer Folder are separate shared RAM locations available to the desktop and Core. Closing a window does not clear them; restarting or losing power does. Ordinary suspend leaves RAM powered and is not a way to clear the workspace. The old disk-based Public Wallet Transfer folder is not automatically erased; any old files left there remain persistent.</p>
-@@ -239,13 +245,13 @@
+@@ -239,13 +247,13 @@
  <p>If both RAM folders are empty, Restart and Shut Down show the ordinary confirmation. If either contains anything, including a hidden file or empty folder, two warnings are followed by a five-minute countdown. Cancel, Esc or closing that window keeps the session open. <b>Restart now</b> or <b>Shut down now</b> skips the remaining wait. Core stops carefully only when the countdown finishes or the immediate action is chosen.</p>
  <p>Please finish or cancel an open encryption job first and copy any RAM files you need. Shutdown warnings do not verify your backups. A sudden power loss also loses RAM contents. RAM-only storage limits leftovers on disk; it does not protect files from an already compromised running system or promise instant physical memory sanitization.</p>
  <h3>KeePassXC and time settings</h3>
@@ -5913,7 +6301,7 @@ index d08783e7ae3a9d8050a899afe4eb5816dd8ca8bd..39ccedbe3942140088fbd9c84c86dd63
  <h3>Change Bitcoin Core only after review</h3>
  <p>The update page shows the active verified Core version and can check the official stable-release record. Choose a supported Core 32 release and <b>Download and verify Core release</b>. Please read the version, file hashes and signing-key fingerprints before approving installation. A fingerprint identifies the full signing key.</p>
 diff --git a/runtime/usr/share/bitcoin-core-node/GUIDE.txt b/runtime/usr/share/bitcoin-core-node/GUIDE.txt
-index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91cc1858406 100644
+index 0e65e9ba6f15648e3aee4678177924896922ff55..918bdd1b113e9522e00c710b8a3701ac89fe8ddb 100644
 --- a/runtime/usr/share/bitcoin-core-node/GUIDE.txt
 +++ b/runtime/usr/share/bitcoin-core-node/GUIDE.txt
 @@ -18,7 +18,7 @@ Open Bitcoin Core. In its first-start window, choose the intended data location
@@ -6064,7 +6452,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  What it does not contain
  
-@@ -340,13 +350,13 @@ Use a compatible Node with the same Core version and Bitcoin network. Keep the s
+@@ -340,13 +350,17 @@ Use a compatible Node with the same Core version and Bitcoin network. Keep the s
  
  Open Blockchain → Restore. Select the USB root and Use latest backup, or choose the specific completed bitcoin-chain folder.
  
@@ -6076,11 +6464,15 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  Start Core if necessary. It continues from the saved tip and validates newer blocks. Restore restarts a Core that had been running before import; backup export never starts it automatically.
  
 -Import can therefore still have verification stages. The change is to backup export, not to safeguards for applying data from removable media. A checksum detects damage but does not prove that a stranger's chain snapshot is trustworthy; use your own trusted source. Arbitrary UTXO dump files are not accepted by this workflow.
++On a fresh Node, restore the blockchain first. Then start Bitcoin Core and restore your watch-only wallet backup. A pruned blockchain backup contains only the blocks retained when the copy was made. A wallet may need earlier blocks to find its transactions.
++
++If Core cannot yet open a wallet set to open at startup, Node can leave it closed and list its name after the import. Its original wallet file still contains its addresses and labels. In Bitcoin Core, choose File → Open Wallet and select the wallet. If Core gives a block height while validating an AssumeUTXO snapshot, leave Core running until background validation reaches that height, then reopen the wallet. You can keep the imported chain. If Core reports that the blocks the wallet needs were pruned, restore a trusted blockchain backup with those blocks and reopen the wallet. Another option is to scan a copy of your watch-only wallet on a trusted node that has the required history. Wait for the wallet scan to finish before relying on its balance.
++
 +Import can therefore still have verification stages. The change is to backup export, not to safeguards for applying data from removable media. Use a backup from your own trusted Node. The hashes used for the restore check are stored with the backup. Anyone who can replace both the data and those hashes can make them agree. If you cannot establish where the copy came from, sync from the network. Arbitrary UTXO dump files are not accepted by this workflow.
  
  You can minimize the copy window and continue using Settings, including exporting Node/Core configuration. Watch-only backup needs running Core and must wait. Avoid forcing shutdown, unplugging media or trying to start Core while its blockchain files are being copied.
  
-@@ -358,11 +368,11 @@ Make a collection
+@@ -358,11 +372,11 @@ Make a collection
  
  Start Core and finish any blockchain-copy operation.
  
@@ -6094,7 +6486,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  A wallet that was closed may be loaded briefly for inspection and then put back in its previous state. The collection keeps public descriptors, receiving/change-address state, labels, address-book entries and transaction records. Descriptors are the wallet's address instructions. The collection cannot authorize spending and cannot replace your original offline signing wallet.
  
-@@ -374,7 +384,7 @@ Use the same Core version and Bitcoin network, and start Core on the target Node
+@@ -374,7 +388,7 @@ Use the same Core version and Bitcoin network, and start Core on the target Node
  
  Choose Restore in the Watch-only wallets row. Select the collection file; supply its passphrase only if it is encrypted.
  
@@ -6103,7 +6495,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  If a name already exists, a new restored name is used rather than overwriting the existing wallet. Repeating this backup's restore does not duplicate wallets already restored successfully.
  
-@@ -428,7 +438,7 @@ Finish applying the settings you want to keep and connect a USB drive.
+@@ -428,7 +442,7 @@ Finish applying the settings you want to keep and connect a USB drive.
  
  Choose Backup → Choose folder… and select the drive or a folder on it.
  
@@ -6112,7 +6504,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  Choose Save backup or Save encrypted backup. Wait for the saved confirmation and note the filename. There is no read-back verification pass.
  
-@@ -440,7 +450,7 @@ Open the same category and choose Restore.
+@@ -440,7 +454,7 @@ Open the same category and choose Restore.
  
  Select the .json or .gpg file. Only an encrypted file needs its backup passphrase.
  
@@ -6121,7 +6513,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  Tick I trust this backup and approve the settings shown above, then choose Restore on next restart.
  
-@@ -472,7 +482,7 @@ Open Settings → Bitcoin Core Network & Privacy. These choices affect how infor
+@@ -472,7 +486,7 @@ Open Settings → Bitcoin Core Network & Privacy. These choices affect how infor
  
  ChoiceWhat it does
  
@@ -6130,7 +6522,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  TorCore's peer-to-peer traffic goes through the local Tor service rather than directly to peers. The operating system's other traffic, including software updates, still uses its ordinary connection.
  
-@@ -502,7 +512,7 @@ Keyboard and Mouse
+@@ -502,7 +516,7 @@ Keyboard and Mouse
  
  Open Settings → Keyboard and Mouse. On the Keyboard tab, choose the keyboard model, layout/language and variant. A layout says which character each key types; a variant is an alternative arrangement. Leave the variant on Default unless you need another one. You can enable or disable held-key repetition, set the delay and repetition rate, and choose whether Num Lock starts on. Use the test area after Apply and Save; please do not type passwords there.
  
@@ -6139,7 +6531,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  On Mouse and Touchpad, select a connected device and adjust pointer speed. Depending on its capabilities, you can swap the main button for left-handed use, reverse scrolling with Natural scrolling, enable tapping, ignore touchpad movement while typing, emulate a middle click, and choose movement/scroll methods. Greyed-out options simply are not offered by that device. Adaptive movement speeds up with your hand; Flat uses a steady relationship. Settings are remembered for matching device names and reapplied after reconnect or restart. They do not change Core or reconnect Bluetooth by themselves.
  
-@@ -578,6 +588,10 @@ PSBT Transfer FolderCleared: public wallet/PSBT transfer files live in RAM.
+@@ -578,6 +592,10 @@ PSBT Transfer FolderCleared: public wallet/PSBT transfer files live in RAM.
  
  A file copied to USBKept on that USB, if saving finished successfully.
  
@@ -6150,7 +6542,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  Three Places in Files
  
  Files opens Core, a read-only view containing wallet folders, blocks, chainstate and logs. The left-hand Places list is Core, Private Workspace, PSBT Transfer Folder; connected drives appear under Devices. The default width is wide enough for names, and a wider manual choice is preserved.
-@@ -604,7 +618,7 @@ Please finish or cancel an open encryption job first and copy any RAM files you
+@@ -604,7 +622,7 @@ Please finish or cancel an open encryption job first and copy any RAM files you
  
  KeePassXC and time settings
  
@@ -6159,7 +6551,7 @@ index 0e65e9ba6f15648e3aee4678177924896922ff55..240fb9485f8dd7a6acdf15f97915d91c
  
  Click the clock or use Settings → Date & Time. Choose your time zone, such as Europe/Zagreb, and automatic network time. Turn automatic time off to enter a date/time manually. Apply and Save preserves the settings after restart. Automatic time may wait for a reachable time server. In Tor peer mode, time synchronization uses ordinary operating-system networking; in WireGuard mode it follows the VPN policy. Manual time works offline.
  
-@@ -616,7 +630,7 @@ Debian and KeePassXC
+@@ -616,7 +634,7 @@ Debian and KeePassXC
  
  Choose the system update check and read the proposed package versions. A package is an application or system component prepared for installation. Debian packages come through Debian's signed archive; the separately supplied KeePassXC package has its release signature verified. A signature is a cryptographic check against a trusted publisher's key, not just a matching filename.
  
@@ -6233,10 +6625,10 @@ index d40c09ce67435a88474b6ffc0ab7faeba26d95da..0b32bfdf83a980dde624305529834303
    </action>
  </policyconfig>
 diff --git a/tests/chain_process_ui.py b/tests/chain_process_ui.py
-index d7de9080cce65fc15af5b53b27e33a634d8d5980..32d375ac65ca7291dd0b52804430cc7e7cf408ae 100644
+index d7de9080cce65fc15af5b53b27e33a634d8d5980..ea3868b48c809ae1f762dcac149aeb8cdc1012d0 100644
 --- a/tests/chain_process_ui.py
 +++ b/tests/chain_process_ui.py
-@@ -1,57 +1,137 @@
+@@ -1,57 +1,163 @@
 -"""Real QProcess completion/cancellation/error regression; no privileged writes."""
 +"""Exercise production chain transfer dialogs against a real local child process."""
 +import json
@@ -6333,10 +6725,18 @@ index d7de9080cce65fc15af5b53b27e33a634d8d5980..32d375ac65ca7291dd0b52804430cc7e
 +if outcome == 'invalid':
 +    print('The saved copy failed verification.', file=sys.stderr)
 +    sys.exit(1)
-+print(json.dumps(dict(event='result', ok=True, height=None if outcome=='unknown' else 250,
-+                      tip_is_hint=outcome in ('hint', 'unknown'), directory=directory,
-+                      core_restarted=outcome=='running',
-+                      core_was_running=outcome in ('running', 'restart-fail'))), flush=True)
++if outcome == 'wrong-network':
++    print('A startup wallet belongs to another Bitcoin network. Close it in Bitcoin Core and retry. Wallet: test savings', file=sys.stderr)
++    sys.exit(1)
++result = dict(event='result', ok=True, height=None if outcome == 'unknown' else 250,
++              tip_is_hint=outcome in ('hint', 'unknown'), directory=directory,
++              core_restarted=outcome in ('running', 'deferred-running'),
++              core_was_running=outcome in ('running', 'deferred-running', 'restart-fail'))
++if outcome in ('deferred-running', 'deferred-stopped'):
++    result['deferred_wallets'] = ['test savings', 'desk <2026>'] + [f'{i}-' + 'š' * 90 for i in range(180)]
++elif outcome == 'stopped':
++    result['deferred_wallets'] = []
++print(json.dumps(result), flush=True)
 +"""
 +
 +
@@ -6378,9 +6778,13 @@ index d7de9080cce65fc15af5b53b27e33a634d8d5980..32d375ac65ca7291dd0b52804430cc7e
 +
 +        wait(app, lambda: not dialog.busy and dialog.process is None)
 +        assert dialog.back.isEnabled() and dialog.browse.isEnabled() and dialog.usb.isEnabled()
-+        errors = {'missing': 'could not start', 'cancel': 'Cancelled', 'invalid': 'failed verification'}
++        errors = {'missing': 'could not start', 'cancel': 'Cancelled', 'invalid': 'failed verification',
++                  'wrong-network': 'belongs to another Bitcoin network'}
 +        if outcome in errors:
 +            assert errors[outcome] in dialog.feedback.text() and dialog.result is None
++            assert not dialog.deferred_wallets.isVisible()
++            if outcome == 'wrong-network':
++                assert 'test savings' in dialog.feedback.text() and 'background validation' not in dialog.feedback.text()
 +            assert not dialog.open_folder.isVisible() and dialog.start.isEnabled()
 +        else:
 +            assert dialog.result['ok'] and not dialog.confirm.isChecked()
@@ -6388,7 +6792,20 @@ index d7de9080cce65fc15af5b53b27e33a634d8d5980..32d375ac65ca7291dd0b52804430cc7e
 +            message = dialog.feedback.text()
 +            if importing:
 +                assert 'Blockchain data imported and checked at block 250' in message
-+                if outcome == 'running':
++                if outcome in ('deferred-running', 'deferred-stopped'):
++                    assert 'original wallet files still contain your labels' in message
++                    assert 'let background validation reach that height and reopen the wallet' in message
++                    assert 'were pruned, restore a trusted blockchain backup' in message
++                    assert 'File → Open Wallet' in message and dialog.deferred_wallets.isVisible()
++                    names = ['test savings', 'desk <2026>'] + [f'{i}-' + 'š' * 90 for i in range(180)]
++                    assert len(json.dumps(names).encode()) > 65536
++                    assert dialog.deferred_wallets.toPlainText().splitlines() == names
++                    assert dialog.deferred_wallets.isReadOnly()
++                    assert dialog.deferred_wallets.verticalScrollBar().maximum() > 0
++                    assert dialog.frameGeometry().height() <= dialog.screen().availableGeometry().height()
++                else:
++                    assert 'wallets listed below' not in message and not dialog.deferred_wallets.isVisible()
++                if outcome in ('running', 'deferred-running'):
 +                    assert 'Bitcoin Core is starting again' in message
 +                elif outcome == 'restart-fail':
 +                    assert 'Automatic Core restart did not complete' in message
@@ -6415,7 +6832,8 @@ index d7de9080cce65fc15af5b53b27e33a634d8d5980..32d375ac65ca7291dd0b52804430cc7e
 +    hub = BackupRestoreDialog()
 +    hub.show()
 +    cases = {'backup': ('success', 'cancel', 'commit', 'missing', 'hint', 'unknown'),
-+             'import': ('running', 'stopped', 'restart-fail', 'cancel', 'commit', 'invalid', 'missing')}
++             'import': ('running', 'stopped', 'deferred-running', 'deferred-stopped',
++                        'restart-fail', 'cancel', 'commit', 'invalid', 'wrong-network', 'missing')}
 +    with tempfile.TemporaryDirectory() as temp:
 +        helper = Path(temp) / 'helper.py'
 +        helper.write_text(HELPER)
@@ -7026,10 +7444,10 @@ index 0000000000000000000000000000000000000000..ab7f719d9a3fe05e26170bd167bbf5e5
 +                chain.open_maintenance_lock(lock)
 diff --git a/tests/test_chain_long_import.py b/tests/test_chain_long_import.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..a3edd70a59cb9ff8c1badd800f329041f605572f
+index 0000000000000000000000000000000000000000..cb4174c6f3f903d1385d6ed6c6cdb31cfcb17e34
 --- /dev/null
 +++ b/tests/test_chain_long_import.py
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,140 @@
 +"""A slow native validation must be cancellable without discarding a healthy import."""
 +from contextlib import ExitStack, nullcontext
 +from io import BytesIO, StringIO
@@ -7037,6 +7455,7 @@ index 0000000000000000000000000000000000000000..a3edd70a59cb9ff8c1badd800f329041
 +from types import SimpleNamespace
 +from unittest.mock import Mock, patch
 +import os
++import signal
 +import subprocess
 +import sys
 +import tempfile
@@ -7045,7 +7464,7 @@ index 0000000000000000000000000000000000000000..a3edd70a59cb9ff8c1badd800f329041
 +sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
 +import chain_backup as broker
 +import chain_probe as native
-+from rpc import CoreError
++from rpc import CoreError, CoreRPC
 +
 +
 +class LongValidation(unittest.TestCase):
@@ -7083,6 +7502,21 @@ index 0000000000000000000000000000000000000000..a3edd70a59cb9ff8c1badd800f329041
 +        process.poll.return_value = 1
 +        with self.assertRaisesRegex(RuntimeError, 'DB error from test Core'):
 +            native.validate_databases(process, Mock(), BytesIO(b'DB error from test Core'))
++
++    def test_sigterm_during_rpc_reaches_validator_cleanup(self):
++        rpc = CoreRPC()
++        process = Mock()
++        process.poll.side_effect = [None, 1]
++        previous = signal.signal(signal.SIGTERM, native.interrupt_validation)
++        try:
++            with patch.object(rpc, '_read_cookie', return_value=b'fixture:only'), \
++                    patch('rpc.http.client.HTTPConnection') as http:
++                http.return_value.getresponse.side_effect = lambda: signal.raise_signal(signal.SIGTERM)
++                with self.assertRaises(native.ValidationCancelled):
++                    native.validate_databases(process, rpc, BytesIO())
++        finally:
++            signal.signal(signal.SIGTERM, previous)
++        process.poll.assert_called_once_with()
 +
 +    def test_cancel_reaps_an_unresponsive_validator(self):
 +        process = Mock()
@@ -7239,6 +7673,159 @@ index 5edd4e7913337343264ed8623698512d7ba9fc5a..8e62462e1b11f090368f2be423d9e0b7
    self.assertEqual(w.bar.value(),333);self.assertIn('Debian',w.caption.toolTip())
    w.update_space(cs.reading(90*G,1*G));self.assertIn('#FF5151',w.bar.styleSheet())
    w.update_space(None);self.assertTrue(w.isHidden());w.deleteLater()
+diff --git a/tests/test_chain_storage_validation.py b/tests/test_chain_storage_validation.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f65e4eb51d01ebaa4278e79cf01f26b18fce67c9
+--- /dev/null
++++ b/tests/test_chain_storage_validation.py
+@@ -0,0 +1,43 @@
++"""An in-progress AssumeUTXO snapshot can lack old blocks in archival mode."""
++from io import BytesIO
++from pathlib import Path
++import sys
++import unittest
++from unittest.mock import Mock, call
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
++import chain_probe as probe
++
++
++class ChainStorageValidation(unittest.TestCase):
++    def test_archival_snapshot_stays_archival(self):
++        run = Mock(return_value={'blocks': 299, 'pruned': False})
++        result = probe.check_storage_mode(run, 'archive')
++        run.assert_called_once_with('0')
++        self.assertFalse(result.get('requires_pruned_mode'))
++
++    def test_native_pruning_record_is_the_only_fallback(self):
++        diagnostic = ('Error: ' + probe.UNPRUNED_MODE_ERROR.replace('. ', '.  ')).encode()
++        process = Mock(returncode=1)
++        process.poll.return_value = 1
++        with self.assertRaises(probe.ArchiveRequiresPruning) as error:
++            probe.validate_databases(process, Mock(), BytesIO(diagnostic))
++        run = Mock(side_effect=[error.exception, {'blocks': 1100, 'pruned': True}])
++        result = probe.check_storage_mode(run, 'archive')
++        self.assertEqual(run.call_args_list, [call('0'), call('1')])
++        self.assertTrue(result['requires_pruned_mode'])
++
++    def test_unrelated_error_is_preserved(self):
++        process = Mock(returncode=1)
++        process.poll.return_value = 1
++        def run(prune):
++            self.assertEqual(prune, '0')
++            return probe.validate_databases(process, Mock(), BytesIO(b'Error: block index checksum mismatch'))
++        with self.assertRaisesRegex(RuntimeError, 'block index checksum mismatch'):
++            probe.check_storage_mode(run, 'archive')
++
++    def test_pruned_preference_checks_database_without_automatic_pruning(self):
++        run = Mock(return_value={'blocks': 1100, 'pruned': True})
++        result = probe.check_storage_mode(run, 'manual')
++        run.assert_called_once_with('1')
++        self.assertFalse(result.get('requires_pruned_mode'))
+diff --git a/tests/test_chain_wallet_history.py b/tests/test_chain_wallet_history.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..0303a0b5473ab97fce6462326296c07702405d6d
+--- /dev/null
++++ b/tests/test_chain_wallet_history.py
+@@ -0,0 +1,98 @@
++from pathlib import Path
++from tempfile import TemporaryDirectory
++from unittest.mock import patch
++import json
++import os
++import subprocess
++import sys
++import unittest
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
++import chain_backup as chain
++import chain_wallet_history as history
++
++PRUNED = ('Wallet loading failed. Prune: last wallet synchronisation goes beyond pruned data. '
++          'You need to -reindex (download the whole blockchain again in case of a pruned node)')
++SNAPSHOT = ('Wallet loading failed. Error loading wallet. Wallet requires blocks to be downloaded, '
++            'and software does not currently support loading wallets while blocks are being downloaded '
++            'out of order when using assumeutxo snapshots. Wallet should be able to load successfully '
++            'after node sync reaches height 299')
++
++
++class WalletHistory(unittest.TestCase):
++    def test_explicit_empty_suppresses_implicit_default(self):
++        with TemporaryDirectory() as temp:
++            root = Path(temp)
++            (root/'wallets').mkdir()
++            (root/'wallets/wallet.dat').touch()
++            self.assertEqual(history.startup_entries(root), [''])
++            (root/'settings.json').write_text('{"wallet":[]}')
++            self.assertEqual(history.startup_entries(root), [])
++
++    def test_only_native_missing_history_errors_defer(self):
++        self.assertTrue(history.history_error(-4, PRUNED))
++        self.assertTrue(history.history_error(-4, SNAPSHOT))
++        self.assertFalse(history.history_error(-4, 'Wallet loading failed. Incorrect passphrase.'))
++        self.assertFalse(history.history_error(-28, PRUNED))
++        self.assertFalse(history.history_error(-4, SNAPSHOT + ' unexpected error'))
++        wrong = history.WalletHistoryRPC.rpc_error(-4, 'Wallet loading failed. Wallet files should not be reused across chains. Restart bitcoind with -walletcrosschain to override.')
++        self.assertFalse(wrong.history_unavailable)
++        self.assertTrue(wrong.wrong_network)
++
++    def test_check_only_copies_and_preserve_order(self):
++        with TemporaryDirectory() as temp:
++            root = Path(temp)
++            ram = root/'ram'
++            ram.mkdir()
++            data = root/'wallets'
++            data.mkdir()
++            for name in ('bad', 'good'):
++                (data/name).mkdir()
++                (data/name/'wallet.dat').write_bytes(name.encode())
++            (root/'settings.json').write_text(json.dumps({'wallet':['bad','good','bad','missing']}))
++            seen = []
++            def native(method, name, startup):
++                self.assertFalse(startup)
++                file = ram/name/'wallet.dat'
++                seen.append((method, file.read_bytes()))
++                if method == 'loadwallet' and file.read_bytes() == b'bad':
++                    raise history.WalletHistoryRPC.rpc_error(-4, PRUNED)
++                file.write_bytes(b'changed by native Core')
++            with patch.object(history.os, 'geteuid', return_value=os.getuid() or 123), \
++                    patch.object(history, 'startup_entries', return_value=['bad','good','bad','missing']):
++                self.assertEqual(history.check_startup_wallets(native, root, ram), ['bad'])
++            self.assertEqual(list(ram.iterdir()), [])
++            self.assertEqual(seen, [('loadwallet',b'bad'),('loadwallet',b'good'),('unloadwallet',b'changed by native Core')])
++            self.assertEqual((data/'good/wallet.dat').read_bytes(), b'good')
++            self.assertEqual((data/'bad/wallet.dat').read_bytes(), b'bad')
++
++    def test_links_and_special_files_cannot_be_opened_as_wallets(self):
++        with TemporaryDirectory() as temp:
++            root = Path(temp)
++            ram = root/'ram'
++            ram.mkdir()
++            (root/'real').mkdir()
++            (root/'real/wallet.dat').write_bytes(b'private fixture')
++            (root/'alias').symlink_to(root/'real',target_is_directory=True)
++            (root/'real/alias').symlink_to(root/'real/wallet.dat')
++            os.mkfifo(root/'fifo')
++            for name in ['alias','alias/wallet.dat','real/alias','fifo']:
++                with self.subTest(name=name), self.assertRaises((OSError, ValueError)):
++                    history.copy_wallet(root,name,ram)
++            self.assertEqual(list(ram.iterdir()), [])
++
++    def test_real_child_can_write_more_than_a_pipe_buffer(self):
++        original = subprocess.Popen
++        script = ("import json;print(json.dumps({'chain':'main','blocks':1,'bestblockhash':'a'*64,"
++                  "'deferred_wallets':['wallet'+str(i)+'x'*100 for i in range(2048)]}))")
++        def launch(args, **kwargs):
++            self.assertIn('--mount', args)
++            self.assertEqual(args[-1],'wallet-history')
++            return original([sys.executable,'-c',script], **kwargs)
++        with patch.object(chain.subprocess,'Popen',side_effect=launch):
++            report=chain.probe(Path('/test/candidate'),'main',chain.Events(emit=lambda row: None),wallet_history=True)
++        self.assertEqual(len(report['deferred_wallets']),2048)
++
++
++if __name__ == '__main__':
++    unittest.main()
 diff --git a/tests/test_copy_only_backups.py b/tests/test_copy_only_backups.py
 index 77d48406ee6eb42eef42a678061f170d3db3ac9a..dbd12e60ce02f24201f13fba9ef7daf80813a7a1 100644
 --- a/tests/test_copy_only_backups.py
@@ -7911,19 +8498,27 @@ index a704a30158c44d6a33dcef7c6f3c0946fc7e1072..7b42319fccea71170050e0f9aea71ac0
          self.assertTrue(self.dialog.remove_button.isHidden())
  
 diff --git a/tests/test_practical_node_guide.py b/tests/test_practical_node_guide.py
-index 04542855cd5a086f56c26018cf2b849865be6ac1..413234ee439c6c1b304a43219d287a1c51cfc0c6 100644
+index 04542855cd5a086f56c26018cf2b849865be6ac1..38aaa2a3b73339f8552ff7e4f2dcfdca88ed0a80 100644
 --- a/tests/test_practical_node_guide.py
 +++ b/tests/test_practical_node_guide.py
-@@ -17,7 +17,7 @@ class PracticalNodeGuide(unittest.TestCase):
+@@ -17,8 +17,15 @@ class PracticalNodeGuide(unittest.TestCase):
     self.assertIn(phrase,text)
   def test_prune_units_budget_and_rescan_limits(self):
    text=SECTIONS['Storage & pruning']
 -  for phrase in ('chainstate','free-space reserve','90 GiB','20 GiB','40 GiB','1,024 MiB','40,960 MiB','prune','rescan','already been removed','does not automatically fetch','Illustrative example'):
 +  for phrase in ('chainstate','free-space reserve','90 GB','20 GB','40 GB','1,000,000,000 bytes','38,147 MiB','Show blockchain storage on Home','prune','rescan','already been removed','does not automatically fetch','Illustrative example'):
     self.assertIn(phrase,text)
++ def test_reopening_wallet_after_chain_restoration(self):
++  plain=(R/'runtime/usr/share/bitcoin-core-node/GUIDE.txt').read_text()
++  for guide in (SECTIONS['Blockchain backup'], plain):
++   for phrase in ('On a fresh Node, restore the blockchain first','original wallet file still contains its addresses and labels',
++                  'background validation reaches that height, then reopen','blocks the wallet needs were pruned',
++                  'restore a trusted blockchain backup with those blocks','File → Open Wallet'):
++    self.assertIn(phrase,guide)
   def test_export_scope_not_confused_with_restore_or_authentication(self):
    text=SECTIONS['Backups & recovery']
-@@ -32,6 +32,12 @@ class PracticalNodeGuide(unittest.TestCase):
+   for phrase in ('All four Backup and Restore categories','no second pass','written and flushed','Restore checks remain enabled','GPG authentication is not disabled','latent media fault'):
+@@ -32,6 +39,12 @@ class PracticalNodeGuide(unittest.TestCase):
    text=' '.join(SECTIONS.values()).lower()
    for phrase in ('earlier discussion','as we discussed','bag of coins','saved-and-verified confirmation'):
     self.assertNotIn(phrase,text)
@@ -8252,6 +8847,23 @@ index c34d54fb9918effa1e44de49103b6396c0bf2ee3..5648dbc77f20d4a96b38ec0aff8e53fd
    Taskbar.sync_reservation(panel);panel.panel_active=False;Taskbar.sync_reservation(panel)
    self.assertEqual(x.values,{})
  
+diff --git a/tests/test_usb_chain_destinations.py b/tests/test_usb_chain_destinations.py
+index 6954e2150c0a8e736ca70bb6c175531cedd5b235..003a724b48dd5a3838da64a23677ead53d908a3b 100644
+--- a/tests/test_usb_chain_destinations.py
++++ b/tests/test_usb_chain_destinations.py
+@@ -109,10 +109,11 @@ class USBBackend(unittest.TestCase):
+              patch.object(chain,'load_setup',return_value={'network':'main'}),\
+              patch.object(chain,'verify_data_mount'),\
+              patch('upgrades.active_release',return_value={'version':'32.1'}),\
++             patch.object(chain,'open_maintenance_lock',side_effect=tempfile.TemporaryFile),\
+              patch.object(chain,'external',side_effect=chain.ChainError('USB is not mounted')) as external,\
+              patch.object(chain,'stop_core') as stop,\
+              patch.object(chain,'service_running') as service:
+-            with self.assertRaises(chain.ChainError):
++            with self.assertRaisesRegex(chain.ChainError, 'USB is not mounted'):
+                 chain.perform('chain-backup',data,caller,events)
+             external.assert_called_once()
+             stop.assert_not_called()
 diff --git a/tests/test_wallet_address_selection.py b/tests/test_wallet_address_selection.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..c9e70e2959a5c714d42cb066c83426410c021952
