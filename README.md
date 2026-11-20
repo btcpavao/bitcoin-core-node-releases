@@ -2,6 +2,8 @@
 
 **Bitcoin Core Node v0.1.0-rc.3** · [Download the ISO, signed checksums and matching source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.3) · [Rebuild the ISO](docs/REBUILD.md) · [Build jobs and comparison](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/44714236174).
 
+Two fresh GitHub builders reproduced the SHA-256 of the hardware-tested download. The comparison job checked both complete ISOs byte for byte. [Machine-readable build record](docs/proofs/v0.1.0-rc.3.json) · [Full comparison log](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/44714236174/job/136224300463).
+
 An independently developed online Bitcoin Core Node environment for ordinary amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
 Pavao tested this ISO on a ThinkPad T550. The signed checksum list identifies the published ISO, the matching project source and the pinned recipe. The recipe uses the signed RC2 project source as its base.

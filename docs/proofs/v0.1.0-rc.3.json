@@ -1,0 +1,32 @@
+{
+  "release": "v0.1.0-rc.3",
+  "iso": "bitcoin-core-node-v0.1.0-rc.3-core32.1-amd64.iso",
+  "bytes": 1288060928,
+  "sha256": "39e9b5b76dce7d9854989365d389caa50d55f0b0c5654602eafc7e12904b6675",
+  "recipe_commit": "97922f807e84de7184aaae6be56375da56d7f1de",
+  "release_tag_commit": "dc82242379bc9c6f8c7d7c60d94a0dbb69bdd1e0",
+  "rebuild_git_tree": "1c3eb241f251c030d2fced5c008b506fc0505b66",
+  "per_builder_sha256": {
+    "one": "39e9b5b76dce7d9854989365d389caa50d55f0b0c5654602eafc7e12904b6675",
+    "two": "39e9b5b76dce7d9854989365d389caa50d55f0b0c5654602eafc7e12904b6675"
+  },
+  "workflow_url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/44714236174",
+  "comparison": "Full-file cmp between two GitHub builds. Both SHA-256 values match the signed, hardware-tested release ISO.",
+  "jobs": [
+    {
+      "name": "build (two)",
+      "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/44714236174/job/136213397653",
+      "result": "success"
+    },
+    {
+      "name": "build (one)",
+      "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/44714236174/job/136213398401",
+      "result": "success"
+    },
+    {
+      "name": "compare",
+      "url": "https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/44714236174/job/136224300463",
+      "result": "success"
+    }
+  ]
+}
