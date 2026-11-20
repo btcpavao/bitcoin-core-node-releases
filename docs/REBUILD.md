@@ -1,23 +1,10 @@
 # Build and compare a Bitcoin Core Node ISO
 
-## Build this review candidate
+## Bitcoin Core Node v0.1.0-rc.3
 
-The signed download below is the historical comparison target. This branch includes updated runtime code and forces both processor vendors' microcode into the initrd. To build the candidate, stay on this branch and run these commands from the repository root in the disposable amd64 Docker build VM. Use new output directories.
+The signed release contains the ThinkPad T550-tested ISO (1,288,060,928 bytes). Its SHA-256 is `39e9b5b76dce7d9854989365d389caa50d55f0b0c5654602eafc7e12904b6675`. The recipe authenticates the historical RC2 source archive, applies the public patch and pins the Debian and security repositories to 19 November 2026 at 09:30 UTC. Installed systems use the normal Debian update repositories.
 
-```bash
-git rev-parse HEAD
-bash rebuild/node source ../reviewed-node-source
-bash rebuild/node build ../reviewed-node-build
-```
-
-Record the commit and the candidate ISO's SHA-256. Compare two independent builds of that same commit with `bash rebuild/node compare FIRST_ISO SECOND_ISO`. The historical digest below identifies the earlier release. An independent Intel builder found that the earlier recipe omitted the AMD archive on Intel hosts.
-
-
-This recipe builds a **new candidate** from the public source of v0.1.0-rc.2. The old RC2 image was made from an earlier image and records its hash in BUILD-INFO.json. Its original build did not lock every input. The signed RC2 checksum authenticates that historical download. The comparison below uses two candidates built from the same revision of this recipe.
-
-[Download the comparison ISO and complete project source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/rebuild-e6519d7e5e95) · [View both build jobs and their byte comparison](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/43015398147)
-
-The publicly compared candidate is `rebuild-e6519d7e5e95`. Both GitHub-hosted machines produced an ISO of 1,284,276,224 bytes with SHA-256 `8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6`. The commands below select the exact revision. A rebuild on your own machine supplies a check outside GitHub.
+[Download the signed release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.3) · [See the two build jobs and comparison](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/44714236174).
 
 ## 1. Set up a build computer
 
@@ -32,7 +19,7 @@ sudo systemctl start docker
 git clone https://github.com/btcpavao/bitcoin-core-node-releases.git
 cd bitcoin-core-node-releases
 git fetch --tags origin
-git switch --detach e6519d7e5e956aa62512294389a9db2cd0a60a96
+git switch --detach 97922f807e84de7184aaae6be56375da56d7f1de
 git rev-parse HEAD
 ```
 
@@ -66,7 +53,7 @@ bash rebuild/release-diff > ../node-rc1-to-rc2.diff
 less ../node-rc1-to-rc2.diff
 ```
 
-Press `q` to leave the viewer. The historical comparison above covers changes between releases. The next candidate additionally applies the changes in `rebuild/node.patch`.
+Press `q` to leave the viewer. The historical comparison above covers changes between releases. The next recipe additionally applies the changes in `rebuild/node.patch`.
 
 For a quick check that the guide and transfer-folder settings refer to the intended source files, run the included test.
 
@@ -101,7 +88,7 @@ sudo bash rebuild/node compare \
 
 `MATCH` means both complete files are identical. A difference produces a failing exit status. Keep both results, compare `filesystem.packages`, `builder.packages` and `iso-files.sha256`, and use Debian's `diffoscope` on the ISOs if needed. A mismatch needs investigation. A match ties the bytes to the recipe and inputs. Reviewing what those inputs do remains a separate task.
 
-The GitHub Actions workflow **Rebuild and compare Node** builds the same recipe on two fresh GitHub-hosted runners. The **compare** job downloads both artifacts and compares the full files. A successful run makes both candidate ISOs and their evidence available as short-lived Actions artifacts. To corroborate a result independently of GitHub, publish your own commit ID, build date, output filename, file size, SHA-256 and signature or other attributable statement. The publisher’s signed checksum list covers the exact public ISO, `BUILD-INFO.json` and `SOURCE-COMMIT.txt`. [Verify the publisher’s signature and the downloaded ISO](../README.md#rebuild-candidate-rebuild-e6519d7e5e95).
+The GitHub Actions workflow **Rebuild and compare Node** builds the same recipe on two fresh GitHub-hosted runners. The **compare** job downloads both artifacts and compares the full files. A successful run makes both candidate ISOs and their evidence available as short-lived Actions artifacts. To corroborate a result independently of GitHub, publish your own commit ID, build date, output filename, file size, SHA-256 and signature or other attributable statement. The publisher’s signed checksum list covers the exact public ISO, `BUILD-INFO.json` and `SOURCE-COMMIT.txt`. [Verify the publisher’s signature and the downloaded ISO](../README.md#how-to-verify-downloads).
 
 [Build workflow and run history](https://github.com/btcpavao/bitcoin-core-node-releases/actions/workflows/node-rebuild.yml) · [Historical RC2 checksum, source archive and build record](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.2)
 
@@ -110,10 +97,10 @@ The GitHub Actions workflow **Rebuild and compare Node** builds the same recipe 
 Stay in the cloned repository directory. This downloads the exact candidate from its own public release, checks its recorded hash, and compares all bytes to your local result. Set aside about 1.3 GB for this additional download.
 
 ```bash
-curl -fL --retry 3 -o ../bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso \
-  https://github.com/btcpavao/bitcoin-core-node-releases/releases/download/rebuild-e6519d7e5e95/bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso
-echo '8efaf0fb4f05a7a59554855575e24e178f07a3629cea5c9b9bbe6e5f498691b6  ../bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso' | sha256sum -c -
+curl -fL --retry 3 -o ../bitcoin-core-node-v0.1.0-rc.3-core32.1-amd64.iso \
+  https://github.com/btcpavao/bitcoin-core-node-releases/releases/download/v0.1.0-rc.3/bitcoin-core-node-v0.1.0-rc.3-core32.1-amd64.iso
+echo '39e9b5b76dce7d9854989365d389caa50d55f0b0c5654602eafc7e12904b6675  ../bitcoin-core-node-v0.1.0-rc.3-core32.1-amd64.iso' | sha256sum -c -
 sudo bash rebuild/node compare \
   ../node-result/bitcoin-core-node-candidate-amd64.iso \
-  ../bitcoin-core-node-rebuild-e6519d7e5e95-core32.1-amd64.iso
+  ../bitcoin-core-node-v0.1.0-rc.3-core32.1-amd64.iso
 ```
