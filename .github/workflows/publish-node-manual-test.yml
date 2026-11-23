@@ -1,0 +1,97 @@
+name: Publish public experimental Node manual-partitioning ISO
+on:
+  push:
+    branches:
+      - feature/advanced-partition-install-20261123
+    paths:
+      - .github/workflows/publish-node-manual-test.yml
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: node-manual-partition-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Require completed matching two-builder comparison
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id=45127466879
+          expected_sha=5348635ad36d246aeff00d5dcb6ff17b4b3755f0
+          result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" --jq '[.head_sha,.status,.conclusion] | join("|")')"
+          test "$result" = "$expected_sha|completed|success"
+          comparison="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" --jq '[.jobs[] | select(.name == "compare") | .conclusion] | join(",")')"
+          test "$comparison" = success
+          echo "Verified original source commit and successful independent ISO comparison."
+      - name: Extract one verified build and produce public checksum
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate public
+          gh run download 45127466879 --repo "$GITHUB_REPOSITORY" --name node-one --dir candidate
+          ( cd candidate && sha256sum --check --strict SHA256SUMS )
+          test -s candidate/bitcoin-core-node-candidate-amd64.iso
+          mv candidate/bitcoin-core-node-candidate-amd64.iso public/bitcoin-core-node-manual-partition-test-amd64.iso
+          ( cd public && sha256sum bitcoin-core-node-manual-partition-test-amd64.iso > SHA256SUMS )
+          printf '%s\n' 5348635ad36d246aeff00d5dcb6ff17b4b3755f0 > public/SOURCE-COMMIT.txt
+          cat > public/RELEASE-NOTES.md <<'EOF'
+          # Experimental Node manual-partitioning installer (T2 evaluation)
+
+          This is **NOT the standard Bitcoin Core Node release**. It is an
+          **unsigned and hardware-unverified test ISO** from two independently
+          built, byte-identical candidates. It enables Calamares advanced manual
+          partitioning without changing the default whole-disk install option.
+
+          **Major risk:** manual partitioning, formatting the wrong volume or
+          selecting the internal Apple EFI partition incorrectly can destroy
+          your macOS data or prevent macOS booting. Back up macOS first.
+          Initial testing should stop at the partition-layout page; do not
+          press Install until the exact target and all format flags are understood.
+          Prefer a blank dedicated external SSD with its own EFI partition for
+          the first real installation.
+
+          The ISO **does not include a T2-patched kernel, firmware, or verified
+          Apple bootloader support**. No real wallets or valuable files should
+          be stored on this experiment.
+
+          Source commit: `5348635ad36d246aeff00d5dcb6ff17b4b3755f0`.
+
+          [Source changes and cautions](https://github.com/btcpavao/bitcoin-core-node-releases/pull/3)
+          · [Two successful independent builds and ISO comparison](https://github.com/btcpavao/bitcoin-core-node-releases/actions/runs/45127466879)
+          · [Detailed install guidance](https://github.com/btcpavao/bitcoin-core-node-releases/blob/feature/advanced-partition-install-20261123/docs/DUAL-BOOT-EXPERIMENT.md)
+
+          The attached SHA256SUMS verifies accidental corruption, **not publisher
+          authenticity**. This experimental image is **not PGP signed**.
+          Normal users should use the separately signed Node RC3 instead.
+          EOF
+      - name: Publish a separate public prerelease (not latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="v0.1.0-rc.3-manual-partition-test.1"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to overwrite an existing published release." >&2
+            exit 1
+          fi
+          gh release create "$tag" \
+            public/bitcoin-core-node-manual-partition-test-amd64.iso \
+            public/SHA256SUMS \
+            public/SOURCE-COMMIT.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target 5348635ad36d246aeff00d5dcb6ff17b4b3755f0 \
+            --title "Experimental Node ISO: manual partitioning (not T2 verified)" \
+            --notes-file public/RELEASE-NOTES.md \
+            --prerelease --latest=false
+      - name: Check anonymous direct-download link and uploaded checksum
+        run: |
+          set -euo pipefail
+          url="https://github.com/btcpavao/bitcoin-core-node-releases/releases/download/v0.1.0-rc.3-manual-partition-test.1/bitcoin-core-node-manual-partition-test-amd64.iso"
+          curl -fsSLI --max-time 60 "$url" | grep -i '^HTTP/' | tail -1
+          echo "Public test image: $url"

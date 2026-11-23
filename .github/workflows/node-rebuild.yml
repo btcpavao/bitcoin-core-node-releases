@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - name: Validate manual partitioning changes before building
+        run: python3 -m unittest discover -s rebuild/tests -v
       - name: Make room for the Debian filesystems on the disposable runner
         run: |
           if [ "$(df --output=avail -BG / | tail -1 | tr -dc 0-9)" -lt 45 ]; then
