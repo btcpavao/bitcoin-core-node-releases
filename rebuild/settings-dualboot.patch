@@ -3204,10 +3204,10 @@ index 0000000..80f3073
 +<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><defs><linearGradient id="body" x2="0" y2="1"><stop stop-color="#e3e7eb"/><stop offset="1" stop-color="#858e98"/></linearGradient></defs><path fill="url(#body)" stroke="#66717d" stroke-width="1" fill-rule="evenodd" d="M20 4h8l1 6 4 2 5-3 5 6-4 5 1 4 6 2-1 8-6 0-3 3 1 6-8 3-3-5-4-1-4 4-7-4 2-6-2-4-6-1v-8l6-1 2-4-3-5 6-5 5 4z M24 16a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/></svg>
 diff --git a/runtime/usr/share/core-desktop/core_display.py b/runtime/usr/share/core-desktop/core_display.py
 new file mode 100644
-index 0000000..c57dabe
+index 0000000..839b3d3
 --- /dev/null
 +++ b/runtime/usr/share/core-desktop/core_display.py
-@@ -0,0 +1,1094 @@
+@@ -0,0 +1,1101 @@
 +#!/usr/bin/python3
 +"""User-session RandR controls shared by Bitcoin Core Node and Vault.
 +
@@ -3596,11 +3596,18 @@ index 0000000..c57dabe
 +                edid_lines.append(line.strip().lower())
 +                continue
 +            finish_edid()
-+        candidate = re.match(r'^\s{2,}(\S+)\s+((?:\d+(?:\.\d+)?[+*]*\s*)+)$', line)
++        candidate = re.match(r'^\s{2,}(\S+)\s+(.+)$', line)
 +        if candidate:
 +            mode_name, values = candidate.groups()
 +            geometry = re.match(r'^(\d+)x(\d+)', mode_name)
 +            if not geometry or not NAME.fullmatch(mode_name):
++                continue
++            # xrandr prints current/preferred in separate flag columns. An
++            # inactive preferred rate is "74.99 +", not "74.99+". Attach
++            # only those flags to their rate; retain the separators between
++            # numeric rates and reject the entire line if anything remains.
++            values = re.sub(r'[ \t]+(?=[+*])', '', values)
++            if not re.fullmatch(r'(?:\d+(?:\.\d+)?(?:\*\+?|\+\*?)?(?:[ \t]+|$))+', values):
 +                continue
 +            rates, preferred = [], False
 +            for value in values.split():
@@ -5148,6 +5155,18 @@ index 0000000..17ea29d
 +        self.poll.stop()
 +        self.closed = True
 +        super().done(result)
+diff --git a/tests/fixtures/shared-display/qemu-mode-switch.json b/tests/fixtures/shared-display/qemu-mode-switch.json
+new file mode 100644
+index 0000000..4556b7f
+--- /dev/null
++++ b/tests/fixtures/shared-display/qemu-mode-switch.json
+@@ -0,0 +1,6 @@
++{
++  "description": "Exact xrandr --query --props replies before and after a reversible 1280x800 to 1024x768 switch in the owned QEMU Node guest.",
++  "trace_sha256": "c15d22e6f56cc25884c1cc34a22fbb30c00a4879676679daeb6c54addf29a79b",
++  "before": "Screen 0: minimum 320 x 200, current 1280 x 800, maximum 8192 x 8192\nVirtual-1 connected primary 1280x800+0+0 (normal left inverted right x axis y axis) 325mm x 203mm\n\tEDID: \n\t\t00ffffffffffff004914341200000000\n\t\t2a180104a520147806ee91a3544c9926\n\t\t0f5054210800e1c0d1c0d100a940b300\n\t\t950081808140ea2900c051201c304026\n\t\t444045cb10000018000000f7000a0040\n\t\t82002820000000000000000000fd0032\n\t\t7d1ea0ff010a202020202020000000fc\n\t\t0051454d55204d6f6e69746f720a013a\n\t\t02030b00467d6560591f610000001000\n\t\t00000000000000000000000000000000\n\t\t10000000000000000000000000000000\n\t\t00001000000000000000000000000000\n\t\t00000000100000000000000000000000\n\t\t00000000000010000000000000000000\n\t\t00000000000000001000000000000000\n\t\t0000000000000000000000000000002f\n\tlink-status: Good \n\t\tsupported: Good, Bad\n\tCONNECTOR_ID: 32 \n\t\tsupported: 32\n\tnon-desktop: 0 \n\t\trange: (0, 1)\n   1280x800      74.99*+\n   1920x1080     60.00    50.00  \n   1600x1200     60.00  \n   1680x1050     59.95  \n   1400x1050     59.98  \n   1280x1024     60.02  \n   1440x900      59.89  \n   1280x960      60.00  \n   1360x768      60.02  \n   1280x768      59.87  \n   1024x768      60.00  \n   800x600       60.32  \n   640x480       60.00    59.94  \n",
++  "after": "Screen 0: minimum 320 x 200, current 1024 x 768, maximum 8192 x 8192\nVirtual-1 connected primary 1024x768+0+0 (normal left inverted right x axis y axis) 325mm x 203mm\n\tEDID: \n\t\t00ffffffffffff004914341200000000\n\t\t2a180104a520147806ee91a3544c9926\n\t\t0f5054210800e1c0d1c0d100a940b300\n\t\t950081808140ea2900c051201c304026\n\t\t444045cb10000018000000f7000a0040\n\t\t82002820000000000000000000fd0032\n\t\t7d1ea0ff010a202020202020000000fc\n\t\t0051454d55204d6f6e69746f720a013a\n\t\t02030b00467d6560591f610000001000\n\t\t00000000000000000000000000000000\n\t\t10000000000000000000000000000000\n\t\t00001000000000000000000000000000\n\t\t00000000100000000000000000000000\n\t\t00000000000010000000000000000000\n\t\t00000000000000001000000000000000\n\t\t0000000000000000000000000000002f\n\tlink-status: Good \n\t\tsupported: Good, Bad\n\tCONNECTOR_ID: 32 \n\t\tsupported: 32\n\tnon-desktop: 0 \n\t\trange: (0, 1)\n   1280x800      74.99 +\n   1920x1080     60.00    50.00  \n   1600x1200     60.00  \n   1680x1050     59.95  \n   1400x1050     59.98  \n   1280x1024     60.02  \n   1440x900      59.89  \n   1280x960      60.00  \n   1360x768      60.02  \n   1280x768      59.87  \n   1024x768      60.00* \n   800x600       60.32  \n   640x480       60.00    59.94  \n"
++}
 diff --git a/tests/installed_chain_probe.py b/tests/installed_chain_probe.py
 index da30ad6..fe21ac7 100644
 --- a/tests/installed_chain_probe.py
@@ -6138,10 +6157,10 @@ index 402ae53..87632d0 100644
                    'Software Updates':('updates',{}),
 diff --git a/tests/test_shared_display.py b/tests/test_shared_display.py
 new file mode 100644
-index 0000000..1cad85b
+index 0000000..cf992bc
 --- /dev/null
 +++ b/tests/test_shared_display.py
-@@ -0,0 +1,418 @@
+@@ -0,0 +1,475 @@
 +"""Behavioral display tests: parsing, validation, rollback and process death."""
 +import copy
 +import json
@@ -6159,8 +6178,51 @@ index 0000000..1cad85b
 +from shared_display_fixtures import (ROOT, QUERY, VERBOSE, SimulatedBackend, events,
 +                                     initial, requested, display)
 +
++QEMU_TRACE = json.loads((ROOT / 'tests/fixtures/shared-display/qemu-mode-switch.json').read_text())
++QEMU_QUERIES = [QEMU_TRACE['before'], QEMU_TRACE['after']]
++
 +
 +class ParsingTests(unittest.TestCase):
++    def test_native_mode_switch_retains_preferred_inactive_capability(self):
++        before, after = map(display.parse_query, QEMU_QUERIES)
++        self.assertEqual(before.topology(), after.topology())
++        self.assertEqual(before.hardware(), after.hardware())
++        original, changed = before.active[0], after.active[0]
++        self.assertEqual((original.mode, original.rate), ('1280x800', '74.99'))
++        self.assertEqual((changed.mode, changed.rate), ('1024x768', '60'))
++        self.assertEqual(original.modes, changed.modes)
++        self.assertEqual(len(changed.modes), 13)
++        self.assertEqual(changed.preferred_mode().name, '1280x800')
++        layout = display.layout_from_snapshot(before)
++        layout['outputs'][0].update(mode='1024x768', rate='60')
++        self.assertTrue(display.active_matches(layout, after))
++        for query in (QEMU_QUERIES[1].replace('   1280x800      74.99 +\n', ''),
++                      QEMU_QUERIES[1].replace('74.99 +', '75.00 +'),
++                      QEMU_QUERIES[1].replace('00ffffffffffff00', '00ffffffffffff01'),
++                      QEMU_QUERIES[1] + 'HDMI-1 connected (normal)\n   800x600 60.00\n'):
++            with self.subTest(query=query[-100:]):
++                self.assertNotEqual(before.topology(), display.parse_query(query).topology())
++
++    def test_rate_flags_allow_xrandr_spacing_without_merging_rates(self):
++        for flags in ('*+', '* +', ' *+', ' * +', '+*', '+ *'):
++            text = QUERY.replace('60.00*+ 59.94', '60.00' + flags + ' 59.94')
++            with self.subTest(flags=flags):
++                output = display.parse_query(text).find('eDP-1')
++                self.assertEqual((output.mode, output.rate), ('1920x1080', '60'))
++                self.assertEqual(output.preferred_mode().name, '1920x1080')
++                self.assertEqual(output.find_mode('1920x1080').rates, ['60', '59.94'])
++        text = QUERY.replace('60.00*+ 59.94', '60.00 + 59.94 *')
++        output = display.parse_query(text).find('eDP-1')
++        self.assertEqual((output.rate, output.preferred_mode().name), ('59.94', '1920x1080'))
++        self.assertEqual(output.find_mode('1920x1080').rates, ['60', '59.94'])
++
++    def test_malformed_rate_lines_cannot_create_partial_capabilities(self):
++        for rates in ('+ 60.00', '* 60.00', '60.00 + garbage', '60.00; echo bad',
++                      '60.00 +59.94', '60.00.59.94', '60.00 ++', '60.00 **'):
++            text = QUERY.replace('60.00+ 59.94 50.00', rates)
++            with self.subTest(rates=rates):
++                self.assertIsNone(display.parse_query(text).find('HDMI-1').find_mode('1920x1080'))
++
 +    def test_connected_disabled_output_and_edid_are_retained(self):
 +        snapshot = initial()
 +        self.assertEqual([o.name for o in snapshot.active], ['eDP-1'])
@@ -6315,6 +6377,20 @@ index 0000000..1cad85b
 +
 +
 +class BackendCommandsTests(unittest.TestCase):
++    def test_native_mode_switch_restores_exact_preferred_mode_without_fallback(self):
++        calls = []
++        def runner(args, **kwargs):
++            calls.append(args)
++            output = QEMU_QUERIES[1] if '--query' in args else (
++                'Virtual-1 connected primary 1024x768+0+0 (normal)\n' if '--verbose' in args else '')
++            return subprocess.CompletedProcess(args, 0, output, '')
++        backend = display.Backend(runner)
++        backend.restore(display.parse_query(QEMU_QUERIES[0]))
++        self.assertFalse(backend.restored_to_fallback)
++        self.assertNotIn('--auto', calls[-1])
++        self.assertEqual(calls[-1][calls[-1].index('--mode') + 1], '1280x800')
++        self.assertEqual(calls[-1][calls[-1].index('--rate') + 1], '74.99')
++
 +    def test_apply_command_is_argument_array_and_disables_only_unselected_connected_outputs(self):
 +        args = display.command_for_layout(requested()['layout'], initial())
 +        self.assertIsInstance(args, list)
