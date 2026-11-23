@@ -76,7 +76,8 @@ def embed_sparse(source, target, offset):
                 dst.write(chunk)
 
 
-def seed(root):
+def seed(root, first_product='node'):
+    require(first_product in ('node', 'vault'), 'The first product must be explicit.')
     root = plain(root)
     require(re.fullmatch(r'[A-Za-z0-9/_-]+', str(root)),
             'Use a simple fixture path for debugfs command parsing.')
@@ -120,7 +121,7 @@ def seed(root):
     require(info['virtual-size'] == DISK_BYTES and not fixture.record['boots'],
             'Refuse to replace a used fixture disk.')
     os.replace(seeded_qcow, target)
-    snapshot = checkpoint(fixture, 0, 'pre-node')
+    snapshot = checkpoint(fixture, 0, 'pre-'+first_product)
     inspected = owned_regular(root/snapshot['raw'])
     require(snapshot['gpt'] == table, 'QCOW2 readback changed GPT metadata.')
     require(span_sha(inspected, DATA_START*512, GIB) == data_sha,
@@ -132,7 +133,8 @@ def seed(root):
                 'QCOW2 readback changed a synthetic EFI sentinel.')
     baseline = dict(kind='settings-existing-partitions-baseline-v1', fixture=token,
                     disk=fixture.record['disks'][0], disk_guid=table['disk_guid'],
-                    virtual_bytes=DISK_BYTES, checkpoint='checkpoint-pre-node-disk0.json',
+                    virtual_bytes=DISK_BYTES, checkpoint=f'checkpoint-pre-{first_product}-disk0.json',
+                    first_product=first_product,
                     existing_partitions=[part_record(p) for p in table['partitions']],
                     data_partition_sha256=data_sha, data_sentinel_sha256=hashlib.sha256(actual).hexdigest(),
                     esp_identity=fat_identity(inspected, table['partitions'][0]),
@@ -207,10 +209,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['seed', 'verify'])
     parser.add_argument('--root', type=Path, required=True)
+    parser.add_argument('--first-product', choices=['node', 'vault'], default='node')
     parser.add_argument('--label')
     args = parser.parse_args()
     require(args.action == 'seed' or args.label, 'Verification requires a fresh --label.')
-    result = seed(args.root) if args.action == 'seed' else verify(args.root, args.label)
+    result = seed(args.root, args.first_product) if args.action == 'seed' else verify(args.root, args.label)
     print(json.dumps(result, indent=2))
 
 
