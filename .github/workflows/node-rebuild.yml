@@ -12,7 +12,38 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    container: debian:13
+    timeout-minutes: 20
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      QT_QPA_PLATFORM: offscreen
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Install source check dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl gnupg git patch python3 python3-yaml python3-pyside6.qtwidgets python3-pyside6.qttest qt6-svg-plugins fonts-dejavu-core util-linux xvfb xauth x11-xserver-utils
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Reconstruct and check the exact candidate source
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash rebuild/node source "$RUNNER_TEMP/candidate-source"
+          cd "$RUNNER_TEMP/candidate-source"
+          python3 -m unittest discover -s tests -p 'test_shared_display*.py' -v
+          for suite in test_display_snapshot_bridge test_device_profiles test_unified_settings test_footer_right_stack test_settings_cards_navigation test_status_centering test_install_plan test_installer_disks; do
+            python3 -m unittest discover -s tests -p "$suite.py" -v
+          done
+          python3 tests/shared_display_x11_smoke.py \
+            --module-dir "$PWD/runtime/usr/share/core-desktop" \
+            --scale-helper "$PWD/runtime/usr/local/bin/core-display-scale" \
+            --output "$RUNNER_TEMP/display-x11-evidence"
   build:
+    needs: checks
     strategy:
       fail-fast: false
       matrix:

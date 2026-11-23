@@ -46,6 +46,10 @@ bash ./build-iso.sh
 mkdir -p /out
 install -m 644 artifacts/bitcoin-core-node-development-amd64.iso /out/bitcoin-core-node-candidate-amd64.iso
 cp build/chroot.packages.live /out/filesystem.packages
+# Retain the exact corresponding native installer source with the candidate.
+test -d artifacts/calamares-source
+cp -a artifacts/calamares-source /out/calamares-source
+(cd /out/calamares-source && sha256sum --strict --check SHA256SUMS)
 (cd /out && sha256sum bitcoin-core-node-candidate-amd64.iso > SHA256SUMS)
 dpkg-query -W > /out/builder.packages
 # Mastering adds the El Torito catalog and patches the ISOLINUX boot image.

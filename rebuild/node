@@ -28,6 +28,11 @@ trap cleanup EXIT
 source "$recipe/fetch-release.sh"
 fetch_release "$NODE_VERSION" "$scratch" "$SOURCE_DIGEST" "$SOURCE_COMMIT"
 (cd "$scratch/source" && patch --forward --batch --fuzz=0 -p1 < "$recipe/node.patch")
+# The candidate remains a delta over the authenticated RC2 archive plus the
+# published RC3 patch. Git applies the candidate's executable modes as well as
+# its contents; a plain text patch would leave new runtime helpers non-executable.
+(cd "$scratch/source" && git apply --check --whitespace=nowarn "$recipe/settings-dualboot.patch")
+(cd "$scratch/source" && git apply --whitespace=nowarn "$recipe/settings-dualboot.patch")
 if [[ $operation == source ]]; then
     cp -a "$scratch/source/." "$staging/"
 else
@@ -41,6 +46,11 @@ else
         --mount "type=bind,source=$staging,target=/out" \
         "$BUILDER_IMAGE" bash /recipe/builder.sh
     (cd "$staging" && sha256sum --strict --check SHA256SUMS)
+    {
+        printf 'recipe_commit=%s\n' "$(git -C "$recipe" rev-parse HEAD)"
+        printf 'source_commit=%s\nsource_sha256=%s\n' "$SOURCE_COMMIT" "$SOURCE_DIGEST"
+        (cd "$recipe" && sha256sum inputs.env node.patch settings-dualboot.patch builder.sh node)
+    } > "$staging/build-inputs.txt"
 fi
 # Publish a complete result only; concurrent runs cannot replace one another.
 mv --no-target-directory --no-clobber -- "$staging" "$destination"
