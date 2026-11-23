@@ -467,6 +467,34 @@ class Probe:
         self.profiles.read(self.export_path,self.args.product)
         self.passed('Explicit USB device export remains valid after reboot', sha256=previous['export_sha256'])
 
+    def vault_system_configuration(self):
+        evidence = {}
+        for value in ('/etc/default/keyboard', '/etc/X11/xorg.conf.d/00-keyboard.conf'):
+            path = Path(value)
+            try:
+                info = path.stat()
+            except FileNotFoundError:
+                evidence[value] = dict(present=False)
+                continue
+            require(stat.S_ISREG(info.st_mode), 'Unexpected system keyboard configuration type: '+value)
+            item = dict(present=True, uid=info.st_uid, gid=info.st_gid,
+                        mode=oct(stat.S_IMODE(info.st_mode)), device=info.st_dev,
+                        inode=info.st_ino, bytes=info.st_size,
+                        mtime_ns=info.st_mtime_ns, ctime_ns=info.st_ctime_ns)
+            try:
+                item['sha256'] = digest(path)
+                item['content_read'] = 'succeeded'
+            except PermissionError:
+                # Calamares creates this root-owned file with mode 0600.
+                # Metadata evidence must not be described as a content hash.
+                require(value == '/etc/X11/xorg.conf.d/00-keyboard.conf'
+                        and info.st_uid == 0 and not info.st_mode & 0o022
+                        and not os.access(path, os.W_OK),
+                        'Unexpected unreadable or writable system keyboard configuration: '+value)
+                item['content_read'] = 'permission-denied'
+            evidence[value] = item
+        return evidence
+
     def run(self):
         self.context()
         previous = json.loads(self.state_path.read_text()) if self.args.phase == 'reboot' else None
@@ -475,15 +503,24 @@ class Probe:
             self.reboot_checks(previous)
         self.gui()
         if self.args.phase == 'initial':
-            original_keyboard = {p: digest(p) if Path(p).is_file() else None for p in
-                                 ('/etc/default/keyboard','/etc/X11/xorg.conf.d/00-keyboard.conf')}
+            original_keyboard = self.vault_system_configuration() if self.args.product == 'vault' else None
+            if original_keyboard is not None:
+                self.report['system_configuration_before'] = original_keyboard
+                if any(item.get('content_read') == 'permission-denied' for item in original_keyboard.values()):
+                    self.report['limitations'].append(
+                        'The normal Vault user cannot read the protected Calamares keyboard configuration. '
+                        'This run compares its observed identity, permissions, size and timestamps; '
+                        'unchanged metadata is not proof of unchanged unreadable contents.')
+                self.checkpoint()
             self.exercise_display(); exported = self.exercise_profiles()
             time_record = self.vault_time() if self.args.product == 'vault' else None
             if self.args.product == 'vault':
-                current = {p:digest(p) if Path(p).is_file() else None for p in original_keyboard}
-                require(current == original_keyboard, 'Vault input controls changed persistent system keyboard configuration.')
+                current = self.vault_system_configuration()
+                self.report['system_configuration_after'] = current
+                require(current == original_keyboard, 'Vault input controls changed observed persistent system keyboard configuration.')
                 importlib.import_module('vault_input_guard').require_ram_home()
-                self.passed('Vault input changes preserve system keyboard files and verified RAM home')
+                self.passed('Vault input leaves readable system content and observed metadata unchanged; home remains RAM',
+                            system_configuration=current)
             state = dict(boot_id=self.report['boot_id'], iso=self.report['iso'],
                          runtime_sha256=self.report['runtime_sha256'],
                          protected_runtime_files=self.report['protected_runtime_files'],
