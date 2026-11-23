@@ -2343,7 +2343,7 @@ index e4b9f9a..e8da905 100644
 +        print(f'Installer: {e}',file=sys.stderr);sys.exit(1)
 diff --git a/runtime/usr/lib/core-node-installer/install_plan.py b/runtime/usr/lib/core-node-installer/install_plan.py
 new file mode 100644
-index 0000000..e4d8c33
+index 0000000..315f7ef
 --- /dev/null
 +++ b/runtime/usr/lib/core-node-installer/install_plan.py
 @@ -0,0 +1,275 @@
@@ -2609,7 +2609,7 @@ index 0000000..e4d8c33
 +    for area,p in planned.items():
 +        now=actual[area]
 +        require(fs(now)==fs(p), 'Installed filesystem differs from the reviewed plan.')
-+        if p['new'] and p.get('label'):
++        if disk.get('table_after')=='gpt' and p['new'] and p.get('label'):
 +            require(now.get('label')==p['label'], 'A new GPT partition label differs from the reviewed plan.')
 +        if not p['new'] and p.get('mount')!='/':
 +            old=original[area]
@@ -5389,10 +5389,10 @@ index e611fa7..8cb2ebb 100644
                      # Reproduce the reported T550 clipping at 16:30 (last 0)
 diff --git a/tests/test_install_plan.py b/tests/test_install_plan.py
 new file mode 100644
-index 0000000..bf610f6
+index 0000000..3ec2aca
 --- /dev/null
 +++ b/tests/test_install_plan.py
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,266 @@
 +"""Destructive-intent boundary tests using JSON and temporary regular files only.
 +
 +No test opens, formats, mounts or unmounts a block device, or executes a boot job.
@@ -5527,6 +5527,21 @@ index 0000000..bf610f6
 +        p,d=fixture();p.update(mode='erase',firmware='bios');disk=p['disks'][0]
 +        root=disk['partitions'][2];disk['partitions']=[root];disk['jobs']=[dict(type='CreatePartitionTableJob',device='/dev/sda'),job('CreatePartitionJob',root),job('SetPartFlagsJob',root)]
 +        P.validate_plan(p,d)
++    def test_bios_msdos_readback_has_no_gpt_partition_name(self):
++        for product in ('node','vault'):
++            with self.subTest(product=product):
++                p,d=fixture(product);p.update(mode='erase',firmware='bios');disk=p['disks'][0]
++                root=disk['partitions'][2];root.update(path='/dev/sda1',label='core-'+product,uuid='')
++                disk.update(table_after='other',partitions=[root],jobs=[dict(type='CreatePartitionTableJob',device='/dev/sda'),job('CreatePartitionJob',root),job('SetPartFlagsJob',root)])
++                after=deepcopy(d);after.update(pttype='dos',ptuuid='12345678')
++                actual=oldpart(1,root['first'],root['size'],'ext4','')
++                actual.update(partuuid='12345678-01',parttype='0x83',fsuuid='new-root')
++                after['partitions']=[actual]
++                self.assertEqual(P.validate_after(p,after)['root']['path'],'/dev/sda1')
++                actual['fs']='ntfs'
++                with self.assertRaisesRegex(P.PlanError,'filesystem differs'):P.validate_after(p,after)
++                actual['fs']='ext4';disk['table_after']='gpt'
++                with self.assertRaisesRegex(P.PlanError,'GPT partition label'):P.validate_after(p,after)
 +    def test_whole_disk_uefi_erase_requires_explicit_table_job(self):
 +        p,d=created_layout();p['mode']='erase-layout'
 +        for part in p['disks'][0]['partitions']:part['new']=True
