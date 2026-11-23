@@ -1162,7 +1162,7 @@ index 0000000..b619338
 +  "limitations": "Xvfb supplies one fixed virtual mode. This record does not claim physical resolution-switch, multiple-monitor, GPU or capture-device compatibility."
 +}
 diff --git a/installer/build-calamares.sh b/installer/build-calamares.sh
-index 4dd5d6f..4e954d7 100644
+index 4dd5d6f..ad55ee5 100644
 --- a/installer/build-calamares.sh
 +++ b/installer/build-calamares.sh
 @@ -3,7 +3,7 @@
@@ -1174,7 +1174,18 @@ index 4dd5d6f..4e954d7 100644
  NODE_WORK="$NODE_ROOT/calamares-build"
  [[ ! -e "$NODE_WORK" ]] || { echo 'Please use a fresh disposable builder.' >&2; exit 1; }
  mkdir -p "$NODE_WORK" "$NODE_ROOT/artifacts/calamares-source"
-@@ -18,7 +18,7 @@ python3 "$NODE_ROOT/installer/calamares/patch_node.py" .
+@@ -11,6 +11,10 @@ mkdir -p "$NODE_WORK" "$NODE_ROOT/artifacts/calamares-source"
+ apt-get update
+ apt-get install -y --no-install-recommends build-essential dpkg-dev devscripts equivs python3
+ apt-get build-dep -y calamares=3.3.14-1
++apt-get install -y --no-install-recommends qt6-svg-plugins
++python3 "$NODE_ROOT/installer/calamares/vault/native_ui_test.py" --product node \
++    --branding "$NODE_ROOT/runtime/etc/calamares/branding/core-node" \
++    --artifacts "$NODE_ROOT/artifacts/calamares-source/native-ui"
+ cd "$NODE_WORK"
+ apt-get source calamares=3.3.14-1
+ cd calamares-3.3.14
+@@ -18,7 +22,7 @@ python3 "$NODE_ROOT/installer/calamares/patch_node.py" .
  EDITOR=true dpkg-source --commit . core-node-vault-installer
  DEBEMAIL=builder@localhost DEBFULLNAME='Bitcoin Core Node builder' \
      dch --newversion "$NODE_PACKAGE_VERSION" --distribution trixie \
@@ -1207,7 +1218,7 @@ index 4ad8882..9b8a868 100644
                  'Bitcoin Core Node will be installed on this drive. Networking is enabled. Your blockchain, wallets, settings and saved files remain on disk after restarting.',
 diff --git a/installer/calamares/vault/advanced_patch.py b/installer/calamares/vault/advanced_patch.py
 new file mode 100644
-index 0000000..00d91de
+index 0000000..5a8391b
 --- /dev/null
 +++ b/installer/calamares/vault/advanced_patch.py
 @@ -0,0 +1,91 @@
@@ -1266,7 +1277,7 @@ index 0000000..00d91de
 +    s=b.once(s,'        m_config->setInstallChoice( InstallChoice::Erase ); // CORE_OFFLINE_INTEGRATION\n        checkInstallChoiceRadioButton( InstallChoice::Erase );',
 +        '        m_config->setInstallChoice( InstallChoice::NoChoice );\n        checkInstallChoiceRadioButton( InstallChoice::NoChoice );','no automatic erase selection')
 +    s=b.once(s,'    force_uncheck(m_grp, m_somethingElseButton);',
-+        '    m_somethingElseButton->show();\n    m_somethingElseButton->setObjectName(QStringLiteral("coreInstallMethodAdvanced"));\n    m_eraseButton->setObjectName(QStringLiteral("coreInstallMethodErase"));\n    m_somethingElseButton->setEnabled(m_isEfi);\n    m_eraseButton->setIcon(QIcon());\n    m_somethingElseButton->setIcon(QIcon());\n    updateChoiceButtonsTr();', 'keep bounded manual option')
++        '    m_somethingElseButton->show();\n    m_somethingElseButton->setObjectName(QStringLiteral("coreInstallMethodAdvanced"));\n    m_eraseButton->setObjectName(QStringLiteral("coreInstallMethodErase"));\n    m_somethingElseButton->setMinimumHeight(54);\n    m_eraseButton->setMinimumHeight(54);\n    m_somethingElseButton->setEnabled(m_isEfi);\n    m_eraseButton->setIcon(QIcon());\n    m_somethingElseButton->setIcon(QIcon());\n    updateChoiceButtonsTr();', 'keep bounded manual option')
 +    s=b.replace_function(s,'ChoicePage::updateChoiceButtonsTr()',r'''    if(m_somethingElseButton) m_somethingElseButton->setText(m_isEfi
 +        ? tr("<strong>Advanced partitioning</strong><br/>Choose a partition or create a layout with reserved space.")
 +        : tr("<strong>Advanced partitioning</strong><br/>Restart this USB in UEFI mode to use this option."));
@@ -1302,6 +1313,243 @@ index 0000000..00d91de
 +        consent->setEnabled(QCoreApplication::instance()->property("coreInstallPlanValid").toBool());''')
 +    path.write_text(s)
 +    path=root/'src/calamares/CalamaresWindow.cpp';s=path.read_text().replace('Erase drive and install','Install Bitcoin Core Vault');path.write_text(s)
+diff --git a/installer/calamares/vault/native_ui_test.py b/installer/calamares/vault/native_ui_test.py
+new file mode 100644
+index 0000000..f29b084
+--- /dev/null
++++ b/installer/calamares/vault/native_ui_test.py
+@@ -0,0 +1,231 @@
++#!/usr/bin/python3
++"""Compile actual native Review/editor UI fragments against Qt, with no disk jobs.
++
++The fake core supplies synthetic reviewed plans; policy tests separately validate
++those plans. Dialog controls, their validation callbacks, sizing and Review text
++come directly from the shipping source templates, rather than a second UI copy.
++"""
++import argparse
++import os
++from pathlib import Path
++import shlex
++import subprocess
++import tempfile
++
++
++def between(text, start, end):
++    if text.count(start) != 1 or text.count(end) != 1:
++        raise RuntimeError('Native UI fixture anchors changed; please review the test.')
++    return text[text.index(start):text.index(end)]
++
++
++def run(product, branding, artifacts):
++    root = Path(__file__).resolve().parent
++    qt = next((name for name in ('Qt6Widgets', 'Qt5Widgets')
++               if subprocess.run(['pkg-config', '--exists', name]).returncode == 0), None)
++    if qt is None:
++        raise RuntimeError('Qt Widgets development files are required.')
++    source = (root / 'shared/PartitionPage.cpp').read_text()
++    helper = between(source, 'static void preparePartitionDialog(', 'static bool espCandidate(')
++    edit = between(source, '    QDialog dialog(this); dialog.setObjectName(QStringLiteral("corePartitionEditDialog"))',
++                   '    if(dialog.exec()==QDialog::Accepted && format->isChecked()) setRoot(p);')
++    create = between(source, '    QDialog dialog(this); dialog.setObjectName(QStringLiteral("coreCreateLayoutDialog"))',
++                     '    if(dialog.exec()!=QDialog::Accepted) return;')
++    review = (root / 'shared/Review.cpp.inc').read_text()
++    code = r'''
++#include <QApplication>
++#include <QDialog>
++#include <QFormLayout>
++#include <QScreen>
++#include <QCheckBox>
++#include <QDialogButtonBox>
++#include <QDoubleSpinBox>
++#include <QLabel>
++#include <QPushButton>
++#include <QHBoxLayout>
++#include <QVBoxLayout>
++#include <QRadioButton>
++#include <QStyleOptionButton>
++#include <QFile>
++#include <QVariant>
++#include <QtMath>
++#include <QJsonArray>
++#include <QJsonObject>
++#include <iostream>
++#include <stdexcept>
++static constexpr qint64 GiB=1024LL*1024*1024;
++static constexpr bool isNode=CORE_PRODUCT_NODE;
++static const int rootMinimum=isNode?32:16;
++static const int companionMinimum=isNode?16:32;
++static const char* companionName=isNode?"Vault":"Node";
++static QString sizeText(qint64 n) {return QString::number(double(n)/GiB,'f',2)+" GiB";}
++static void require(bool value,const char* message) {if(!value) throw std::runtime_error(message);}
++static QString outputDirectory;
++static QString productName;
++static QSize testScreen;
++static void capture(QWidget& widget,const QString& name) {
++    if(!outputDirectory.isEmpty()) require(widget.grab().save(outputDirectory+"/"+productName+"-"+name+"-"+
++        QString::number(testScreen.width())+"x"+QString::number(testScreen.height())+".png"),"Cannot save UI evidence");
++}
++UI_DIALOG_HELPER
++static void checkEditor(QDialog& dialog,QFormLayout& form) {
++    dialog.show(); QApplication::processEvents();
++    require(dialog.minimumSize()==dialog.maximumSize(),"Editor lacks fixed window-manager size hints");
++    require(!dialog.windowFlags().testFlag(Qt::WindowMaximizeButtonHint),"Editor offers maximize");
++    require(dialog.width()<=560 && dialog.height()<500,"Editor is not compact");
++    require(dialog.parentWidget()->window()->frameGeometry().contains(dialog.frameGeometry()),"Editor is outside its parent");
++    require(form.totalHeightForWidth(dialog.width())<=dialog.height(),"Wrapped editor content is clipped");
++    for(auto* child:dialog.findChildren<QWidget*>()) {
++        if(!child->isVisible() || child->isWindow()) continue;
++        const QRect area(child->mapTo(&dialog,QPoint()),child->size());
++        require(dialog.rect().contains(area),"Editor control extends beyond the dialog");
++    }
++    for(auto* spin:dialog.findChildren<QDoubleSpinBox*>()) {
++        QStyleOptionSpinBox option; option.initFrom(spin); option.buttonSymbols=QAbstractSpinBox::UpDownArrows;
++        const QRect up=spin->style()->subControlRect(QStyle::CC_SpinBox,&option,QStyle::SC_SpinBoxUp,spin).adjusted(3,3,-3,-3);
++        const auto pixels=spin->grab().toImage(); int visible=0;
++        for(int y=up.top();y<=up.bottom();++y) for(int x=up.left();x<=up.right();++x)
++            if(qGray(pixels.pixel(x,y))>160) ++visible;
++        require(visible>5,"Numeric spinner arrow is invisible");
++    }
++}
++struct FakePartition {
++    QString partitionPath() const {return "/dev/vda3";}
++    qint64 capacity() const {return 60*GiB;}
++};
++class EditorProbe:public QWidget {
++public:
++    void checkEdit() {
++        FakePartition partition; auto* p=&partition;
++UI_EDIT_BODY
++        require(!buttons->button(QDialogButtonBox::Ok)->isEnabled(),"Format consent was not required");
++        format->setChecked(true);
++        require(buttons->button(QDialogButtonBox::Ok)->isEnabled(),"Format consent does not enable confirmation");
++        checkEditor(dialog,*form); capture(dialog,"edit"); dialog.close();
++    }
++    void checkCreate() {
++        const qint64 availableMiB=96767; const bool hasEsp=true;
++UI_CREATE_BODY
++        require(!other->isEnabled(),"Reservation starts enabled without consent");
++        reserve->setChecked(true); other->setValue(32); root->setValue(60);
++        require(other->isEnabled() && buttons->button(QDialogButtonBox::Ok)->isEnabled(),"Valid 60+32 GiB layout is rejected");
++        root->setValue(94);
++        require(!buttons->button(QDialogButtonBox::Ok)->isEnabled(),"Oversized layout can be confirmed");
++        root->setValue(60);
++        checkEditor(dialog,*form); capture(dialog,"create"); dialog.close();
++    }
++};
++struct FakeCore {
++    QJsonObject plan; QString error;
++    QJsonObject installPlan(const void*) const {return plan;}
++    QString validateInstallPlan(const void*) const {return error;}
++};
++class ReviewProbe:public QWidget {
++public:
++    FakeCore* m_core; const void* m_config=nullptr;
++    QWidget* render() const {
++UI_REVIEW_BODY
++    }
++};
++static QJsonObject partition(const QString& path,const QString& mount,bool fresh,bool format,double size,const QString& label=QString()) {
++    return {{"path",path},{"mount",mount},{"new",fresh},{"format",format},{"size",size*GiB},{"label",label}};
++}
++static QString reviewText(FakeCore& core) {
++    ReviewProbe probe; probe.m_core=&core; QWidget* rendered=probe.render(); QString result;
++    for(auto* label:rendered->findChildren<QLabel*>()) result+=label->text()+"\n";
++    delete rendered; return result;
++}
++static void checkReview() {
++    FakeCore core;
++    core.plan={{"target","/dev/vda"},{"mode","erase"},
++        {"expected",QJsonObject{{"model","QEMU <fixture>"},{"size",64.0*GiB}}}};
++    for(bool efi:{false,true}) {
++        QJsonArray parts;
++        if(efi) parts.append(partition("/dev/vda1","/boot/efi",true,true,.5));
++        if(isNode) parts.append(partition("/dev/vda2","/boot",true,true,1));
++        parts.append(partition("/dev/vda3","/",true,true,60));
++        core.plan["disks"]=QJsonArray{QJsonObject{{"path","/dev/vda"},{"partitions",parts}}};
++        const auto text=reviewText(core);
++        require(text.contains("QEMU &lt;fixture&gt;"),"Drive identity is not HTML escaped");
++        require(text.contains("Create and format ext4 boot partition")==isNode,"Automatic boot action is missing or spurious");
++        require(!text.contains("unformatted reservation"),"Automatic /boot is described as a reservation");
++        require(text.contains("Create EFI / FAT32")==efi,"Automatic EFI action is inaccurate");
++        require(text.contains("Format ext4; install Bitcoin Core"),"Root formatting action missing");
++    }
++    core.plan["mode"]="advanced";
++    core.plan["disks"]=QJsonArray{QJsonObject{{"path","/dev/vda"},{"partitions",QJsonArray{
++        partition("/dev/vda1","/boot/efi",false,false,.5),
++        partition("/dev/vda2","",false,false,1),
++        partition("/dev/vda3","/",true,true,60),
++        partition("/dev/vda4","",true,false,32,"companion-reserved")}}}};
++    const auto advanced=reviewText(core);
++    require(advanced.contains("Reuse EFI; do not format") && advanced.contains("Keep unchanged"),"Preservation is not explicit");
++    require(advanced.count("unformatted reservation")==1 && !advanced.contains("ext4 boot partition"),"Advanced reservation action is inaccurate");
++    require(advanced.contains(isNode?"reservation for Vault":"reservation for Node"),"Companion product is mislabeled");
++    core.error="Synthetic rejected plan";
++    const auto blocked=reviewText(core);
++    require(blocked.contains(core.error) && !blocked.contains("<table"),"Rejected plan displays an actionable operation table");
++    require(!QCoreApplication::instance()->property("coreInstallPlanValid").toBool(),"Rejected plan permits confirmation");
++}
++static void checkChoices() {
++    QWidget choice; choice.setObjectName("coreInstallMethodErase"); auto* row=new QHBoxLayout(&choice);
++    auto* radio=new QRadioButton(&choice); row->addWidget(radio);
++    row->addWidget(new QLabel("<strong>Install to disk</strong><br/>Erase the selected physical disk.",&choice));
++    choice.show(); QApplication::processEvents();
++    QStyleOptionButton option; option.initFrom(radio);
++    const QRect indicator=radio->style()->subElementRect(QStyle::SE_RadioButtonIndicator,&option,radio);
++    require(indicator.width()>=20 && indicator.height()>=20,"Method indicator is too small");
++    const auto unchecked=radio->grab().toImage();
++    int visible=0;
++    for(int y=indicator.top();y<=indicator.bottom();++y) for(int x=indicator.left();x<=indicator.right();++x)
++        if(qGray(unchecked.pixel(x,y))>120) ++visible;
++    require(visible>30,"Unchecked method outline is invisible");
++    radio->setChecked(true); QApplication::processEvents();
++    const auto checked=radio->grab().toImage();
++    require(qGray(checked.pixel(indicator.center()))>200,"Checked method lacks a visible center");
++    require(unchecked!=checked,"Checked and unchecked methods look identical");
++    capture(choice,"method");
++}
++int main(int argc,char** argv) {
++    QApplication app(argc,argv); require(argc==3,"Style and output directory are required");
++    QFile style(QString::fromLocal8Bit(argv[1])); require(style.open(QIODevice::ReadOnly),"Missing stylesheet");
++    app.setStyleSheet(QString::fromUtf8(style.readAll()));
++    outputDirectory=QString::fromLocal8Bit(argv[2]); productName=isNode?"node":"vault";
++    checkReview();
++    for(const QSize size:{QSize(800,600),QSize(1280,800)}) {
++        testScreen=size; EditorProbe parent; parent.resize(size); parent.show(); QApplication::processEvents();
++        parent.checkCreate(); parent.checkEdit(); parent.close();
++        std::cout<<"PASS actual native editor controls/geometry "<<size.width()<<"x"<<size.height()<<std::endl;
++    }
++    checkChoices(); std::cout<<"PASS native Review boot/EFI/root/reservation semantics and visible method indicators"<<std::endl;
++}
++'''
++    for name, fragment in (('UI_DIALOG_HELPER', helper), ('UI_EDIT_BODY', edit),
++                           ('UI_CREATE_BODY', create), ('UI_REVIEW_BODY', review)):
++        code = code.replace(name, fragment)
++    code = code.replace('CORE_PRODUCT_NODE', 'true' if product == 'node' else 'false')
++    if product == 'node':
++        code = code.replace('Bitcoin Core Vault', 'Bitcoin Core Node')
++    style = (branding / 'stylesheet.qss').read_text()
++    for name in ('core-node', 'core-offline'):
++        style = style.replace('/etc/calamares/branding/' + name + '/', str(branding) + '/')
++    if artifacts:
++        artifacts.mkdir(parents=True, exist_ok=True)
++    with tempfile.TemporaryDirectory(prefix='core-native-ui-test-') as directory:
++        work = Path(directory)
++        (work / 'test.cpp').write_text(code)
++        (work / 'stylesheet.qss').write_text(style)
++        flags = shlex.split(subprocess.check_output(['pkg-config', '--cflags', '--libs', qt], text=True))
++        subprocess.run(['g++', '-std=c++17', '-fPIC', str(work / 'test.cpp'), '-o', str(work / 'test'), *flags], check=True)
++        subprocess.run([str(work / 'test'), str(work / 'stylesheet.qss'), str(artifacts) if artifacts else ''],
++                       check=True, timeout=35, env=dict(os.environ, QT_QPA_PLATFORM='offscreen',
++                       QT_SCALE_FACTOR='1', QT_AUTO_SCREEN_SCALE_FACTOR='0'))
++
++
++if __name__ == '__main__':
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument('--product', choices=('node', 'vault'), required=True)
++    parser.add_argument('--branding', type=Path, required=True)
++    parser.add_argument('--artifacts', type=Path)
++    args = parser.parse_args()
++    run(args.product, args.branding.resolve(), args.artifacts.resolve() if args.artifacts else None)
 diff --git a/installer/calamares/vault/patch_calamares_source.py b/installer/calamares/vault/patch_calamares_source.py
 index cbcf52c..72e0089 100644
 --- a/installer/calamares/vault/patch_calamares_source.py
@@ -1407,10 +1655,10 @@ index 0000000..fd2fdba
 +};
 diff --git a/installer/calamares/vault/shared/PartitionPage.cpp b/installer/calamares/vault/shared/PartitionPage.cpp
 new file mode 100644
-index 0000000..35ecc6a
+index 0000000..caefb69
 --- /dev/null
 +++ b/installer/calamares/vault/shared/PartitionPage.cpp
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,316 @@
 +// SPDX-License-Identifier: GPL-3.0-or-later
 +#include "PartitionPage.h"
 +#include "Config.h"
@@ -1439,6 +1687,7 @@ index 0000000..35ecc6a
 +#include <QJsonObject>
 +#include <QMessageBox>
 +#include <QPushButton>
++#include <QScreen>
 +#include <QSignalBlocker>
 +#include <QTreeWidget>
 +#include <QVBoxLayout>
@@ -1455,6 +1704,29 @@ index 0000000..35ecc6a
 +static const char* companionName = isNode ? "Vault" : "Node";
 +static const char* companionLabel = isNode ? "BitcoinCoreVaultReserved" : "BitcoinCoreNodeReserved";
 +static QString sizeText(qint64 n) { return QString::number(double(n)/GiB, 'f', 2)+QStringLiteral(" GiB"); }
++// Keep the new editors compact even when the live window manager maximizes
++// ordinary dialogs. The fixed size is calculated after stylesheet polish and
++// word wrapping, so the visible controls fit the existing 800x600 minimum.
++static void preparePartitionDialog(QDialog& dialog, QFormLayout& form)
++{
++    dialog.setWindowModality(Qt::WindowModal);
++    dialog.setWindowFlag(Qt::WindowMaximizeButtonHint, false);
++    dialog.setSizeGripEnabled(false);
++    form.setContentsMargins(20, 16, 20, 16);
++    form.setHorizontalSpacing(16);
++    form.setVerticalSpacing(12);
++    form.setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
++    dialog.ensurePolished();
++    QWidget* parent = dialog.parentWidget()->window();
++    QRect available = parent->frameGeometry();
++    if (parent->screen()) available = available.intersected(parent->screen()->availableGeometry());
++    available = available.adjusted(20, 20, -20, -20);
++    const int width = qMin(560, available.width());
++    const int wrappedHeight = form.totalHeightForWidth(width);
++    const int height = wrappedHeight >= 0 ? wrappedHeight : form.sizeHint().height();
++    dialog.setFixedSize(width, height);
++    dialog.move(available.center() - dialog.rect().center());
++}
 +static bool espCandidate(const Partition* p)
 +{
 +    return p && !isPartitionFreeSpace(p) && !isPartitionNew(p)
@@ -1627,6 +1899,7 @@ index 0000000..35ecc6a
 +    connect(format,&QCheckBox::toggled,buttons->button(QDialogButtonBox::Ok),&QPushButton::setEnabled);
 +    connect(buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept);
 +    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
++    preparePartitionDialog(dialog, *form);
 +    if(dialog.exec()==QDialog::Accepted && format->isChecked()) setRoot(p);
 +}
 +void PartitionPage::createLayout()
@@ -1677,6 +1950,7 @@ index 0000000..35ecc6a
 +    connect(root,QOverload<double>::of(&QDoubleSpinBox::valueChanged),&dialog,[=](double){validate();});
 +    connect(other,QOverload<double>::of(&QDoubleSpinBox::valueChanged),&dialog,[=](double){validate();});
 +    connect(buttons,&QDialogButtonBox::accepted,&dialog,&QDialog::accept); connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject); validate();
++    preparePartitionDialog(dialog, *form);
 +    if(dialog.exec()!=QDialog::Accepted) return;
 +    qint64 cursor=first;
 +    auto add=[&](qint64 mib,FileSystem::Type fs,const QString& mount,const QString& label,PartitionTable::Flags flags) {
@@ -1811,10 +2085,10 @@ index 0000000..6ad1f5d
 +}
 diff --git a/installer/calamares/vault/shared/Review.cpp.inc b/installer/calamares/vault/shared/Review.cpp.inc
 new file mode 100644
-index 0000000..7134989
+index 0000000..735f689
 --- /dev/null
 +++ b/installer/calamares/vault/shared/Review.cpp.inc
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,33 @@
 +    auto* widget=new QWidget; auto* layout=new QVBoxLayout(widget);
 +    layout->setContentsMargins(0,0,0,0);layout->setSpacing(8);
 +    const auto plan=m_core->installPlan(m_config);
@@ -1836,7 +2110,8 @@ index 0000000..7134989
 +            const auto p=entry.toObject();QString action;
 +            if(p.value("mount").toString()==QStringLiteral("/")) action=tr("Format ext4; install Bitcoin Core Vault");
 +            else if(p.value("mount").toString()==QStringLiteral("/boot/efi")) action=p.value("new").toBool()?tr("Create EFI / FAT32"):tr("Reuse EFI; do not format");
-+            else if(p.value("new").toBool()) action=tr("Clear old signatures; reserve unformatted: %1").arg(p.value("label").toString());
++            else if(p.value("mount").toString()==QStringLiteral("/boot")) action=tr("Create and format ext4 boot partition");
++            else if(p.value("new").toBool()) action=tr("Create unformatted reservation for %1").arg(CORE_PRODUCT_NODE?tr("Vault"):tr("Node"));
 +            else action=tr("Keep unchanged");
 +            QString name=p.value("path").toString();if(name.isEmpty()) name=p.value("original_path").toString();if(name.isEmpty()) name=tr("New partition");
 +            rows+=QStringLiteral("<tr><td>%1 — %2 GiB</td><td>%3</td><td>%4</td></tr>")
@@ -1872,6 +2147,97 @@ index 9af9217..1c9fbea 100644
  apt-mark hold calamares
  test -s /etc/calamares/branding/core-node/stylesheet.qss
  test -s /etc/calamares/modules/finished.conf
+diff --git a/runtime/etc/calamares/branding/core-node/spin-down.svg b/runtime/etc/calamares/branding/core-node/spin-down.svg
+new file mode 100644
+index 0000000..7ab44bd
+--- /dev/null
++++ b/runtime/etc/calamares/branding/core-node/spin-down.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="10" height="8" viewBox="0 0 10 8"><path d="M1 2 L5 6 L9 2" fill="none" stroke="#d8d8d8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+diff --git a/runtime/etc/calamares/branding/core-node/spin-up.svg b/runtime/etc/calamares/branding/core-node/spin-up.svg
+new file mode 100644
+index 0000000..314787d
+--- /dev/null
++++ b/runtime/etc/calamares/branding/core-node/spin-up.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" width="10" height="8" viewBox="0 0 10 8"><path d="M1 6 L5 2 L9 6" fill="none" stroke="#d8d8d8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+diff --git a/runtime/etc/calamares/branding/core-node/stylesheet.qss b/runtime/etc/calamares/branding/core-node/stylesheet.qss
+index 87e07c3..108b2aa 100644
+--- a/runtime/etc/calamares/branding/core-node/stylesheet.qss
++++ b/runtime/etc/calamares/branding/core-node/stylesheet.qss
+@@ -160,3 +160,72 @@ QWidget#coreVaultWizardSurface[coreVaultCompact="true"] QLabel#coreOfflineEraseW
+ }
+ QWidget#coreVaultWizardSurface[coreVaultCompact="true"] QLabel#summaryItemTitle,
+ QWidget#coreVaultWizardSurface[coreVaultCompact="true"] QLabel#summaryItemBody { font-size: 13px; }
++
++/* Native partition choices/editors: retain the established installer palette. */
++QWidget#coreInstallMethodErase QRadioButton,
++QWidget#coreInstallMethodAdvanced QRadioButton { padding: 10px 2px; }
++QWidget#coreInstallMethodErase QRadioButton::indicator,
++QWidget#coreInstallMethodAdvanced QRadioButton::indicator {
++  width: 20px; height: 20px; border: 1px solid #b8b8b8;
++  border-radius: 11px; background: #111111;
++}
++QWidget#coreInstallMethodErase QRadioButton::indicator:checked,
++QWidget#coreInstallMethodAdvanced QRadioButton::indicator:checked {
++  border-color: #ffffff;
++  background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
++    stop:0 #ffffff, stop:0.52 #ffffff, stop:0.58 #111111, stop:1 #111111);
++}
++QWidget#coreInstallMethodErase QRadioButton::indicator:hover,
++QWidget#coreInstallMethodAdvanced QRadioButton::indicator:hover { border-color: #ffffff; }
++QWidget#coreInstallMethodErase QRadioButton::indicator:focus,
++QWidget#coreInstallMethodAdvanced QRadioButton::indicator:focus { border: 2px solid #f7931a; }
++QWidget#coreInstallMethodErase QRadioButton::indicator:disabled,
++QWidget#coreInstallMethodAdvanced QRadioButton::indicator:disabled { border-color: #555555; background: #171717; }
++QDoubleSpinBox#coreRootSizeGiB,
++QDoubleSpinBox#coreReservedSizeGiB {
++  background: #121212; color: #ffffff; border: 1px solid #4a4a4a;
++  border-radius: 6px; padding: 6px 24px 6px 6px; min-height: 26px;
++  selection-background-color: #343434; selection-color: #ffffff;
++}
++QDoubleSpinBox#coreRootSizeGiB:focus,
++QDoubleSpinBox#coreReservedSizeGiB:focus { border: 2px solid #f7931a; }
++QDoubleSpinBox#coreRootSizeGiB:disabled,
++QDoubleSpinBox#coreReservedSizeGiB:disabled { color: #777777; border-color: #303030; background: #151515; }
++QCheckBox#coreReserveCompanion,
++QCheckBox#coreFormatRootConsent { color: #ffffff; spacing: 10px; padding: 6px 0px; }
++QCheckBox#coreReserveCompanion::indicator,
++QCheckBox#coreFormatRootConsent::indicator {
++  width: 20px; height: 20px; border: 1px solid #888888; background: #111111;
++}
++QCheckBox#coreReserveCompanion::indicator:checked,
++QCheckBox#coreFormatRootConsent::indicator:checked {
++  image: url(/etc/calamares/branding/core-node/checkmark.png);
++  background: #303030; border: 1px solid #b8b8b8;
++}
++QCheckBox#coreReserveCompanion::indicator:hover,
++QCheckBox#coreFormatRootConsent::indicator:hover { border-color: #ffffff; }
++QCheckBox#coreReserveCompanion::indicator:focus,
++QCheckBox#coreFormatRootConsent::indicator:focus { border: 2px solid #f7931a; }
++
++QDoubleSpinBox#coreRootSizeGiB::up-button,
++QDoubleSpinBox#coreReservedSizeGiB::up-button {
++  subcontrol-origin: border; subcontrol-position: top right; width: 18px;
++  background: #252525; border-top-right-radius: 5px; border: 1px solid #4a4a4a;
++}
++QDoubleSpinBox#coreRootSizeGiB::down-button,
++QDoubleSpinBox#coreReservedSizeGiB::down-button {
++  subcontrol-origin: border; subcontrol-position: bottom right; width: 18px;
++  background: #252525; border-bottom-right-radius: 5px; border: 1px solid #4a4a4a;
++}
++QDoubleSpinBox#coreRootSizeGiB::up-button:disabled,
++QDoubleSpinBox#coreRootSizeGiB::down-button:disabled,
++QDoubleSpinBox#coreReservedSizeGiB::up-button:disabled,
++QDoubleSpinBox#coreReservedSizeGiB::down-button:disabled { background: #303030; }
++QDoubleSpinBox#coreRootSizeGiB::up-arrow,
++QDoubleSpinBox#coreReservedSizeGiB::up-arrow {
++  image: url(/etc/calamares/branding/core-node/spin-up.svg); width: 10px; height: 8px;
++}
++QDoubleSpinBox#coreRootSizeGiB::down-arrow,
++QDoubleSpinBox#coreReservedSizeGiB::down-arrow {
++  image: url(/etc/calamares/branding/core-node/spin-down.svg); width: 10px; height: 8px;
++}
 diff --git a/runtime/etc/calamares/modules/bootloader.conf b/runtime/etc/calamares/modules/bootloader.conf
 index a1d1f60..abaa519 100644
 --- a/runtime/etc/calamares/modules/bootloader.conf
@@ -2343,10 +2709,10 @@ index e4b9f9a..e8da905 100644
 +        print(f'Installer: {e}',file=sys.stderr);sys.exit(1)
 diff --git a/runtime/usr/lib/core-node-installer/install_plan.py b/runtime/usr/lib/core-node-installer/install_plan.py
 new file mode 100644
-index 0000000..315f7ef
+index 0000000..f563905
 --- /dev/null
 +++ b/runtime/usr/lib/core-node-installer/install_plan.py
-@@ -0,0 +1,275 @@
+@@ -0,0 +1,283 @@
 +#!/usr/bin/python3
 +"""Pure, fail-closed validation of the native installer's planned disk operations.
 +
@@ -2421,6 +2787,13 @@ index 0000000..315f7ef
 +    root = roots[0]
 +    require(root.get('format') is True and fs(root) == 'ext4', 'The selected root must be explicitly formatted as ext4.')
 +    require(integer(root.get('size'), 'root size') >= MIN_ROOT[product], 'The selected root partition is too small.')
++    boot = [p for p in parts if p.get('mount') == '/boot']
++    require(not boot or (product == 'node' and mode == 'erase' and len(boot) == 1),
++            'A separate /boot is supported only by the automatic whole-disk Node layout.')
++    if boot:
++        require(boot[0].get('new') is True and boot[0].get('format') is True
++                and fs(boot[0]) == 'ext4' and integer(boot[0].get('size'), 'boot size') == GIB,
++                'Automatic Node /boot must be a new, explicitly formatted 1 GiB ext4 partition.')
 +    root_span = span(root)
 +    before = current.get('partitions', [])
 +    require(isinstance(before, list), 'The original partition table could not be verified.')
@@ -2448,7 +2821,8 @@ index 0000000..315f7ef
 +                    'An existing partition path or identity differs from the original disk.')
 +        require(start >= MIB and end <= current['size'], 'A planned partition is outside the selected disk.')
 +        require(not any(overlaps((start,end), other) for other in planned_spans[i+1:]), 'Planned partitions overlap.')
-+        require(p.get('mount') in ('', '/', '/boot/efi'), 'Only root and EFI mount assignments are supported.')
++        require(p.get('mount') in ('', '/', '/boot/efi') or (boot and p is boot[0]),
++                'Only root, EFI and the validated automatic Node /boot mount assignments are supported.')
 +        require(type(p.get('format')) is bool and type(p.get('new')) is bool, 'Invalid format state.')
 +    for job in jobs:
 +        require(isinstance(job, dict) and job.get('type') in JOBS,
@@ -5389,10 +5763,10 @@ index e611fa7..8cb2ebb 100644
                      # Reproduce the reported T550 clipping at 16:30 (last 0)
 diff --git a/tests/test_install_plan.py b/tests/test_install_plan.py
 new file mode 100644
-index 0000000..3ec2aca
+index 0000000..0b19771
 --- /dev/null
 +++ b/tests/test_install_plan.py
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,305 @@
 +"""Destructive-intent boundary tests using JSON and temporary regular files only.
 +
 +No test opens, formats, mounts or unmounts a block device, or executes a boot job.
@@ -5438,6 +5812,20 @@ index 0000000..3ec2aca
 +    reserve=planned(oldpart(4,root['first']+root['size'],32*GiB,'',P.RESERVED_LABEL[other]),new=True)
 +    reserve['uuid']='';disk['partitions'].append(reserve)
 +    disk['jobs']=[job('CreatePartitionJob',root),job('CreatePartitionJob',reserve)]
++    return plan,identity
++
++def automatic_node(firmware='efi'):
++    plan,identity=fixture();identity.update(size=64*GiB,pttype='',ptuuid='',partitions=[])
++    plan.update(mode='erase',firmware=firmware,expected=deepcopy(identity))
++    disk=plan['disks'][0];parts=[];first=MiB
++    if firmware=='efi':
++        esp=planned(oldpart(1,first,512*MiB,'fat32','EFI'),'/boot/efi',True,True)
++        parts.append(esp);first+=512*MiB
++    boot=planned(oldpart(len(parts)+1,first,GiB,'ext4','boot'),'/boot',True,True)
++    parts.append(boot);first+=GiB
++    parts.append(planned(oldpart(len(parts)+1,first,identity['size']-first-MiB,'ext4','core-node'),'/',True,True))
++    disk.update(table_before='none',table_after='gpt' if firmware=='efi' else 'other',partitions=parts,
++                jobs=[dict(type='CreatePartitionTableJob',device='/dev/sda')]+[job('CreatePartitionJob',p) for p in parts])
 +    return plan,identity
 +
 +class PlanTests(unittest.TestCase):
@@ -5527,6 +5915,31 @@ index 0000000..3ec2aca
 +        p,d=fixture();p.update(mode='erase',firmware='bios');disk=p['disks'][0]
 +        root=disk['partitions'][2];disk['partitions']=[root];disk['jobs']=[dict(type='CreatePartitionTableJob',device='/dev/sda'),job('CreatePartitionJob',root),job('SetPartFlagsJob',root)]
 +        P.validate_plan(p,d)
++    def test_existing_automatic_node_boot_partition_is_supported_in_both_firmwares(self):
++        for firmware in ('efi','bios'):
++            with self.subTest(firmware=firmware):
++                plan,identity=automatic_node(firmware);P.validate_plan(plan,identity)
++                after=deepcopy(identity);after['pttype']='gpt' if firmware=='efi' else 'dos';after['ptuuid']='new-table'
++                after['partitions']=[oldpart(i,p['first'],p['size'],p['fs'],p['label'] if firmware=='efi' else '')
++                                     for i,p in enumerate(plan['disks'][0]['partitions'],1)]
++                P.validate_after(plan,after)
++    def test_separate_boot_is_not_enabled_for_advanced_or_vault(self):
++        for field,value in [('mode','advanced'),('mode','erase-layout'),('product','vault')]:
++            with self.subTest(field=field,value=value):
++                plan,identity=automatic_node();plan[field]=value
++                with self.assertRaisesRegex(P.PlanError,'separate /boot'):P.validate_plan(plan,identity)
++    def test_automatic_boot_requires_exact_new_formatted_ext4_layout(self):
++        for field,value in [('new',False),('format',False),('fs','fat32'),('size',512*MiB),('mount','/home')]:
++            with self.subTest(field=field,value=value):
++                plan,identity=automatic_node();plan['disks'][0]['partitions'][1][field]=value
++                with self.assertRaises(P.PlanError):P.validate_plan(plan,identity)
++    def test_automatic_boot_cannot_be_duplicated_or_target_another_disk(self):
++        for mutation in ('duplicate','device'):
++            with self.subTest(mutation=mutation):
++                plan,identity=automatic_node();disk=plan['disks'][0]
++                if mutation=='duplicate':disk['partitions'].append(deepcopy(disk['partitions'][1]))
++                else:disk['partitions'][1]['device']='/dev/sdb'
++                with self.assertRaises(P.PlanError):P.validate_plan(plan,identity)
 +    def test_bios_msdos_readback_has_no_gpt_partition_name(self):
 +        for product in ('node','vault'):
 +            with self.subTest(product=product):
