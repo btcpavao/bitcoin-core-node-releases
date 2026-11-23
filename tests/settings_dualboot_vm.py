@@ -256,7 +256,8 @@ def create(args):
     for i, size in enumerate(sizes):
         name = f'disk-{i}.qcow2'
         run(['qemu-img','create','-f','qcow2',str(root/name),f'{size}G'],capture_output=True)
-        record['disks'].append({'file':name,'gib':size,'serial':f'OWNED_SETTINGS_DISK_{i}'})
+        # Virtio-blk exposes at most 20 serial bytes; keep the index visible.
+        record['disks'].append({'file':name,'gib':size,'serial':f'QA_SETTINGS_DISK_{i}'})
     if args.firmware == 'uefi':
         code = plain('/usr/share/OVMF/OVMF_CODE_4M.fd')
         variables = plain('/usr/share/OVMF/OVMF_VARS_4M.fd')

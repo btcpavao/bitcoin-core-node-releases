@@ -8,6 +8,10 @@ debugfs, sfdisk and hashes without mounting a filesystem.
 Fixture preparation is not installation evidence. Use the exact reviewed ISO
 path and SHA256, obtain an assigned VM slot, and keep at most two VMs running.
 No prepared fixture should be started automatically by a seeding helper.
+Internal fixture serials are `QA_SETTINGS_DISK_0` and `QA_SETTINGS_DISK_1`.
+They fit within virtio-blk's 20-byte identity field and retain the disk index.
+The one-time `serial-adjustment.json` records migration of the five unbooted
+fixtures, with original changed JSON retained and disk/media bytes preserved.
 
 ## Same-disk reciprocal installation
 
@@ -42,11 +46,38 @@ python3 settings_seed_partition_fixture.py verify \
   --label after-vault
 ```
 
-Before booting the second installer, checkpoint the first product's completed
-root and ESP files. Compare the entire first root partition after the second
-installation, as well as its product EFI loader/configuration. The original
-seed baseline covers the preexisting synthetic data and foreign EFI files;
-it does not include an operating system that was installed later.
+Before booting the second installer, capture the first product's completed root
+and EFI files from that existing readback. The example partition number below
+must be replaced if Review/readback shows a different root partition:
+
+```bash
+python3 settings_first_os_preservation.py capture \
+  --root /home/pavao/iso-settings-dualboot-20261123/qa-vault-first \
+  --readback preservation-after-vault.json --product vault --partition 3
+```
+
+After the second installation, stop the VM and run the seed preservation helper
+with `--label after-node` to produce a second readback. Compare the first root
+and its EFI vendor directory using those existing files:
+
+```bash
+python3 settings_first_os_preservation.py compare \
+  --root /home/pavao/iso-settings-dualboot-20261123/qa-vault-first \
+  --readback preservation-after-node.json --product vault --partition 3 \
+  --label after-node
+```
+
+This hashes every byte of the explicitly selected first root and compares the
+complete first product EFI vendor inventory plus its installed-product record.
+The helper verifies fresh GPT/EFI readback, root/ESP UUIDs, exact fixture serial,
+and the product metadata binding. It permits the other product's added files.
+It does not convert another image or hash the entire 96 GiB disk. Historical raw
+stat checks are provenance checks, not a fresh digest of that old file; the byte
+comparison uses the captured root digest and the newly computed root digest.
+
+The original seed baseline covers the preexisting synthetic data and foreign
+EFI files; it does not include an operating system installed later. For Node
+first, use the corresponding `qa-node-first` readbacks and `--product node`.
 
 The second installer must identify the verified matching reservation. Open
 Edit, explicitly enable ext4 formatting at `/`, preserve the same ESP without
