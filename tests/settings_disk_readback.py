@@ -197,8 +197,8 @@ def efi_inventory(path, table):
 def checkpoint(fixture, index, label):
     require(LABEL.fullmatch(label), 'Invalid checkpoint label.')
     disk, image, info = disk_info(fixture, index)
-    target = fixture.root / f'checkpoint-{label}-disk{index}.raw'
-    report = target.with_suffix('.json')
+    target = plain(fixture.root / f'checkpoint-{label}-disk{index}.raw')
+    report = plain(target.with_suffix('.json'))
     require(not target.exists() and not report.exists(), 'Use a new checkpoint label.')
     estimate = image.stat().st_blocks * 512 + 512 * 1024**2
     require(shutil.disk_usage(fixture.root).free >= estimate, 'Insufficient free space for a sparse checkpoint.')
@@ -228,7 +228,7 @@ def compare(fixture, index, checkpoint_name, label):
     require(raw.parent == fixture.root and raw.stat().st_size == info['virtual-size'] == baseline['virtual_bytes'],
             'Checkpoint disk size changed.')
     require(whole_sha(raw) == baseline['sha256'], 'The retained checkpoint bytes changed.')
-    output = fixture.root / f'comparison-{label}-disk{index}.json'
+    output = plain(fixture.root / f'comparison-{label}-disk{index}.json')
     require(not output.exists(), 'Use a new comparison label.')
     command = ['qemu-img', 'compare', '-f', 'raw', '-F', 'qcow2', str(raw), str(image)]
     value = subprocess.run(command, capture_output=True, text=True, timeout=600)

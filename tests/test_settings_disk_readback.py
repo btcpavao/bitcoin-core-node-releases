@@ -3,7 +3,9 @@ from pathlib import Path
 import struct
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 import uuid
 import zlib
 
@@ -82,6 +84,22 @@ class ReadbackTests(unittest.TestCase):
                 return True
         with self.assertRaisesRegex(RuntimeError, 'Stop the owned'):
             readback.disk_info(Active(), 0)
+
+    def test_checkpoint_rejects_dangling_output_symlink_before_writer(self):
+        fixture = SimpleNamespace(root=self.root)
+        info = ({}, self.image, {'virtual-size': self.image.stat().st_size})
+        for suffix in ('raw', 'json'):
+            with self.subTest(suffix=suffix):
+                label = 'dangling-'+suffix
+                output = self.root/f'checkpoint-{label}-disk0.{suffix}'
+                outside = self.root/f'missing-{suffix}'
+                output.symlink_to(outside)
+                with mock.patch.object(readback, 'disk_info', return_value=info), \
+                     mock.patch.object(readback, 'run') as writer:
+                    with self.assertRaisesRegex(RuntimeError, 'Symlinked'):
+                        readback.checkpoint(fixture, 0, label)
+                    writer.assert_not_called()
+                self.assertFalse(outside.exists())
 
     def test_process_output_is_bounded_and_binary_preserved(self):
         value = readback.bounded_output([sys.executable, '-c', 'import sys;sys.stdout.buffer.write(bytes(range(256)))'], 256)
