@@ -135,6 +135,17 @@ class Fixture:
                                  'ticks': (proc/'stat').read_text().split(') ',1)[1].split()[19]}
         self.record.setdefault('boots', []).append({'number': phase, 'iso': image_record, 'installed':installed or not iso,'time': time.time()})
         self.save()
+        # exec() can finish before QEMU binds/listens on its monitor socket.
+        # Return only once the exact recorded process answers a QMP handshake.
+        deadline = time.monotonic()+10
+        while True:
+            require(process.poll() is None, log_path.read_text())
+            try:
+                self.qmp('query-status')
+                break
+            except (FileNotFoundError, ConnectionRefusedError):
+                require(time.monotonic() < deadline, 'QEMU monitor did not become ready.')
+                time.sleep(.05)
         return {'pid': process.pid, 'boot': phase, 'iso': image_record}
 
     def capture(self, label='screen'):
