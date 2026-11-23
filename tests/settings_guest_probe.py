@@ -341,7 +341,7 @@ class Probe:
 
     def picker_click(self, button, path):
         from PySide6.QtCore import QTimer
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QLineEdit
         pending = {'done':False,'error':None,'picker':None}
         timer = QTimer(); timer.setInterval(100)
         deadline = time.monotonic()+12
@@ -362,7 +362,9 @@ class Probe:
                     picker.setDirectory(str(path.parent))
                     return
                 if picker.selectedFiles() != [str(path)]:
-                    picker.selectFile(str(path))
+                    editor = picker.findChild(QLineEdit, 'fileNameEdit')
+                    require(editor is not None, 'The actual file chooser has no filename editor.')
+                    editor.setText(path.name)
                     return
                 self.capture(picker, 'usb-picker-'+('save' if 'Export' in button.text() else 'open'))
                 picker.accept()
