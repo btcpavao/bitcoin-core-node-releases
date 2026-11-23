@@ -1928,6 +1928,17 @@ index feef3f4..0f97c49 100644
        - umount
    - show:
        - finished
+diff --git a/runtime/etc/default/grub.d/core-node.cfg b/runtime/etc/default/grub.d/core-node.cfg
+index 97dbe86..a9e5d2b 100644
+--- a/runtime/etc/default/grub.d/core-node.cfg
++++ b/runtime/etc/default/grub.d/core-node.cfg
+@@ -1,3 +1,6 @@
+ # Vault-derived quiet graphical boot for the installed Node.
+ GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3 systemd.show_status=false rd.systemd.show_status=false vt.global_cursor_default=0"
+ GRUB_GFXPAYLOAD_LINUX=keep
++
++# Peer EFI entries are generated from verified records; never mount another OS.
++GRUB_DISABLE_OS_PROBER=true
 diff --git a/runtime/usr/lib/core-node-installer/boot_finalize.py b/runtime/usr/lib/core-node-installer/boot_finalize.py
 new file mode 100644
 index 0000000..3f7d090
