@@ -28,6 +28,8 @@ trap cleanup EXIT
 source "$recipe/fetch-release.sh"
 fetch_release "$NODE_VERSION" "$scratch" "$SOURCE_DIGEST" "$SOURCE_COMMIT"
 (cd "$scratch/source" && patch --forward --batch --fuzz=0 -p1 < "$recipe/node.patch")
+# Add an opt-in manual layout without modifying the authenticated RC2 archive.
+python3 "$recipe/enable-manual-partitioning.py" "$scratch/source"
 if [[ $operation == source ]]; then
     cp -a "$scratch/source/." "$staging/"
 else
