@@ -164,9 +164,35 @@ class Probe:
                       Path('/usr/share/polkit-1/actions/org.bitcoin-core-vault.time.policy'),
                       Path('/etc/polkit-1/rules.d/49-core-vault-time.rules')]
             importlib.import_module('vault_input_guard').require_ram_home()
-        hashes = {str(path): digest(path) for path in files}
+        hashes, protected = {}, []
+        for path in files:
+            try:
+                hashes[str(path)] = digest(path)
+            except PermissionError:
+                # Debian protects rules.d from the ordinary desktop user. Do
+                # not weaken that policy just to hash its contents in this QA.
+                require(product == 'vault' and str(path) == '/etc/polkit-1/rules.d/49-core-vault-time.rules',
+                        'An ordinary Settings runtime file is unexpectedly unreadable: '+str(path))
+                item = dict(path=str(path), content_read='permission-denied')
+                for name, target in (('file_stat', path), ('directory_stat', path.parent)):
+                    try:
+                        info = target.stat()
+                    except PermissionError:
+                        item[name] = 'permission-denied'
+                    else:
+                        item[name] = dict(uid=info.st_uid, gid=info.st_gid,
+                                          mode=oct(stat.S_IMODE(info.st_mode)))
+                protected.append(item)
+        self.report['protected_runtime_files'] = protected
+        if protected:
+            self.report['limitations'].append(
+                'The normal desktop user cannot hash the protected Polkit time rule. '
+                'Its contents require host-side image/manifest verification; '
+                'this probe still exercises the real authorized helper.')
         if previous is not None:
             require(hashes == previous['runtime_sha256'], 'Installed Settings payload changed between acceptance boots.')
+            require(protected == previous.get('protected_runtime_files', []),
+                    'Protected Settings runtime access or observed metadata changed between acceptance boots.')
         self.report['runtime_sha256'] = hashes
         self.backend = self.display.Backend()
         self.initial_snapshot = self.backend.probe(transforms=True)
@@ -460,6 +486,7 @@ class Probe:
                 self.passed('Vault input changes preserve system keyboard files and verified RAM home')
             state = dict(boot_id=self.report['boot_id'], iso=self.report['iso'],
                          runtime_sha256=self.report['runtime_sha256'],
+                         protected_runtime_files=self.report['protected_runtime_files'],
                          export_sha256=digest(self.export_path), input_preferences=self.inputs.load(),
                          display_profile=self.display.load_saved(self.args.product), time=time_record)
             write_json(self.state_path, state)
