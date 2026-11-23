@@ -356,8 +356,14 @@ class Probe:
                 picker = dialogs[-1]
                 if pending['picker'] is not picker:
                     pending['picker'] = picker
-                    picker.setDirectory(str(path.parent)); picker.selectFile(path.name)
-                    return  # Allow the real asynchronous directory model to load.
+                    picker.setDirectory(str(path.parent))
+                    return  # The real asynchronous model can reset the filename.
+                if Path(picker.directory().absolutePath()) != path.parent:
+                    picker.setDirectory(str(path.parent))
+                    return
+                if picker.selectedFiles() != [str(path)]:
+                    picker.selectFile(str(path))
+                    return
                 self.capture(picker, 'usb-picker-'+('save' if 'Export' in button.text() else 'open'))
                 picker.accept()
                 if not picker.isVisible():
