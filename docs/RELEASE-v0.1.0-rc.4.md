@@ -13,7 +13,7 @@ Debian 13 for amd64 with Bitcoin Core 32.1. This release publishes the exact loc
 
 ## Verification and PGP status
 
-**PGP signatures are pending at initial publication.** `SHA256SUMS` identifies the release assets, and `btcpavao-pgp.asc` is the existing public signing key. A checksum match alone does not authenticate the publisher. The owner will sign the frozen manifest and ISO; signature links will become available after those signatures have been verified and uploaded.
+**PGP signatures are published and verified.** The publisher signed the frozen `SHA256SUMS` manifest and the exact ISO on 26 November 2026. Both detached signatures were independently verified against the established public fingerprint before upload. Download `SHA256SUMS.asc`, the optional direct ISO signature and `btcpavao-pgp.asc` from this release. The ISO and original checksum manifest are unchanged.
 
 Expected publisher fingerprint: `787A 2AAF B0D1 19CA 0522 B2A5 B9C9 9AF8 5788 96D0`.
 
@@ -23,7 +23,7 @@ The exact ISO is `bitcoin-core-node-v0.1.0-rc.4-core32.1-amd64.iso`. To compare 
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
-After signatures are available and the publisher fingerprint is confirmed independently:
+After confirming the publisher fingerprint independently:
 
 ```sh
 gpg --import btcpavao-pgp.asc
@@ -32,7 +32,7 @@ gpg --verify SHA256SUMS.asc SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
-The optional direct ISO signature will be named `bitcoin-core-node-v0.1.0-rc.4-core32.1-amd64.iso.asc`.
+The optional direct ISO signature is named `bitcoin-core-node-v0.1.0-rc.4-core32.1-amd64.iso.asc`.
 
 ## Source and evidence
 

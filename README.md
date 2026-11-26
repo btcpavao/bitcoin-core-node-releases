@@ -2,7 +2,7 @@
 
 **Bitcoin Core Node v0.1.0-rc.4** · [Download the approved ISO and matching source](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.4) · [Release notes and evidence](docs/RELEASE-v0.1.0-rc.4.md)
 
-**PGP signature pending.** The exact owner-approved ISO is published with its checksum, matching source and build provenance. The publisher's signature has not yet been uploaded; the checksum alone does not authenticate the publisher. Signed RC3 remains available as a historical release.
+**Signed release candidate.** The exact owner-approved ISO is published with signed checksums, a separate ISO signature, matching source and build provenance. Both signatures were verified against the established publisher fingerprint before publication. Signed RC3 remains available as a historical release.
 
 An independently developed online Bitcoin Core Node environment for amd64 Intel/AMD computers, based on Debian GNU/Linux 13 and the official Bitcoin Core 32.1 binaries. Designed to pair with a separate offline signer such as [Bitcoin Core Vault](https://github.com/btcpavao/bitcoin-core-vault-releases).
 
@@ -19,7 +19,7 @@ The project owner approved the exact image on 26 November 2026. It was not rebui
 
 ## Check the download
 
-Download the ISO and `SHA256SUMS` from the [same release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.4), then run `sha256sum --check --ignore-missing SHA256SUMS` in their directory. This checks integrity only while the PGP signature is pending. The release notes describe signature verification once the owner's signature is available.
+Download the ISO, `SHA256SUMS`, `SHA256SUMS.asc` and `btcpavao-pgp.asc` from the [same release](https://github.com/btcpavao/bitcoin-core-node-releases/releases/tag/v0.1.0-rc.4). Confirm the full publisher fingerprint independently, verify `SHA256SUMS.asc` against `SHA256SUMS`, then run `sha256sum --check --ignore-missing SHA256SUMS` in their directory. The [release notes](docs/RELEASE-v0.1.0-rc.4.md#verification-and-pgp-status) include the commands. A separate detached ISO signature is also available.
 
 The source archive, `SOURCE-COMMIT.txt`, `SOURCE-PROVENANCE.json`, recipe archive and matching Calamares corresponding source are attached to the release. The recipe preserves the actual derivation scripts and inputs; it does not establish a self-contained public fresh rebuild of rc.4.
 
