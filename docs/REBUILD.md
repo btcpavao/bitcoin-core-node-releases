@@ -1,5 +1,7 @@
 # Build and compare a Bitcoin Core Node ISO
 
+> This guide and the existing rebuild workflow describe historical RC3. For current RC4 source, derivation inputs and verification scope, see [the RC4 release record](RELEASE-v0.1.0-rc.4.md). RC3 reproduction results do not establish reproduction of RC4.
+
 ## Bitcoin Core Node v0.1.0-rc.3
 
 The signed release contains the ThinkPad T550-tested ISO (1,288,060,928 bytes). Its SHA-256 is `39e9b5b76dce7d9854989365d389caa50d55f0b0c5654602eafc7e12904b6675`. The recipe authenticates the historical RC2 source archive, applies the public patch and pins the Debian and security repositories to 19 November 2026 at 09:30 UTC. Installed systems use the normal Debian update repositories.
